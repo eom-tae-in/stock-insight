@@ -1,13 +1,17 @@
 # 🤖 Claude Code 개발 지침
 
-**claude-nextjs-starters**는 Next.js 15.5.3 + React 19 기반 모던 웹 애플리케이션 스타터 템플릿입니다.
+**StockInsight**는 Yahoo Finance + Google Trends 데이터를 결합하여 종목의 5년 가격 흐름과 대중 검색 관심도를 비교 분석하는 로컬 주식 분석 도구입니다.
+
+📋 상세 프로젝트 요구사항은 @/docs/PRD.md 참조
 
 ## 🛠️ 핵심 기술 스택
 
 - **Framework**: Next.js 15.5.3 (App Router + Turbopack)
 - **Runtime**: React 19.1.0 + TypeScript 5
 - **Styling**: TailwindCSS v4 + shadcn/ui (new-york style)
-- **Forms**: React Hook Form + Zod + Server Actions
+- **Database**: better-sqlite3 (로컬 SQLite, `data/stock-insight.db`)
+- **Data Sources**: yahoo-finance2 (주가), SerpAPI (Google Trends)
+- **Forms**: React Hook Form + Zod
 - **UI Components**: Radix UI + Lucide Icons
 - **Development**: ESLint + Prettier + Husky + lint-staged
 
