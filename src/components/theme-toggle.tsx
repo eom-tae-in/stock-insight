@@ -21,17 +21,19 @@ export function ThemeToggle() {
       className="border-primary/50 bg-primary/5 text-primary hover:bg-primary/15 hover:border-primary rounded-full border transition-colors"
     >
       <Sun
-        className={`h-[1.2rem] w-[1.2rem] transition-all ${
-          resolvedTheme === 'light' ? 'scale-100 rotate-0' : 'scale-0 rotate-90'
+        className={`h-5 w-5 transition-all ${
+          resolvedTheme === 'light'
+            ? 'scale-100 rotate-0'
+            : 'absolute scale-0 rotate-90'
         }`}
       />
       <Moon
-        className={`absolute h-[1.2rem] w-[1.2rem] transition-all ${
+        className={`absolute h-5 w-5 transition-all ${
           resolvedTheme === 'dark' ? 'scale-100 rotate-0' : 'scale-0 rotate-90'
         }`}
       />
       <Leaf
-        className={`absolute h-[1.2rem] w-[1.2rem] transition-all ${
+        className={`absolute h-5 w-5 transition-all ${
           resolvedTheme === 'calm' ? 'scale-100 rotate-0' : 'scale-0 rotate-90'
         }`}
       />
