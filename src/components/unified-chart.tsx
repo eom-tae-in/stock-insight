@@ -65,17 +65,31 @@ export function UnifiedChart({
   ma13,
   metrics,
   onDownload,
-}: UnifiedChartProps) {
+  initialEnabledSeries,
+}: UnifiedChartProps & {
+  initialEnabledSeries?: string[]
+}) {
   const [enabledSeries, setEnabledSeries] = useState<
     Record<SeriesKey, boolean>
-  >({
-    close: true,
-    ma13: true,
-    week52High: true,
-    week52Low: true,
-    trends: true,
-    yoy: true,
-  })
+  >(
+    initialEnabledSeries
+      ? {
+          close: initialEnabledSeries.includes('close'),
+          ma13: initialEnabledSeries.includes('ma13'),
+          week52High: initialEnabledSeries.includes('week52High'),
+          week52Low: initialEnabledSeries.includes('week52Low'),
+          trends: initialEnabledSeries.includes('trends'),
+          yoy: initialEnabledSeries.includes('yoy'),
+        }
+      : {
+          close: true,
+          ma13: true,
+          week52High: true,
+          week52Low: true,
+          trends: true,
+          yoy: true,
+        }
+  )
 
   // 데이터 병합: price + trends (matchPriceAndTrends 재사용)
   const matchedData = matchPriceAndTrends(priceData, trendsData)
