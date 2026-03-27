@@ -7,11 +7,11 @@ const envSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'production', 'test'])
     .default('development'),
-  SERPAPI_KEY: z
+  FINNHUB_API_KEY: z
     .string()
     .optional()
     .describe(
-      'Google Trends API 키 (https://serpapi.com 발급) - 없으면 주가만 조회됨'
+      'Finnhub API 키 (https://finnhub.io 발급) - 없으면 Yahoo Finance 폴백'
     ),
 })
 
@@ -22,7 +22,7 @@ function validateEnv() {
   try {
     return envSchema.parse({
       NODE_ENV: process.env.NODE_ENV,
-      SERPAPI_KEY: process.env.SERPAPI_KEY,
+      FINNHUB_API_KEY: process.env.FINNHUB_API_KEY,
     })
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {

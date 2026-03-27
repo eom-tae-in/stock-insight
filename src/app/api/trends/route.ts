@@ -8,20 +8,10 @@
 import { NextRequest } from 'next/server'
 import { fetchTrendsData } from '@/lib/services/trends-service'
 import { TickerInputSchema } from '@/lib/validation'
-import { env } from '@/lib/env'
 import { createSuccessResponse, createErrorResponse } from '@/lib/api-helpers'
 
 export async function GET(request: NextRequest) {
   try {
-    // 환경 변수 검증
-    if (!env.SERPAPI_KEY) {
-      return createErrorResponse(
-        'SERPAPI_KEY_MISSING',
-        'SerpAPI 키가 설정되지 않았습니다.',
-        503
-      )
-    }
-
     // 쿼리 파라미터 추출
     const ticker = request.nextUrl.searchParams.get('ticker')
     const companyName =
