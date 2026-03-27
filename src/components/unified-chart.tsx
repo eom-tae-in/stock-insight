@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Download, Check, AlertCircle } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -16,6 +17,8 @@ import {
   calculateWeekly52WeekHigh,
   calculateWeekly52WeekLow,
 } from '@/lib/calculations'
+import { captureChartAsPng } from '@/lib/export'
+import { useChartTheme } from '@/hooks/use-chart-theme'
 import {
   ComposedChart,
   Bar,
@@ -86,6 +89,7 @@ const TIME_RANGE_PRESETS = [
 ]
 
 export function UnifiedChart({
+  ticker,
   priceData,
   trendsData,
   ma13,
@@ -97,6 +101,9 @@ export function UnifiedChart({
   initialEnabledSeries?: string[]
   timeRange?: number
 }) {
+  const chartContainerRef = useRef<HTMLDivElement>(null)
+  const [isPngLoading, setIsPngLoading] = useState(false)
+  const chartTheme = useChartTheme()
   const [enabledSeries, setEnabledSeries] = useState<
     Record<SeriesKey, boolean>
   >(
@@ -202,6 +209,28 @@ export function UnifiedChart({
     }))
   }
 
+  const handleDownloadChart = async () => {
+    if (!chartContainerRef.current || !ticker) {
+      toast.error('차트를 찾을 수 없습니다.')
+      return
+    }
+
+    try {
+      setIsPngLoading(true)
+      await captureChartAsPng(chartContainerRef.current, {
+        ticker,
+        chartName: 'unified-chart',
+      })
+      toast.success('차트가 PNG로 다운로드되었습니다.')
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : '차트 다운로드에 실패했습니다.'
+      toast.error(message)
+    } finally {
+      setIsPngLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* 제목 및 시간 범위 */}
@@ -299,18 +328,19 @@ export function UnifiedChart({
         <Button
           size="sm"
           variant="outline"
-          onClick={onDownload}
-          disabled={!onDownload}
+          onClick={onDownload ?? handleDownloadChart}
+          disabled={isPngLoading}
           aria-label="통합 분석 차트를 PNG로 다운로드"
           className="flex-shrink-0"
         >
           <Download className="mr-2 h-4 w-4" />
-          PNG 다운로드
+          {isPngLoading ? '다운로드 중...' : 'PNG 다운로드'}
         </Button>
       </div>
 
       {/* 차트 */}
       <div
+        ref={chartContainerRef}
         className="bg-card rounded-lg border p-4"
         style={{ overflow: 'hidden' }}
       >
@@ -319,7 +349,10 @@ export function UnifiedChart({
             data={chartData}
             margin={{ top: 5, right: 120, left: 0, bottom: 5 }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke={chartTheme.gridColor}
+            />
             <XAxis
               dataKey="date"
               tick={{ fontSize: 12 }}
@@ -327,7 +360,7 @@ export function UnifiedChart({
               angle={-45}
               textAnchor="end"
               height={80}
-              stroke="#9ca3af"
+              stroke={chartTheme.axisColor}
             />
 
             {/* 좌측 Y축: 가격 ($) */}
@@ -343,7 +376,7 @@ export function UnifiedChart({
                   position: 'insideLeft',
                 }}
                 tick={{ fontSize: 12 }}
-                stroke="#9ca3af"
+                stroke={chartTheme.axisColor}
               />
             )}
 
@@ -360,7 +393,7 @@ export function UnifiedChart({
                   offset: 10,
                 }}
                 tick={{ fontSize: 12 }}
-                stroke="#9ca3af"
+                stroke={chartTheme.axisColor}
               />
             )}
 
@@ -376,14 +409,14 @@ export function UnifiedChart({
                   offset: -10,
                 }}
                 tick={{ fontSize: 12 }}
-                stroke="#9ca3af"
+                stroke={chartTheme.axisColor}
               />
             )}
 
             <RechartTooltip
               contentStyle={{
-                backgroundColor: '#1f2937',
-                border: '1px solid #374151',
+                backgroundColor: chartTheme.tooltipBg,
+                border: `1px solid ${chartTheme.tooltipBorder}`,
                 borderRadius: '6px',
               }}
               formatter={value => {

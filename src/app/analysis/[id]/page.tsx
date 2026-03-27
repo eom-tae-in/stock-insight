@@ -2,14 +2,13 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Header } from '@/components/layout/header'
 import { Container } from '@/components/layout/container'
-import { Button } from '@/components/ui/button'
 import { MetricsSummary } from '@/components/metrics-summary'
-import { UnifiedChart } from '@/components/unified-chart'
+import { AnalysisDownloadWrapper } from '@/components/analysis-download-wrapper'
 import { CustomChartBuilder } from '@/components/custom-chart-builder'
 import { CustomChartView } from '@/components/custom-chart-view'
 import { getSearchById } from '@/lib/db/queries'
 import { calculateMetrics, calculateMA13 } from '@/lib/calculations'
-import { Download, Table } from 'lucide-react'
+import { Table } from 'lucide-react'
 
 interface AnalysisPageProps {
   params: Promise<{ id: string }>
@@ -52,15 +51,14 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
             />
           </section>
 
-          {/* 통합 분석 차트 */}
-          <section className="mb-8">
-            <UnifiedChart
-              priceData={record.price_data}
-              trendsData={record.trends_data}
-              ma13={ma13Values}
-              metrics={metrics}
-            />
-          </section>
+          {/* 통합 분석 차트 + 다운로드 섹션 */}
+          <AnalysisDownloadWrapper
+            ticker={record.ticker}
+            priceData={record.price_data}
+            trendsData={record.trends_data}
+            ma13Values={ma13Values}
+            metrics={metrics}
+          />
 
           {/* 커스텀 차트 빌더 */}
           <section className="mb-8">
@@ -102,31 +100,6 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
                 </div>
               </div>
             </Link>
-          </section>
-
-          {/* 다운로드 섹션 */}
-          <section className="bg-card rounded-lg border p-6">
-            <h3 className="mb-4 text-lg font-semibold">데이터 다운로드</h3>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Button
-                variant="outline"
-                disabled
-                title="준비 중입니다"
-                className="flex-1 sm:flex-none"
-              >
-                <Download className="mr-2 h-4 w-4" />
-                엑셀 다운로드
-              </Button>
-              <Button
-                variant="outline"
-                disabled
-                title="준비 중입니다"
-                className="flex-1 sm:flex-none"
-              >
-                <Download className="mr-2 h-4 w-4" />
-                전체 차트 PNG 다운로드
-              </Button>
-            </div>
           </section>
         </Container>
       </main>
