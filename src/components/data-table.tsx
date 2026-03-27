@@ -110,16 +110,16 @@ export function DataTable({
         <table className="w-full text-sm">
           <thead className="bg-muted/50 border-b">
             <tr>
-              <th className="px-4 py-3 text-left">
+              <th className="border-muted/30 border-r px-4 py-3 text-left">
                 <SortHeader label="일정" sortKey="date" />
               </th>
-              <th className="px-4 py-3 text-right">
+              <th className="border-muted/30 border-r px-4 py-3 text-right">
                 <SortHeader label="주가 ($)" sortKey="close" />
               </th>
-              <th className="px-4 py-3 text-right">
+              <th className="border-muted/30 border-r px-4 py-3 text-center">
                 <SortHeader label="Google Trends (0-100)" sortKey="trends" />
               </th>
-              <th className="px-4 py-3 text-right">
+              <th className="border-muted/30 border-r px-4 py-3 text-right">
                 <SortHeader label="13주 MA ($)" sortKey="ma13" />
               </th>
               <th className="px-4 py-3 text-right">
@@ -133,22 +133,26 @@ export function DataTable({
                 key={`${row.date}-${index}`}
                 className="hover:bg-muted/30 border-b transition-colors"
               >
-                <td className="px-4 py-3 font-medium">{row.date}</td>
-                <td className="px-4 py-3 text-right">
+                <td className="border-muted/20 border-r px-4 py-3 font-medium">
+                  {row.date}
+                </td>
+                <td className="border-muted/20 border-r px-4 py-3 text-right">
                   ${row.close.toFixed(2)}
                 </td>
-                <td className="px-4 py-3 text-right">
-                  <div className="flex items-center justify-end gap-2">
+                <td className="border-muted/20 border-r px-4 py-3 text-center">
+                  <div className="flex items-center justify-center gap-2">
                     <div className="bg-muted relative h-6 w-16 overflow-hidden rounded">
                       <div
                         className="h-full bg-blue-500"
                         style={{ width: `${row.trends}%` }}
                       />
                     </div>
-                    <span className="w-8 text-right">{row.trends}</span>
+                    <span className="w-8 text-center">{row.trends}</span>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-right">${row.ma13.toFixed(2)}</td>
+                <td className="border-muted/20 border-r px-4 py-3 text-right">
+                  ${row.ma13.toFixed(2)}
+                </td>
                 <td
                   className={cn(
                     'px-4 py-3 text-right font-semibold',
