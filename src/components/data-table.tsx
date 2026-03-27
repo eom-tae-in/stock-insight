@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useMemo, useEffect, useRef } from 'react'
+import { ArrowUp } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { PriceDataPoint, TrendsDataPoint } from '@/types'
 
@@ -24,6 +26,7 @@ export function DataTable({
     key: string
     direction: 'asc' | 'desc'
   }>({ key: 'date', direction: 'desc' })
+  const [showScrollTop, setShowScrollTop] = useState(false)
   const lastRowRef = useRef<HTMLTableRowElement>(null)
 
   // 트렌드 데이터 맵 만들기 (날짜 기준)
@@ -86,6 +89,21 @@ export function DataTable({
 
     return () => observer.disconnect()
   }, [loadedCount, sortedData])
+
+  // 스크롤 위치 감지 - 맨 위로 가기 버튼 표시/숨김
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollTop(window.scrollY > 300)
+    }
+
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  // 맨 위로 스크롤
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   // 표시할 데이터
   const displayedData = sortedData.slice(0, loadedCount)
@@ -202,6 +220,18 @@ export function DataTable({
             총 {sortedData.length}개 항목
           </div>
         </div>
+      )}
+
+      {/* 맨 위로 가기 버튼 */}
+      {showScrollTop && (
+        <Button
+          onClick={scrollToTop}
+          size="icon"
+          className="fixed right-6 bottom-6 rounded-full shadow-lg transition-all hover:shadow-xl"
+          aria-label="맨 위로 이동"
+        >
+          <ArrowUp className="h-5 w-5" />
+        </Button>
       )}
     </div>
   )
