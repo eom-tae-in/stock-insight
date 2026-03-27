@@ -140,23 +140,33 @@ export function DataTable({
     <div className="space-y-4">
       {/* 테이블 */}
       <div className="bg-card overflow-x-auto rounded-lg border">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
           <thead className="bg-muted/50 border-b">
             <tr>
-              <th className="border-muted/60 border-r px-4 py-3 text-center">
-                <SortHeader label="일정" sortKey="date" />
+              <th className="border-muted/60 border-r px-4 py-3">
+                <div className="flex items-center justify-center">
+                  <SortHeader label="일정" sortKey="date" />
+                </div>
               </th>
-              <th className="border-muted/60 border-r px-4 py-3 text-center">
-                <SortHeader label="주가 ($)" sortKey="close" />
+              <th className="border-muted/60 border-r px-4 py-3">
+                <div className="flex items-center justify-center">
+                  <SortHeader label="주가 ($)" sortKey="close" />
+                </div>
               </th>
-              <th className="border-muted/60 border-r px-4 py-3 text-center">
-                <SortHeader label="Google Trends (0-100)" sortKey="trends" />
+              <th className="border-muted/60 border-r px-4 py-3">
+                <div className="flex items-center justify-center">
+                  <SortHeader label="Google Trends (0-100)" sortKey="trends" />
+                </div>
               </th>
-              <th className="border-muted/60 border-r px-4 py-3 text-center">
-                <SortHeader label="13주 MA ($)" sortKey="ma13" />
+              <th className="border-muted/60 border-r px-4 py-3">
+                <div className="flex items-center justify-center">
+                  <SortHeader label="13주 MA ($)" sortKey="ma13" />
+                </div>
               </th>
-              <th className="px-4 py-3 text-center">
-                <SortHeader label="전년도 대비 (%)" sortKey="yoy" />
+              <th className="px-4 py-3">
+                <div className="flex items-center justify-center">
+                  <SortHeader label="전년도 대비 (%)" sortKey="yoy" />
+                </div>
               </th>
             </tr>
           </thead>
@@ -167,13 +177,13 @@ export function DataTable({
                 className="hover:bg-muted/30 border-b transition-colors"
                 ref={index === displayedData.length - 1 ? lastRowRef : null}
               >
-                <td className="border-muted/60 border-r px-4 py-3 text-center font-medium">
-                  {row.date}
+                <td className="border-muted/60 border-r px-4 py-3">
+                  <div className="text-center font-medium">{row.date}</div>
                 </td>
-                <td className="border-muted/60 border-r px-4 py-3 text-center">
-                  ${row.close.toFixed(2)}
+                <td className="border-muted/60 border-r px-4 py-3">
+                  <div className="text-center">${row.close.toFixed(2)}</div>
                 </td>
-                <td className="border-muted/60 border-r px-4 py-3 text-center">
+                <td className="border-muted/60 border-r px-4 py-3">
                   <div className="flex items-center justify-center gap-2">
                     <div className="bg-muted relative h-6 w-16 overflow-hidden rounded">
                       <div
@@ -184,19 +194,21 @@ export function DataTable({
                     <span className="w-8 text-center">{row.trends}</span>
                   </div>
                 </td>
-                <td className="border-muted/60 border-r px-4 py-3 text-center">
-                  ${row.ma13.toFixed(2)}
+                <td className="border-muted/60 border-r px-4 py-3">
+                  <div className="text-center">${row.ma13.toFixed(2)}</div>
                 </td>
-                <td
-                  className={cn(
-                    'px-4 py-3 text-center font-semibold',
-                    row.yoy >= 0
-                      ? 'text-blue-600 dark:text-blue-400'
-                      : 'text-red-600 dark:text-red-400'
-                  )}
-                >
-                  {row.yoy >= 0 ? '+' : ''}
-                  {row.yoy.toFixed(2)}%
+                <td className="px-4 py-3">
+                  <div
+                    className={cn(
+                      'text-center font-semibold',
+                      row.yoy >= 0
+                        ? 'text-blue-600 dark:text-blue-400'
+                        : 'text-red-600 dark:text-red-400'
+                    )}
+                  >
+                    {row.yoy >= 0 ? '+' : ''}
+                    {row.yoy.toFixed(2)}%
+                  </div>
                 </td>
               </tr>
             ))}
