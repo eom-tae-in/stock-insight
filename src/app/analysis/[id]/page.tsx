@@ -3,12 +3,12 @@ import Link from 'next/link'
 import { Header } from '@/components/layout/header'
 import { Container } from '@/components/layout/container'
 import { MetricsSummary } from '@/components/metrics-summary'
-import { AnalysisDownloadWrapper } from '@/components/analysis-download-wrapper'
+import { UnifiedChart } from '@/components/unified-chart'
 import { CustomChartBuilder } from '@/components/custom-chart-builder'
 import { CustomChartView } from '@/components/custom-chart-view'
 import { getSearchById } from '@/lib/db/queries'
 import { calculateMetrics, calculateMA13 } from '@/lib/calculations'
-import { Table } from 'lucide-react'
+import { Table as TableIcon } from 'lucide-react'
 
 interface AnalysisPageProps {
   params: Promise<{ id: string }>
@@ -51,14 +51,16 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
             />
           </section>
 
-          {/* 통합 분석 차트 + 다운로드 섹션 */}
-          <AnalysisDownloadWrapper
-            ticker={record.ticker}
-            priceData={record.price_data}
-            trendsData={record.trends_data}
-            ma13Values={ma13Values}
-            metrics={metrics}
-          />
+          {/* 통합 분석 차트 */}
+          <section className="mb-8">
+            <UnifiedChart
+              ticker={record.ticker}
+              priceData={record.price_data}
+              trendsData={record.trends_data}
+              ma13={ma13Values}
+              metrics={metrics}
+            />
+          </section>
 
           {/* 커스텀 차트 빌더 */}
           <section className="mb-8">
@@ -83,7 +85,7 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
                 <div className="rounded-2xl border border-blue-500/20 bg-gradient-to-br from-blue-500/10 to-blue-500/5 p-8 transition-all hover:border-blue-500/40 hover:from-blue-500/15 hover:to-blue-500/10 hover:shadow-lg">
                   <div className="flex items-center gap-4">
                     <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-xl bg-blue-500/20 transition-colors group-hover:bg-blue-500/30">
-                      <Table className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                      <TableIcon className="h-8 w-8 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div className="flex-1">
                       <h3 className="text-lg font-semibold">표로 보기</h3>
