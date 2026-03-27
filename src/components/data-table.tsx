@@ -136,8 +136,27 @@ export function DataTable({
     </button>
   )
 
+  // 정렬 상태 텍스트 생성
+  const getSortStatusText = () => {
+    const labelMap: { [key: string]: string } = {
+      date: '일정',
+      close: '주가',
+      trends: 'Google Trends',
+      ma13: '13주 MA',
+      yoy: '전년도 대비',
+    }
+
+    const label = labelMap[sortConfig.key] || '일정'
+    const direction = sortConfig.direction === 'asc' ? '오름차순' : '내림차순'
+
+    return `현재 ${label} 기준 ${direction}으로 정렬되어 있습니다`
+  }
+
   return (
     <div className="space-y-4">
+      {/* 정렬 상태 설명 */}
+      <div className="text-muted-foreground text-sm">{getSortStatusText()}</div>
+
       {/* 테이블 */}
       <div className="bg-card overflow-x-auto rounded-lg border">
         <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
