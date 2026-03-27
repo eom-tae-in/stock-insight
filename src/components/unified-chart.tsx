@@ -177,94 +177,92 @@ export function UnifiedChart({
 
   return (
     <div className="space-y-4">
-      {/* 제목 및 컨트롤 */}
-      <div className="space-y-2">
-        {/* 첫 번째 줄: 제목 + 시간 범위 */}
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">통합 분석 차트</h3>
+      {/* 제목 및 시간 범위 */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">통합 분석 차트</h3>
 
-          {/* 우측 시간 범위 컨트롤 패널 */}
-          <div className="flex items-center gap-2">
-            {/* Preset 버튼들 */}
-            <div className="flex gap-1">
-              {TIME_RANGE_PRESETS.map(preset => (
-                <button
-                  key={preset.weeks}
-                  onClick={() => handleRangeChange(preset.weeks, preset.label)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                    displayRange === preset.weeks && customRange === ''
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  }`}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Custom 입력 */}
-            <div className="flex items-center gap-1">
-              <Input
-                type="number"
-                min="1"
-                max="260"
-                value={customRange}
-                onChange={e => handleCustomRange(e.target.value)}
-                placeholder="주"
-                className="h-8 w-16 text-xs"
-              />
-              <span className="text-muted-foreground text-xs">주</span>
-            </div>
-
-            {/* 임시 레이블 표시 */}
-            {rangeLabel && (
-              <div className="rounded-md bg-blue-500/10 px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400">
-                {rangeLabel}
-              </div>
-            )}
+        {/* 우측 시간 범위 컨트롤 패널 */}
+        <div className="flex items-center gap-2">
+          {/* Preset 버튼들 */}
+          <div className="flex gap-1">
+            {TIME_RANGE_PRESETS.map(preset => (
+              <button
+                key={preset.weeks}
+                onClick={() => handleRangeChange(preset.weeks, preset.label)}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                  displayRange === preset.weeks && customRange === ''
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                }`}
+              >
+                {preset.label}
+              </button>
+            ))}
           </div>
-        </div>
 
-        {/* 두 번째 줄: 다운로드 버튼 */}
-        <div className="flex justify-end">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onDownload}
-            disabled={!onDownload}
-            aria-label="통합 분석 차트를 PNG로 다운로드"
-          >
-            <Download className="mr-2 h-4 w-4" />
-            PNG 다운로드
-          </Button>
+          {/* Custom 입력 */}
+          <div className="flex items-center gap-1">
+            <Input
+              type="number"
+              min="1"
+              max="260"
+              value={customRange}
+              onChange={e => handleCustomRange(e.target.value)}
+              placeholder="주"
+              className="h-8 w-16 text-xs"
+            />
+            <span className="text-muted-foreground text-xs">주</span>
+          </div>
+
+          {/* 임시 레이블 표시 */}
+          {rangeLabel && (
+            <div className="rounded-md bg-blue-500/10 px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400">
+              {rangeLabel}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* 토글 버튼 (현대적 디자인) */}
-      <div className="flex flex-wrap gap-2">
-        {Object.entries(SERIES_CONFIG).map(([key, config]) => (
-          <button
-            key={key}
-            onClick={() => toggleSeries(key as SeriesKey)}
-            className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-all ${
-              enabledSeries[key as SeriesKey]
-                ? 'bg-opacity-100 text-white'
-                : 'border-muted-foreground/30 text-muted-foreground hover:border-muted-foreground/50 border bg-transparent'
-            }`}
-            style={
-              enabledSeries[key as SeriesKey]
-                ? { backgroundColor: config.color }
-                : {}
-            }
-          >
-            <span
-              className="flex h-2 w-2 rounded-full"
-              style={{ backgroundColor: config.color }}
-            />
-            {config.name}
-            {enabledSeries[key as SeriesKey] && <Check className="h-3 w-3" />}
-          </button>
-        ))}
+      {/* 토글 버튼 + PNG 다운로드 (현대적 디자인) */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-2">
+          {Object.entries(SERIES_CONFIG).map(([key, config]) => (
+            <button
+              key={key}
+              onClick={() => toggleSeries(key as SeriesKey)}
+              className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-all ${
+                enabledSeries[key as SeriesKey]
+                  ? 'bg-opacity-100 text-white'
+                  : 'border-muted-foreground/30 text-muted-foreground hover:border-muted-foreground/50 border bg-transparent'
+              }`}
+              style={
+                enabledSeries[key as SeriesKey]
+                  ? { backgroundColor: config.color }
+                  : {}
+              }
+            >
+              <span
+                className="flex h-2 w-2 rounded-full"
+                style={{ backgroundColor: config.color }}
+              />
+              {config.name}
+              {enabledSeries[key as SeriesKey] && <Check className="h-3 w-3" />}
+            </button>
+          ))}
+        </div>
+
+        {/* PNG 다운로드 버튼 */}
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onDownload}
+          disabled={!onDownload}
+          aria-label="통합 분석 차트를 PNG로 다운로드"
+          className="flex-shrink-0"
+        >
+          <Download className="mr-2 h-4 w-4" />
+          PNG 다운로드
+        </Button>
       </div>
 
       {/* 차트 */}
