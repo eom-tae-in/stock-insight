@@ -1,8 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import type { PriceDataPoint, TrendsDataPoint } from '@/types'
 
@@ -21,11 +19,12 @@ export function DataTable({
   ma13Values,
   yoyChange,
 }: DataTableProps) {
-  const [currentPage, setCurrentPage] = useState(1)
+  const [loadedCount, setLoadedCount] = useState(ITEMS_PER_PAGE)
   const [sortConfig, setSortConfig] = useState<{
     key: string
     direction: 'asc' | 'desc'
   }>({ key: 'date', direction: 'desc' })
+  const lastRowRef = useRef<HTMLTableRowElement>(null)
 
   // 트렌드 데이터 맵 만들기 (날짜 기준)
   const trendsMap = useMemo(() => {
@@ -68,13 +67,28 @@ export function DataTable({
     return sorted
   }, [tableData, sortConfig])
 
-  // 페이지네이션
-  const totalPages = Math.ceil(sortedData.length / ITEMS_PER_PAGE)
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
-  const paginatedData = sortedData.slice(
-    startIndex,
-    startIndex + ITEMS_PER_PAGE
-  )
+  // 무한 스크롤 - Intersection Observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && loadedCount < sortedData.length) {
+          setLoadedCount(prev =>
+            Math.min(prev + ITEMS_PER_PAGE, sortedData.length)
+          )
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    if (lastRowRef.current) {
+      observer.observe(lastRowRef.current)
+    }
+
+    return () => observer.disconnect()
+  }, [loadedCount, sortedData.length])
+
+  // 표시할 데이터
+  const displayedData = sortedData.slice(0, loadedCount)
 
   const handleSort = (key: string) => {
     setSortConfig(prev => ({
@@ -92,7 +106,7 @@ export function DataTable({
   }) => (
     <button
       onClick={() => handleSort(sortKey)}
-      className="flex items-center gap-1 font-semibold transition-colors hover:text-blue-500"
+      className="flex items-center justify-center gap-1 font-semibold transition-colors hover:text-blue-500"
     >
       {label}
       {sortConfig.key === sortKey && (
@@ -108,9 +122,9 @@ export function DataTable({
       {/* 테이블 */}
       <div className="bg-card overflow-x-auto rounded-lg border">
         <table className="w-full text-sm">
-          <thead className="bg-muted/70 border-b">
+          <thead className="bg-muted/50 border-b">
             <tr>
-              <th className="border-muted/60 border-r px-4 py-3 text-left">
+              <th className="border-muted/60 border-r px-4 py-3 text-center">
                 <SortHeader label="일정" sortKey="date" />
               </th>
               <th className="border-muted/60 border-r px-4 py-3 text-center">
@@ -128,12 +142,13 @@ export function DataTable({
             </tr>
           </thead>
           <tbody>
-            {paginatedData.map((row, index) => (
+            {displayedData.map((row, index) => (
               <tr
                 key={`${row.date}-${index}`}
                 className="hover:bg-muted/30 border-b transition-colors"
+                ref={index === displayedData.length - 1 ? lastRowRef : null}
               >
-                <td className="border-muted/60 border-r px-4 py-3 font-medium">
+                <td className="border-muted/60 border-r px-4 py-3 text-center font-medium">
                   {row.date}
                 </td>
                 <td className="border-muted/60 border-r px-4 py-3 text-center">
@@ -170,32 +185,23 @@ export function DataTable({
         </table>
       </div>
 
-      {/* 페이지네이션 */}
-      <div className="bg-card flex items-center justify-between rounded-lg border p-4">
-        <div className="text-muted-foreground text-sm">
-          총 {sortedData.length}개 항목 | {currentPage} / {totalPages} 페이지
+      {/* 로딩 상태 */}
+      {loadedCount < sortedData.length && (
+        <div className="flex justify-center py-4">
+          <div className="text-muted-foreground text-sm">
+            스크롤하여 더 보기... ({loadedCount} / {sortedData.length})
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-            disabled={currentPage === 1}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              setCurrentPage(prev => Math.min(totalPages, prev + 1))
-            }
-            disabled={currentPage === totalPages}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+      )}
+
+      {/* 모든 데이터 로드됨 */}
+      {loadedCount >= sortedData.length && displayedData.length > 0 && (
+        <div className="flex justify-center py-4">
+          <div className="text-muted-foreground text-sm">
+            총 {sortedData.length}개 항목
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
