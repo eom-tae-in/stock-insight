@@ -1,0 +1,334 @@
+'use client'
+
+import { useState } from 'react'
+import { Download, Check } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { matchPriceAndTrends, calculateWeeklyYoY } from '@/lib/calculations'
+import {
+  ComposedChart,
+  Bar,
+  Line,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+} from 'recharts'
+import type { UnifiedChartProps } from '@/types'
+
+const SERIES_CONFIG = {
+  close: {
+    name: '종가',
+    color: '#3b82f6',
+    yAxisId: 'left',
+    enabled: true,
+  },
+  ma13: {
+    name: '13주 MA',
+    color: '#f97316',
+    yAxisId: 'left',
+    enabled: true,
+  },
+  week52High: {
+    name: '52주 최고가',
+    color: '#22c55e',
+    yAxisId: 'left',
+    enabled: true,
+  },
+  week52Low: {
+    name: '52주 최저가',
+    color: '#ef4444',
+    yAxisId: 'left',
+    enabled: true,
+  },
+  trends: {
+    name: '검색 관심도',
+    color: '#a78bfa',
+    yAxisId: 'middle',
+    enabled: true,
+  },
+  yoy: {
+    name: '52주 YoY',
+    color: '#f59e0b',
+    yAxisId: 'right',
+    enabled: true,
+  },
+}
+
+type SeriesKey = keyof typeof SERIES_CONFIG
+
+export function UnifiedChart({
+  priceData,
+  trendsData,
+  ma13,
+  metrics,
+  onDownload,
+}: UnifiedChartProps) {
+  const [enabledSeries, setEnabledSeries] = useState<
+    Record<SeriesKey, boolean>
+  >({
+    close: true,
+    ma13: true,
+    week52High: true,
+    week52Low: true,
+    trends: true,
+    yoy: true,
+  })
+
+  // 데이터 병합: price + trends (matchPriceAndTrends 재사용)
+  const matchedData = matchPriceAndTrends(priceData, trendsData)
+
+  // 주별 YoY 계산
+  const weeklyYoY = calculateWeeklyYoY(priceData)
+
+  // 모든 데이터 병합
+  const chartData = priceData.map((point, index) => ({
+    date: point.date,
+    close: point.close,
+    ma13: ma13?.[index] ?? null,
+    week52High: metrics.week52High,
+    week52Low: metrics.week52Low,
+    trends: matchedData.find(d => d.date === point.date)?.trend ?? null,
+    yoy: weeklyYoY[index] ?? null,
+  }))
+
+  // X축 레이블 간격 (매 12주마다 표시)
+  const tickInterval = Math.max(1, Math.floor(chartData.length / 12))
+
+  const toggleSeries = (key: SeriesKey) => {
+    setEnabledSeries(prev => ({
+      ...prev,
+      [key]: !prev[key],
+    }))
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* 제목 및 다운로드 */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">통합 분석 차트</h3>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onDownload}
+          disabled={!onDownload}
+          aria-label="통합 분석 차트를 PNG로 다운로드"
+        >
+          <Download className="mr-2 h-4 w-4" />
+          PNG 다운로드
+        </Button>
+      </div>
+
+      {/* 토글 버튼 (현대적 디자인) */}
+      <div className="flex flex-wrap gap-2">
+        {Object.entries(SERIES_CONFIG).map(([key, config]) => (
+          <button
+            key={key}
+            onClick={() => toggleSeries(key as SeriesKey)}
+            className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-all ${
+              enabledSeries[key as SeriesKey]
+                ? 'bg-opacity-100 text-white'
+                : 'border-muted-foreground/30 text-muted-foreground hover:border-muted-foreground/50 border bg-transparent'
+            }`}
+            style={
+              enabledSeries[key as SeriesKey]
+                ? { backgroundColor: config.color }
+                : {}
+            }
+          >
+            <span
+              className="flex h-2 w-2 rounded-full"
+              style={{ backgroundColor: config.color }}
+            />
+            {config.name}
+            {enabledSeries[key as SeriesKey] && <Check className="h-3 w-3" />}
+          </button>
+        ))}
+      </div>
+
+      {/* 차트 */}
+      <div className="bg-card rounded-lg border p-4">
+        <ResponsiveContainer width="100%" height={500}>
+          <ComposedChart
+            data={chartData}
+            margin={{ top: 5, right: 120, left: 0, bottom: 5 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+            <XAxis
+              dataKey="date"
+              tick={{ fontSize: 12 }}
+              interval={tickInterval}
+              angle={-45}
+              textAnchor="end"
+              height={80}
+              stroke="#9ca3af"
+            />
+
+            {/* 좌측 Y축: 가격 ($) */}
+            {(enabledSeries.close ||
+              enabledSeries.ma13 ||
+              enabledSeries.week52High ||
+              enabledSeries.week52Low) && (
+              <YAxis
+                yAxisId="left"
+                label={{
+                  value: '가격 ($)',
+                  angle: -90,
+                  position: 'insideLeft',
+                }}
+                tick={{ fontSize: 12 }}
+                stroke="#9ca3af"
+              />
+            )}
+
+            {/* 중간 Y축: 검색 관심도 (0-100) */}
+            {enabledSeries.trends && (
+              <YAxis
+                yAxisId="middle"
+                orientation="right"
+                domain={[0, 100]}
+                label={{
+                  value: '검색 관심도 (0-100)',
+                  angle: 90,
+                  position: 'right',
+                  offset: 10,
+                }}
+                tick={{ fontSize: 12 }}
+                stroke="#9ca3af"
+              />
+            )}
+
+            {/* 우측 Y축: YoY (%) */}
+            {enabledSeries.yoy && (
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                label={{
+                  value: 'YoY (%)',
+                  angle: 90,
+                  position: 'insideRight',
+                  offset: -10,
+                }}
+                tick={{ fontSize: 12 }}
+                stroke="#9ca3af"
+              />
+            )}
+
+            <Tooltip
+              contentStyle={{
+                backgroundColor: '#1f2937',
+                border: '1px solid #374151',
+                borderRadius: '6px',
+              }}
+              formatter={value => {
+                if (typeof value === 'number') {
+                  return value.toFixed(2)
+                }
+                return value
+              }}
+              labelFormatter={label => `날짜: ${label}`}
+            />
+
+            {/* 52주 최고가 (ReferenceLine) */}
+            {enabledSeries.week52High && (
+              <ReferenceLine
+                yAxisId="left"
+                y={metrics.week52High}
+                stroke={SERIES_CONFIG.week52High.color}
+                strokeDasharray="5 5"
+                label={{
+                  value: `52주 최고: $${metrics.week52High.toFixed(2)}`,
+                  position: 'right',
+                  fill: SERIES_CONFIG.week52High.color,
+                  fontSize: 12,
+                }}
+              />
+            )}
+
+            {/* 52주 최저가 (ReferenceLine) */}
+            {enabledSeries.week52Low && (
+              <ReferenceLine
+                yAxisId="left"
+                y={metrics.week52Low}
+                stroke={SERIES_CONFIG.week52Low.color}
+                strokeDasharray="5 5"
+                label={{
+                  value: `52주 최저: $${metrics.week52Low.toFixed(2)}`,
+                  position: 'right',
+                  fill: SERIES_CONFIG.week52Low.color,
+                  fontSize: 12,
+                }}
+              />
+            )}
+
+            {/* 종가 라인 */}
+            {enabledSeries.close && (
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="close"
+                stroke={SERIES_CONFIG.close.color}
+                strokeWidth={2}
+                dot={false}
+                name="종가"
+                isAnimationActive={false}
+              />
+            )}
+
+            {/* 13주 MA 라인 */}
+            {enabledSeries.ma13 && (
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="ma13"
+                stroke={SERIES_CONFIG.ma13.color}
+                strokeWidth={2}
+                dot={false}
+                name="13주 MA"
+                isAnimationActive={false}
+              />
+            )}
+
+            {/* 검색 관심도 영역 */}
+            {enabledSeries.trends && (
+              <Area
+                yAxisId="middle"
+                type="monotone"
+                dataKey="trends"
+                fill={SERIES_CONFIG.trends.color}
+                stroke={SERIES_CONFIG.trends.color}
+                fillOpacity={0.2}
+                strokeWidth={2}
+                dot={false}
+                name="검색 관심도"
+                isAnimationActive={false}
+              />
+            )}
+
+            {/* 52주 YoY 바 */}
+            {enabledSeries.yoy && (
+              <Bar
+                yAxisId="right"
+                dataKey="yoy"
+                fill={SERIES_CONFIG.yoy.color}
+                fillOpacity={0.6}
+                name="52주 YoY"
+                isAnimationActive={false}
+              />
+            )}
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* 데이터 설명 */}
+      <div className="bg-muted/50 text-muted-foreground rounded-lg p-4 text-sm">
+        <p>
+          💡 위의 토글 버튼을 클릭하여 원하는 데이터를 표시/숨길 수 있습니다.
+          좌측은 주가($), 우측은 검색 관심도와 YoY(%)를 표시합니다.
+        </p>
+      </div>
+    </div>
+  )
+}

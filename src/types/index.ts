@@ -34,6 +34,9 @@ export type {
   SearchFormProps,
   ProgressState,
   Downloadable,
+  UnifiedChartProps,
+  CustomTable,
+  CustomTableBuilderProps,
 } from './ui'
 
 // 공통 타입

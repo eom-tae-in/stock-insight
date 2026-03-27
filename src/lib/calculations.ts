@@ -94,6 +94,29 @@ export function calculateMetrics(priceData: PriceDataPoint[]): Metrics {
 }
 
 /**
+ * 주별 YoY(Year over Year) 계산
+ * 각 주차별로 52주 전 종가 대비 변화율을 배열로 반환합니다.
+ * 52주 미만의 데이터는 0으로 채웁니다.
+ */
+export function calculateWeeklyYoY(priceData: PriceDataPoint[]): number[] {
+  if (priceData.length === 0) return []
+
+  return priceData.map((point, index) => {
+    const week52AgoIndex = index - 52
+
+    if (week52AgoIndex < 0) {
+      return 0
+    }
+
+    const week52AgoPrice = priceData[week52AgoIndex].close
+    if (week52AgoPrice === 0) return 0
+
+    const yoyChange = ((point.close - week52AgoPrice) / week52AgoPrice) * 100
+    return Math.round(yoyChange * 100) / 100
+  })
+}
+
+/**
  * 가격 데이터와 트렌드 데이터를 날짜 기준으로 매칭
  * 이미 두 데이터 모두 startOfISOWeek로 정규화되어 있어 직접 매칭 가능
  * 비교 차트(ComparisonChart)용으로 사용됩니다.
