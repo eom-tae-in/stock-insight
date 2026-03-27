@@ -19,7 +19,7 @@ export function ThemeToggle() {
       variant="ghost"
       size="icon"
       onClick={cycleTheme}
-      className="hover:bg-primary/10 rounded-full"
+      className="text-primary hover:bg-primary/10 rounded-full"
     >
       <Sun
         className={`h-[1.2rem] w-[1.2rem] transition-all ${
