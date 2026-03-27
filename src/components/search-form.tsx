@@ -40,6 +40,7 @@ export function SearchForm({
   const [suggestions, setSuggestions] = useState<TickerSuggestion[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
+  const [selectedIndex, setSelectedIndex] = useState<number>(-1)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
@@ -174,6 +175,36 @@ export function SearchForm({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  // Suggestions 변경 시 선택된 인덱스 초기화
+  useEffect(() => {
+    setSelectedIndex(-1)
+  }, [suggestions])
+
+  // 키보드 네비게이션
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSuggestions || suggestions.length === 0) return
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setSelectedIndex(prev =>
+          prev < suggestions.length - 1 ? prev + 1 : prev
+        )
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setSelectedIndex(prev => (prev > 0 ? prev - 1 : -1))
+        break
+      case 'Enter':
+        e.preventDefault()
+        if (selectedIndex >= 0) {
+          handleSelectSuggestion(suggestions[selectedIndex].symbol)
+          setSelectedIndex(-1)
+        }
+        break
+    }
+  }
+
   // Cleanup
   useEffect(() => {
     return () => {
@@ -211,6 +242,7 @@ export function SearchForm({
                   ref={inputRef}
                   placeholder="예: AAPL, TSLA, MSFT 또는 회사명..."
                   disabled={isLoading}
+                  autoComplete="off"
                   className="text-center text-lg"
                   onFocus={() => {
                     if (suggestions.length > 0) {
@@ -226,18 +258,23 @@ export function SearchForm({
                     field.onChange(e)
                     handleInputChange(e.target.value)
                   }}
+                  onKeyDown={handleKeyDown}
                 />
               </FormControl>
 
               {/* 자동완성 드롭다운 */}
               {showSuggestions && suggestions.length > 0 && (
                 <div className="bg-popover border-input absolute top-full right-0 left-0 z-50 mt-1 max-h-64 overflow-y-auto rounded-md border shadow-lg">
-                  {suggestions.map(suggestion => (
+                  {suggestions.map((suggestion, index) => (
                     <button
                       key={suggestion.symbol}
                       type="button"
                       onClick={() => handleSelectSuggestion(suggestion.symbol)}
-                      className="hover:bg-accent flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition-colors"
+                      className={`flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition-colors ${
+                        selectedIndex === index
+                          ? 'bg-accent'
+                          : 'hover:bg-accent'
+                      }`}
                     >
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-semibold">
