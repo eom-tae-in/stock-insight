@@ -18,6 +18,7 @@ import {
   getAllSearches,
   upsertSearch,
   replaceStockData,
+  withTransaction,
 } from '@/lib/db/queries'
 import { createSuccessResponse, createErrorResponse } from '@/lib/api-helpers'
 import type { SearchRecord, TrendsDataPoint } from '@/types'
@@ -92,29 +93,31 @@ export async function POST(request: NextRequest) {
     // 3. 지표 계산
     const metrics = calculateMetrics(stockData.priceData)
 
-    // 4. DB 저장
+    // 4. DB 저장 (트랜잭션으로 원자성 보장)
     const now = new Date()
-    const searchRecord: SearchRecord = {
-      id: crypto.randomUUID(),
-      ticker: validatedTicker,
-      company_name: stockData.companyName,
-      current_price: metrics.currentPrice,
-      previous_close: metrics.previousClose,
-      ma13: metrics.ma13,
-      yoy_change: metrics.yoyChange,
-      week52_high: metrics.week52High,
-      week52_low: metrics.week52Low,
-      price_data: stockData.priceData,
-      trends_data: trendsData,
-      last_updated_at: now.toISOString(),
-      searched_at: now.toISOString(),
-      created_at: now.toISOString(),
-    }
 
-    const id = upsertSearch(searchRecord)
+    const id = withTransaction(db => {
+      const searchRecord: SearchRecord = {
+        id: crypto.randomUUID(),
+        ticker: validatedTicker,
+        company_name: stockData.companyName,
+        current_price: metrics.currentPrice,
+        previous_close: metrics.previousClose,
+        ma13: metrics.ma13,
+        yoy_change: metrics.yoyChange,
+        week52_high: metrics.week52High,
+        week52_low: metrics.week52Low,
+        price_data: stockData.priceData,
+        trends_data: trendsData,
+        last_updated_at: now.toISOString(),
+        searched_at: now.toISOString(),
+        created_at: now.toISOString(),
+      }
 
-    // 별도 테이블(price_data, trends_data)도 동기화
-    replaceStockData(id, stockData.priceData, trendsData)
+      const recordId = upsertSearch(searchRecord)
+      replaceStockData(recordId, stockData.priceData, trendsData)
+      return recordId
+    })
 
     // 5. 응답
     return createSuccessResponse(

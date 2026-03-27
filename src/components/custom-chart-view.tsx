@@ -29,7 +29,7 @@ export function CustomChartView({
   const [customCharts, setCustomCharts] = useState<CustomChart[]>([])
   const [expandedChartId, setExpandedChartId] = useState<string | null>(null)
 
-  // localStorage에서 커스텀 차트 로드 및 업데이트 감지
+  // localStorage에서 커스텀 차트 로드
   useEffect(() => {
     const loadCharts = () => {
       const storageKey = `stock-custom-charts-${searchId}`
@@ -38,8 +38,8 @@ export function CustomChartView({
         try {
           const charts = JSON.parse(savedData)
           setCustomCharts(charts)
-          // 첫 번째 차트를 기본으로 확장
-          if (charts.length > 0 && !expandedChartId) {
+          // 첫 번째 차트를 기본으로 확장 (처음 로드할 때만)
+          if (charts.length > 0) {
             setExpandedChartId(charts[0].id)
           }
         } catch (error) {
@@ -165,6 +165,7 @@ export function CustomChartView({
                     ma13={ma13}
                     metrics={metrics}
                     initialEnabledSeries={chart.series}
+                    timeRange={chart.timeRange}
                   />
                 </div>
               </div>

@@ -22,7 +22,6 @@ export default async function TablePage({ params }: TablePageProps) {
     notFound()
   }
 
-  const metrics = calculateMetrics(record.price_data)
   const ma13Values = calculateMA13(record.price_data)
 
   return (
@@ -57,7 +56,6 @@ export default async function TablePage({ params }: TablePageProps) {
               priceData={record.price_data}
               trendsData={record.trends_data}
               ma13Values={ma13Values}
-              yoyChange={metrics.yoyChange}
             />
           </section>
         </Container>
