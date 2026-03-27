@@ -126,7 +126,7 @@ export function CustomChartBuilder({
         커스텀 차트 만들기
       </Button>
 
-      <DialogContent className="m-2 max-w-7xl rounded-2xl border-0 bg-white p-0 shadow-2xl sm:m-4 dark:bg-slate-950">
+      <DialogContent className="m-2 flex max-h-[75vh] max-w-[90vw] flex-col rounded-2xl border-0 bg-white p-0 shadow-2xl sm:m-4 dark:bg-slate-950">
         {/* 닫기 버튼 */}
         <button
           onClick={() => setIsOpen(false)}
@@ -148,7 +148,7 @@ export function CustomChartBuilder({
         </div>
 
         {/* 콘텐츠 */}
-        <div className="space-y-5 px-8 py-6">
+        <div className="flex-1 space-y-4 overflow-y-auto px-8 py-5">
           {/* 차트 이름 */}
           <div className="space-y-2">
             <Label className="text-sm font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
@@ -301,7 +301,7 @@ export function CustomChartBuilder({
         </div>
 
         {/* 푸터 */}
-        <div className="flex gap-3 border-t border-slate-200 px-8 py-4 dark:border-slate-700">
+        <div className="sticky bottom-0 flex gap-3 border-t border-slate-200 bg-white px-8 py-4 dark:border-slate-700 dark:bg-slate-950">
           <Button
             variant="outline"
             onClick={() => setIsOpen(false)}
