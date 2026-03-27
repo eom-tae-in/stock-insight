@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { RefreshCw, Trash2 } from 'lucide-react'
+import { RefreshCw, Trash2, GripVertical } from 'lucide-react'
 import { LineChart, Line, ResponsiveContainer } from 'recharts'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -17,6 +17,11 @@ import {
 import { cn } from '@/lib/utils'
 import type { StockCardProps } from '@/types'
 
+interface StockCardWithEditProps extends StockCardProps {
+  isEditMode?: boolean
+  isDragging?: boolean
+}
+
 export function StockCard({
   id,
   ticker,
@@ -28,7 +33,9 @@ export function StockCard({
   onRefresh,
   onDelete,
   isLoading = false,
-}: StockCardProps) {
+  isEditMode = false,
+  isDragging = false,
+}: StockCardWithEditProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -65,16 +72,27 @@ export function StockCard({
 
   return (
     <>
-      <Link href={`/analysis/${id}`}>
+      <Link
+        href={isEditMode ? '#' : `/analysis/${id}`}
+        onClick={e => isEditMode && e.preventDefault()}
+      >
         <Card
-          className="group relative cursor-pointer overflow-hidden transition-all hover:shadow-lg"
-          onMouseEnter={() => setShowOverlay(true)}
-          onMouseLeave={() => setShowOverlay(false)}
-          onClick={() => setShowOverlay(!showOverlay)}
+          className={cn(
+            'group relative overflow-hidden transition-all',
+            !isEditMode && 'cursor-pointer hover:shadow-lg',
+            isEditMode && 'cursor-move border-blue-500 bg-blue-500/5',
+            isDragging && 'opacity-50'
+          )}
+          onMouseEnter={() => !isEditMode && setShowOverlay(true)}
+          onMouseLeave={() => !isEditMode && setShowOverlay(false)}
+          onClick={() => !isEditMode && setShowOverlay(!showOverlay)}
         >
           <div className="p-6">
-            {/* 헤더: Ticker와 회사명 (가로 배치) */}
+            {/* 헤더: 드래그 핸들 + Ticker와 회사명 (가로 배치) */}
             <div className="mb-6 flex items-baseline gap-2">
+              {isEditMode && (
+                <GripVertical className="h-5 w-5 flex-shrink-0 text-blue-500" />
+              )}
               <h3 className="text-2xl font-bold">{ticker}</h3>
               <p className="text-muted-foreground text-sm">{companyName}</p>
             </div>
@@ -138,8 +156,8 @@ export function StockCard({
             <p className="text-muted-foreground text-xs">1년 가격 추이</p>
           </div>
 
-          {/* 호버/터치 오버레이 */}
-          {showOverlay && (
+          {/* 호버/터치 오버레이 (수정 모드가 아닐 때만) */}
+          {!isEditMode && showOverlay && (
             <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/50 transition-opacity">
               <Button
                 size="icon"
