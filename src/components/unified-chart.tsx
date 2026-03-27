@@ -10,7 +10,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { matchPriceAndTrends, calculateWeeklyYoY } from '@/lib/calculations'
+import {
+  matchPriceAndTrends,
+  calculateWeeklyYoY,
+  calculateWeekly52WeekHigh,
+  calculateWeekly52WeekLow,
+} from '@/lib/calculations'
 import {
   ComposedChart,
   Bar,
@@ -168,13 +173,17 @@ export function UnifiedChart({
   // 주별 YoY 계산
   const weeklyYoY = calculateWeeklyYoY(priceData)
 
+  // 주별 52주 최고가/최저가 계산
+  const weekly52WeekHigh = calculateWeekly52WeekHigh(priceData)
+  const weekly52WeekLow = calculateWeekly52WeekLow(priceData)
+
   // 모든 데이터 병합
   const fullChartData = priceData.map((point, index) => ({
     date: point.date,
     close: point.close,
     ma13: ma13?.[index] ?? null,
-    week52High: metrics.week52High,
-    week52Low: metrics.week52Low,
+    week52High: weekly52WeekHigh[index] ?? null,
+    week52Low: weekly52WeekLow[index] ?? null,
     trends: matchedData.find(d => d.date === point.date)?.trend ?? null,
     yoy: weeklyYoY[index] ?? null,
   }))
@@ -399,35 +408,33 @@ export function UnifiedChart({
               labelFormatter={label => `날짜: ${label}`}
             />
 
-            {/* 52주 최고가 (ReferenceLine) */}
+            {/* 52주 최고가 라인 */}
             {enabledSeries.week52High && (
-              <ReferenceLine
+              <Line
                 yAxisId="left"
-                y={metrics.week52High}
+                type="monotone"
+                dataKey="week52High"
                 stroke={SERIES_CONFIG.week52High.color}
+                strokeWidth={2}
                 strokeDasharray="5 5"
-                label={{
-                  value: `52주 최고: $${metrics.week52High.toFixed(2)}`,
-                  position: 'right',
-                  fill: SERIES_CONFIG.week52High.color,
-                  fontSize: 12,
-                }}
+                dot={false}
+                name="52주 최고가"
+                isAnimationActive={false}
               />
             )}
 
-            {/* 52주 최저가 (ReferenceLine) */}
+            {/* 52주 최저가 라인 */}
             {enabledSeries.week52Low && (
-              <ReferenceLine
+              <Line
                 yAxisId="left"
-                y={metrics.week52Low}
+                type="monotone"
+                dataKey="week52Low"
                 stroke={SERIES_CONFIG.week52Low.color}
+                strokeWidth={2}
                 strokeDasharray="5 5"
-                label={{
-                  value: `52주 최저: $${metrics.week52Low.toFixed(2)}`,
-                  position: 'right',
-                  fill: SERIES_CONFIG.week52Low.color,
-                  fontSize: 12,
-                }}
+                dot={false}
+                name="52주 최저가"
+                isAnimationActive={false}
               />
             )}
 

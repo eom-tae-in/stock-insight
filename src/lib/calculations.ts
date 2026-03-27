@@ -117,6 +117,40 @@ export function calculateWeeklyYoY(priceData: PriceDataPoint[]): number[] {
 }
 
 /**
+ * 주별 52주 최고가 계산
+ * 각 주차별로 최근 52주(또는 그 이하) 범위 내 최고가를 배열로 반환합니다.
+ */
+export function calculateWeekly52WeekHigh(
+  priceData: PriceDataPoint[]
+): number[] {
+  if (priceData.length === 0) return []
+
+  return priceData.map((point, index) => {
+    const startIndex = Math.max(0, index - 51)
+    const rangeData = priceData.slice(startIndex, index + 1)
+    const high = Math.max(...rangeData.map(p => p.high || p.close))
+    return Math.round(high * 100) / 100
+  })
+}
+
+/**
+ * 주별 52주 최저가 계산
+ * 각 주차별로 최근 52주(또는 그 이하) 범위 내 최저가를 배열로 반환합니다.
+ */
+export function calculateWeekly52WeekLow(
+  priceData: PriceDataPoint[]
+): number[] {
+  if (priceData.length === 0) return []
+
+  return priceData.map((point, index) => {
+    const startIndex = Math.max(0, index - 51)
+    const rangeData = priceData.slice(startIndex, index + 1)
+    const low = Math.min(...rangeData.map(p => p.low || p.close))
+    return Math.round(low * 100) / 100
+  })
+}
+
+/**
  * 가격 데이터와 트렌드 데이터를 날짜 기준으로 매칭
  * 이미 두 데이터 모두 startOfISOWeek로 정규화되어 있어 직접 매칭 가능
  * 비교 차트(ComparisonChart)용으로 사용됩니다.
