@@ -71,6 +71,7 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
           <section className="mb-8">
             <CustomChartView
               searchId={record.id}
+              ticker={record.ticker}
               priceData={record.price_data}
               trendsData={record.trends_data}
               ma13={ma13Values}

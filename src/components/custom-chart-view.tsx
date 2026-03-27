@@ -13,6 +13,7 @@ import type {
 
 interface CustomChartViewProps {
   searchId: string
+  ticker: string
   priceData: PriceDataPoint[]
   trendsData: TrendsDataPoint[]
   ma13?: (number | null)[]
@@ -21,6 +22,7 @@ interface CustomChartViewProps {
 
 export function CustomChartView({
   searchId,
+  ticker,
   priceData,
   trendsData,
   ma13,
@@ -160,6 +162,7 @@ export function CustomChartView({
                   </div>
 
                   <UnifiedChart
+                    ticker={ticker}
                     priceData={priceData}
                     trendsData={trendsData}
                     ma13={ma13}
