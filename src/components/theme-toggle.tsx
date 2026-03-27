@@ -15,7 +15,12 @@ export function ThemeToggle() {
   }
 
   return (
-    <Button variant="outline" size="icon" onClick={cycleTheme}>
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={cycleTheme}
+      className="hover:bg-primary/10 rounded-full"
+    >
       <Sun
         className={`h-[1.2rem] w-[1.2rem] transition-all ${
           resolvedTheme === 'light' ? 'scale-100 rotate-0' : 'scale-0 rotate-90'
