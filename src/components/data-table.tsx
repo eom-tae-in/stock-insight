@@ -95,6 +95,7 @@ export function DataTable({
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
     }))
+    setLoadedCount(ITEMS_PER_PAGE)
   }
 
   const SortHeader = ({
