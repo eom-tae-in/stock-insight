@@ -119,10 +119,21 @@ export function UnifiedChart({
   const [customRange, setCustomRange] = useState('')
   const [rangeLabel, setRangeLabel] = useState<string | null>(null)
 
+  const autoEnableSeries = (weeks: number) => {
+    setEnabledSeries(prev => ({
+      ...prev,
+      ma13: weeks >= 13 ? true : prev.ma13,
+      week52High: weeks >= 52 ? true : prev.week52High,
+      week52Low: weeks >= 52 ? true : prev.week52Low,
+      yoy: weeks >= 52 ? true : prev.yoy,
+    }))
+  }
+
   const handleRangeChange = (weeks: number, label: string) => {
     setDisplayRange(weeks)
     setCustomRange('')
     setRangeLabel(label)
+    autoEnableSeries(weeks)
 
     // 진동 피드백
     if (navigator.vibrate) {
@@ -139,6 +150,7 @@ export function UnifiedChart({
     if (weeks > 0 && weeks <= 260) {
       setDisplayRange(weeks)
       setRangeLabel(`${weeks}주`)
+      autoEnableSeries(weeks)
 
       // 진동 피드백
       if (navigator.vibrate) {

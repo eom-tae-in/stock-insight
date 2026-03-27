@@ -39,6 +39,7 @@ export interface MetricsCardProps {
  */
 export interface MetricsSummaryProps {
   metrics: import('./database').Metrics
+  lastUpdatedAt?: string
 }
 
 /**

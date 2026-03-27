@@ -46,7 +46,10 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
 
           {/* 지표 요약 */}
           <section className="mb-8">
-            <MetricsSummary metrics={metrics} />
+            <MetricsSummary
+              metrics={metrics}
+              lastUpdatedAt={record.last_updated_at}
+            />
           </section>
 
           {/* 통합 분석 차트 */}
