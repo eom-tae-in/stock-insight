@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react'],
   },
+  serverExternalPackages: ['better-sqlite3'],
   async headers() {
     return [
       {
