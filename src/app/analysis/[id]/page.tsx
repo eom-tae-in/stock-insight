@@ -5,8 +5,8 @@ import { Container } from '@/components/layout/container'
 import { Button } from '@/components/ui/button'
 import { MetricsSummary } from '@/components/metrics-summary'
 import { UnifiedChart } from '@/components/unified-chart'
-import { CustomTableBuilder } from '@/components/custom-table-builder'
-import { CustomTableView } from '@/components/custom-table-view'
+import { CustomChartBuilder } from '@/components/custom-chart-builder'
+import { CustomChartView } from '@/components/custom-chart-view'
 import { getSearchById } from '@/lib/db/queries'
 import { calculateMetrics, calculateMA13 } from '@/lib/calculations'
 import { Download, Table } from 'lucide-react'
@@ -59,26 +59,19 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
             />
           </section>
 
-          {/* 커스텀 테이블 빌더 */}
+          {/* 커스텀 차트 빌더 */}
           <section className="mb-8">
-            <CustomTableBuilder
-              searchId={record.id}
-              priceData={record.price_data}
-              trendsData={record.trends_data}
-              ma13={ma13Values}
-            />
+            <CustomChartBuilder searchId={record.id} />
           </section>
 
-          {/* 저장된 커스텀 테이블 */}
+          {/* 저장된 커스텀 차트 */}
           <section className="mb-8">
-            <CustomTableView
+            <CustomChartView
               searchId={record.id}
               priceData={record.price_data}
               trendsData={record.trends_data}
               ma13={ma13Values}
-              yoyChange={metrics.yoyChange}
-              week52High={metrics.week52High}
-              week52Low={metrics.week52Low}
+              metrics={metrics}
             />
           </section>
 
