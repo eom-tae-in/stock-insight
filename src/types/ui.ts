@@ -138,3 +138,21 @@ export interface CustomTableBuilderProps {
   ma13?: (number | null)[]
   onTableCreated?: (table: CustomTable) => void
 }
+
+/**
+ * 커스텀 차트 설정
+ */
+export interface CustomChart {
+  id: string // crypto.randomUUID()
+  name: string // 사용자가 지정한 차트 이름
+  series: string[] // 선택된 시리즈 키 배열
+  createdAt: string // ISO 8601 타임스탬프
+}
+
+/**
+ * 커스텀 차트 빌더 Props
+ */
+export interface CustomChartBuilderProps {
+  searchId: string
+  onChartCreated?: (chart: CustomChart) => void
+}

@@ -37,6 +37,8 @@ export type {
   UnifiedChartProps,
   CustomTable,
   CustomTableBuilderProps,
+  CustomChart,
+  CustomChartBuilderProps,
 } from './ui'
 
 // 공통 타입
