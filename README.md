@@ -57,15 +57,21 @@ cd stock_insight
 npm install
 ```
 
-### 2단계: API 키 설정
+### 2단계: API 키 설정 (선택 사항)
 
 `.env.local` 파일 생성:
 
 ```
-SERPAPI_KEY=your_serpapi_key_here
+FINNHUB_API_KEY=your_finnhub_api_key_here
 ```
 
-[SerpAPI](https://serpapi.com) 가입 후 API 키 발급 필요 (Google Trends 수집용)
+**API 정보:**
+
+- **Finnhub**: [가입](https://finnhub.io) 후 발급 가능 (무료 계정 지원)
+  - 주식 데이터 수집 시 사용
+  - 없으면 로컬 데모 데이터로 자동 사용
+- **Google Trends**: 별도 API 키 불필요
+  - pytrends 라이브러리로 자동 수집
 
 ### 3단계: 개발 서버 실행
 
@@ -132,17 +138,17 @@ npm run format         # 자동 포맷
 
 ## 📊 기술 스택
 
-| 분야             | 기술                                    |
-| ---------------- | --------------------------------------- |
-| **프레임워크**   | Next.js 15.5.3 (App Router + Turbopack) |
-| **런타임**       | React 19.1.0, TypeScript 5              |
-| **UI/스타일**    | TailwindCSS v4, shadcn/ui, Radix UI     |
-| **데이터베이스** | better-sqlite3 (로컬 SQLite)            |
-| **데이터 소스**  | Yahoo Finance, SerpAPI (Google Trends)  |
-| **폼/유효성**    | React Hook Form, Zod                    |
-| **아이콘**       | Lucide Icons                            |
-| **차트**         | Recharts                                |
-| **개발 도구**    | ESLint, Prettier, Husky, lint-staged    |
+| 분야             | 기술                                     |
+| ---------------- | ---------------------------------------- |
+| **프레임워크**   | Next.js 15.5.3 (App Router + Turbopack)  |
+| **런타임**       | React 19.1.0, TypeScript 5               |
+| **UI/스타일**    | TailwindCSS v4, shadcn/ui, Radix UI      |
+| **데이터베이스** | better-sqlite3 (로컬 SQLite)             |
+| **데이터 소스**  | Finnhub (주식), pytrends (Google Trends) |
+| **폼/유효성**    | React Hook Form, Zod                     |
+| **아이콘**       | Lucide Icons                             |
+| **차트**         | Recharts                                 |
+| **개발 도구**    | ESLint, Prettier, Husky, lint-staged     |
 
 ---
 
@@ -209,8 +215,8 @@ stock_insight/
 - **목적**: 새로운 종목 데이터 조회 및 저장
 - **기능**:
   - Ticker/회사명 자동완성 검색
-  - Yahoo Finance에서 5년 주간 데이터 수집
-  - SerpAPI로 Google Trends 검색 관심도 수집
+  - Finnhub에서 5년 주간 주가 데이터 수집
+  - pytrends로 Google Trends 검색 관심도 수집
   - 수집 데이터 자동 DB 저장
 
 ### 상세 분석 (`/analysis/[id]`)
