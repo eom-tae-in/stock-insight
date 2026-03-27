@@ -126,7 +126,7 @@ export function CustomChartBuilder({
         커스텀 차트 만들기
       </Button>
 
-      <DialogContent className="m-2 max-w-6xl rounded-2xl border-0 bg-white p-0 shadow-2xl sm:m-4 dark:bg-slate-950">
+      <DialogContent className="m-2 max-w-7xl rounded-2xl border-0 bg-white p-0 shadow-2xl sm:m-4 dark:bg-slate-950">
         {/* 닫기 버튼 */}
         <button
           onClick={() => setIsOpen(false)}
@@ -232,20 +232,20 @@ export function CustomChartBuilder({
                 포함할 시리즈
               </Label>
 
-              <div className="space-y-2">
+              <div className="grid grid-cols-3 gap-3">
                 {AVAILABLE_SERIES.map(series => (
                   <button
                     key={series.key}
                     onClick={() => toggleSeries(series.key)}
                     disabled={isSubmitting}
-                    className={`flex items-center gap-2 rounded-lg border-2 px-3 py-2 transition-all duration-200 ${
+                    className={`flex flex-col items-center justify-center gap-2 rounded-lg border-2 px-4 py-4 text-center transition-all duration-200 ${
                       selectedSeries.includes(series.key)
                         ? 'border-blue-300 bg-gradient-to-br from-blue-50 to-blue-50/50 dark:border-blue-700 dark:from-blue-950/50 dark:to-blue-950/30'
                         : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50 dark:border-slate-700 dark:bg-slate-900/30 dark:hover:border-slate-600'
                     }`}
                   >
                     <div
-                      className={`h-4 w-4 rounded-md transition-all ${
+                      className={`h-5 w-5 rounded-md transition-all ${
                         selectedSeries.includes(series.key)
                           ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-950'
                           : ''
@@ -257,8 +257,8 @@ export function CustomChartBuilder({
                         border: `2px solid ${series.color}`,
                       }}
                     />
-                    <div className="flex-1 text-left">
-                      <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                         {series.label}
                       </p>
                       {series.minWeeks > 0 && (
