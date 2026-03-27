@@ -232,7 +232,7 @@ export function CustomChartBuilder({
                 포함할 시리즈
               </Label>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-2">
                 {AVAILABLE_SERIES.map(series => (
                   <button
                     key={series.key}
