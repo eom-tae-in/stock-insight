@@ -42,7 +42,8 @@ export function upsertSearchRecord(record: SearchRecord): string {
           week52_low = ?,
           price_data = ?,
           trends_data = ?,
-          last_updated_at = ?
+          last_updated_at = ?,
+          searched_at = ?
         WHERE id = ?`
       ).run(
         raw.company_name,
@@ -55,6 +56,7 @@ export function upsertSearchRecord(record: SearchRecord): string {
         raw.price_data,
         raw.trends_data,
         raw.last_updated_at,
+        raw.searched_at,
         existing.id
       )
 

@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { Download } from 'lucide-react'
+import { matchPriceAndTrends } from '@/lib/calculations'
 import {
   ComposedChart,
   Bar,
@@ -20,11 +21,13 @@ export function ComparisonChart({
   trendsData,
   onDownload,
 }: ComparisonChartProps) {
-  // 동일 길이 시퀀스 기반 직접 매칭
-  const chartData = priceData.map((point, index) => ({
-    date: point.date,
-    price: point.close,
-    trends: trendsData[index]?.value ?? 0,
+  // 날짜 기준으로 정확히 매칭된 데이터
+  const matchedData = matchPriceAndTrends(priceData, trendsData)
+
+  const chartData = matchedData.map(item => ({
+    date: item.date,
+    price: item.price,
+    trends: item.trend,
   }))
 
   // X축 레이블: 매 12주마다 표시
@@ -85,6 +88,7 @@ export function ComparisonChart({
               labelFormatter={label => `날짜: ${label}`}
             />
             <Legend />
+            {/* TODO: Phase 4에서 다크모드 지원 시 색상을 CSS 변수로 변경 */}
             <Bar
               yAxisId="left"
               dataKey="price"

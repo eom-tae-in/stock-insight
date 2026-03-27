@@ -19,7 +19,7 @@ const searchSchema = z.object({
   ticker: z
     .string()
     .min(1, '종목 심볼을 입력해주세요')
-    .max(5, '종목 심볼은 최대 5자입니다')
+    .max(6, '종목 심볼은 최대 6자입니다 (예: BRK.B)')
     .transform(val => val.toUpperCase()),
 })
 
@@ -68,11 +68,6 @@ export function SearchForm({
                 <Input
                   placeholder="예: AAPL, TSLA, MSFT"
                   disabled={isLoading}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      form.handleSubmit(handleSubmit)()
-                    }
-                  }}
                   className="text-center text-lg"
                   {...field}
                 />

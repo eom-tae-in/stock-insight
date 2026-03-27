@@ -2,13 +2,17 @@ import { z } from 'zod'
 
 /**
  * Ticker 입력 검증 스키마
+ *
+ * 미국 주식 심볼 규칙:
+ * - 1~5자 (BRK.B, MSFT, etc.)
+ * - 영문 대문자, 숫자, 점(.) 허용
  */
 export const TickerInputSchema = z
   .string()
   .min(1, '종목 심볼을 입력하세요')
-  .max(5, '종목 심볼은 5자 이내여야 합니다')
+  .max(6, '종목 심볼은 6자 이내여야 합니다')
   .toUpperCase()
-  .regex(/^[A-Z0-9]+$/, '영문 대문자와 숫자만 입력 가능합니다')
+  .regex(/^[A-Z0-9.]+$/, '영문 대문자, 숫자, 점(.)만 입력 가능합니다')
 
 /**
  * 주가 데이터 포인트 검증

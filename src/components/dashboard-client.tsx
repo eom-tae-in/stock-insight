@@ -45,8 +45,9 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
       // 데이터 재조회 (새로고침된 레코드 반영)
       const getAllResponse = await fetch('/api/searches')
       if (getAllResponse.ok) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const allData: any = await getAllResponse.json()
+        const allData = (await getAllResponse.json()) as {
+          data?: SearchRecord[]
+        }
         if (allData.data && Array.isArray(allData.data)) {
           setRecords(allData.data)
         }
