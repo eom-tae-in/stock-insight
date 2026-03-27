@@ -75,3 +75,58 @@ export function generateExcelFile({
   // 파일 다운로드
   XLSX.writeFile(workbook, filename)
 }
+
+interface TableExcelRow {
+  date: string
+  close: number
+  trends: number
+  ma13: number | null
+  yoy: number
+}
+
+/**
+ * 테이블 데이터를 xlsx 파일로 생성하고 다운로드합니다.
+ * 단일 시트: 일자, 종가, 검색 관심도, 13주 MA, YoY
+ */
+export function generateTableExcelFile(
+  ticker: string,
+  tableData: TableExcelRow[]
+): void {
+  // 데이터 검증
+  if (!tableData || tableData.length === 0) {
+    throw new Error('테이블 데이터가 없습니다.')
+  }
+
+  // 테이블 데이터 시트
+  const tableSheetData = [
+    ['일자', '종가 ($)', '검색 관심도 (0-100)', '13주 MA ($)', 'YoY (%)'],
+    ...tableData.map(row => [
+      row.date,
+      row.close.toFixed(2),
+      row.trends,
+      row.ma13 !== null ? row.ma13.toFixed(2) : '',
+      row.yoy.toFixed(2),
+    ]),
+  ]
+
+  // 워크북 생성
+  const workbook = XLSX.utils.book_new()
+  const tableSheet = XLSX.utils.aoa_to_sheet(tableSheetData)
+
+  // 열 너비 설정
+  tableSheet['!cols'] = [
+    { wch: 12 },
+    { wch: 12 },
+    { wch: 18 },
+    { wch: 14 },
+    { wch: 12 },
+  ]
+
+  XLSX.utils.book_append_sheet(workbook, tableSheet, '데이터')
+
+  // 파일명: {ticker}_Table_{YYYYMMDD}.xlsx
+  const filename = `${ticker}_Table_${format(new Date(), 'yyyyMMdd')}.xlsx`
+
+  // 파일 다운로드
+  XLSX.writeFile(workbook, filename)
+}
