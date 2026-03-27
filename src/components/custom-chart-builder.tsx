@@ -126,7 +126,7 @@ export function CustomChartBuilder({
         커스텀 차트 만들기
       </Button>
 
-      <DialogContent className="m-2 flex max-h-[75vh] max-w-[90vw] flex-col rounded-2xl border-0 bg-white p-0 shadow-2xl sm:m-4 dark:bg-slate-950">
+      <DialogContent className="m-2 flex max-h-[70vh] w-[950px] flex-col rounded-2xl border-0 bg-white p-0 shadow-2xl sm:m-4 dark:bg-slate-950">
         {/* 닫기 버튼 */}
         <button
           onClick={() => setIsOpen(false)}
@@ -135,53 +135,50 @@ export function CustomChartBuilder({
           <X className="h-5 w-5" />
         </button>
 
-        {/* 헤더 */}
-        <div className="border-b border-slate-200 px-8 py-5 dark:border-slate-700">
+        {/* 헤더 (고정) */}
+        <div className="flex-shrink-0 border-b border-slate-200 px-8 py-6 dark:border-slate-700">
           <DialogHeader className="text-left">
             <DialogTitle className="text-2xl font-bold">
               커스텀 차트 생성
             </DialogTitle>
-            <DialogDescription className="mt-1 text-sm">
+            <DialogDescription className="mt-2 text-sm">
               원하는 데이터를 선택하여 나만의 분석 차트를 만들어보세요
             </DialogDescription>
           </DialogHeader>
         </div>
 
-        {/* 콘텐츠 */}
-        <div className="flex-1 space-y-4 overflow-y-auto px-8 py-5">
-          {/* 차트 이름 */}
-          <div className="space-y-2">
-            <Label className="text-sm font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
-              차트 이름
-            </Label>
-            <Input
-              placeholder="예: 최근 1년 가격 추이"
-              value={chartName}
-              onChange={e => setChartName(e.target.value)}
-              disabled={isSubmitting}
-              className="h-10 border-slate-200 bg-slate-50/50 text-sm placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-900/30 dark:placeholder:text-slate-500"
-            />
-          </div>
-
-          {/* 시간 범위 & 시리즈 선택 */}
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
-            {/* 시간 범위 */}
-            <div className="space-y-3">
-              <Label className="text-sm font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
-                시간 범위
+        {/* 콘텐츠 (스크롤 가능) */}
+        <div className="flex-1 overflow-y-auto px-8 py-6">
+          <div className="space-y-6">
+            {/* 차트 이름 */}
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold tracking-wider text-slate-600 uppercase dark:text-slate-400">
+                차트 이름
               </Label>
+              <Input
+                placeholder="예: 최근 1년 가격 추이"
+                value={chartName}
+                onChange={e => setChartName(e.target.value)}
+                disabled={isSubmitting}
+                className="h-9 border-slate-200 bg-slate-50/50 text-sm placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-900/30 dark:placeholder:text-slate-500"
+              />
+            </div>
 
-              {/* 프리셋 버튼들 */}
-              <div className="grid grid-cols-5 gap-2">
+            {/* 기간 선택 (Segmented Control) */}
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold tracking-wider text-slate-600 uppercase dark:text-slate-400">
+                기간 선택
+              </Label>
+              <div className="flex gap-1 rounded-lg bg-slate-100/50 p-1 dark:bg-slate-800/50">
                 {TIME_RANGES.map(preset => (
                   <button
                     key={preset.weeks}
                     onClick={() => setTimeRange(preset.weeks)}
                     disabled={isSubmitting}
-                    className={`rounded-lg px-2 py-2 text-xs font-semibold transition-all duration-200 ${
+                    className={`flex-1 rounded-md px-3 py-2 text-xs font-semibold transition-all duration-200 ${
                       timeRange === preset.weeks
-                        ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30'
-                        : 'border-2 border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50/50 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-200 dark:hover:border-blue-600 dark:hover:bg-blue-950/30'
+                        ? 'bg-blue-500 text-white shadow-md'
+                        : 'text-slate-600 hover:bg-slate-200/50 dark:text-slate-300 dark:hover:bg-slate-700/50'
                     }`}
                   >
                     {preset.label}
@@ -190,32 +187,29 @@ export function CustomChartBuilder({
               </div>
 
               {/* 커스텀 입력 */}
-              <div className="space-y-2">
-                <Label
-                  htmlFor="custom-weeks"
-                  className="text-xs font-medium text-slate-500 dark:text-slate-400"
-                >
-                  커스텀 입력
-                </Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="custom-weeks"
-                    type="number"
-                    min="1"
-                    max="260"
-                    value={timeRange}
-                    onChange={e => {
-                      const weeks = parseInt(e.target.value) || 1
-                      setTimeRange(Math.min(Math.max(1, weeks), 260))
-                    }}
-                    disabled={isSubmitting}
-                    className="h-10 border-slate-200 bg-slate-50/50 text-sm dark:border-slate-700 dark:bg-slate-900/30"
-                  />
-                  <span className="text-sm font-semibold whitespace-nowrap text-slate-600 dark:text-slate-300">
-                    주
-                  </span>
-                </div>
-              </div>
+              {timeRange !== 52 &&
+                timeRange !== 104 &&
+                timeRange !== 156 &&
+                timeRange !== 208 &&
+                timeRange !== 260 && (
+                  <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/50 p-2 dark:border-slate-700 dark:bg-slate-900/30">
+                    <Input
+                      type="number"
+                      min="1"
+                      max="260"
+                      value={timeRange}
+                      onChange={e => {
+                        const weeks = parseInt(e.target.value) || 1
+                        setTimeRange(Math.min(Math.max(1, weeks), 260))
+                      }}
+                      disabled={isSubmitting}
+                      className="border-0 bg-transparent text-xs font-semibold placeholder:text-slate-400"
+                    />
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                      주
+                    </span>
+                  </div>
+                )}
 
               {timeRange < minRequiredWeeks && minRequiredWeeks > 0 && (
                 <div className="rounded-lg bg-amber-50/80 p-2 dark:bg-amber-950/30">
@@ -227,27 +221,26 @@ export function CustomChartBuilder({
             </div>
 
             {/* 시리즈 선택 */}
-            <div className="space-y-3">
-              <Label className="text-sm font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold tracking-wider text-slate-600 uppercase dark:text-slate-400">
                 포함할 시리즈
               </Label>
-
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-2">
                 {AVAILABLE_SERIES.map(series => (
                   <button
                     key={series.key}
                     onClick={() => toggleSeries(series.key)}
                     disabled={isSubmitting}
-                    className={`flex flex-col items-center justify-center gap-2 rounded-lg border-2 px-4 py-4 text-center transition-all duration-200 ${
+                    className={`flex flex-col items-center gap-1.5 rounded-lg border-2 px-3 py-3 transition-all duration-200 ${
                       selectedSeries.includes(series.key)
-                        ? 'border-blue-300 bg-gradient-to-br from-blue-50 to-blue-50/50 dark:border-blue-700 dark:from-blue-950/50 dark:to-blue-950/30'
-                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50 dark:border-slate-700 dark:bg-slate-900/30 dark:hover:border-slate-600'
+                        ? 'border-blue-400 bg-blue-50/60 dark:border-blue-500 dark:bg-blue-950/40'
+                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/30 dark:border-slate-700 dark:bg-slate-900/20 dark:hover:border-slate-600 dark:hover:bg-slate-900/30'
                     }`}
                   >
                     <div
-                      className={`h-5 w-5 rounded-md transition-all ${
+                      className={`h-4 w-4 rounded-sm transition-all ${
                         selectedSeries.includes(series.key)
-                          ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-950'
+                          ? 'ring-2 ring-blue-400 ring-offset-1 dark:ring-offset-slate-950'
                           : ''
                       }`}
                       style={{
@@ -257,51 +250,49 @@ export function CustomChartBuilder({
                         border: `2px solid ${series.color}`,
                       }}
                     />
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        {series.label}
+                    <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                      {series.label}
+                    </p>
+                    {series.minWeeks > 0 && (
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        최소 {series.minWeeks}주
                       </p>
-                      {series.minWeeks > 0 && (
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                          최소 {series.minWeeks}주
-                        </p>
-                      )}
-                    </div>
+                    )}
                   </button>
                 ))}
               </div>
             </div>
-          </div>
 
-          {/* 선택된 데이터 미리보기 */}
-          {selectedSeries.length > 0 && (
-            <div className="space-y-2 border-t border-slate-200 pt-4 dark:border-slate-700">
-              <Label className="text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
-                선택된 데이터
-              </Label>
-              <div className="flex flex-wrap gap-2">
-                {selectedSeries.map(key => {
-                  const series = AVAILABLE_SERIES.find(s => s.key === key)
-                  return (
-                    <div
-                      key={key}
-                      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold text-white shadow-md"
-                      style={{
-                        backgroundColor: series?.color,
-                      }}
-                    >
-                      <div className="h-1.5 w-1.5 rounded-full bg-white/80" />
-                      {series?.label}
-                    </div>
-                  )
-                })}
+            {/* 선택된 데이터 미리보기 */}
+            {selectedSeries.length > 0 && (
+              <div className="space-y-2 border-t border-slate-200 pt-4 dark:border-slate-700">
+                <p className="text-xs font-semibold tracking-wider text-slate-600 uppercase dark:text-slate-400">
+                  선택된 데이터
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedSeries.map(key => {
+                    const series = AVAILABLE_SERIES.find(s => s.key === key)
+                    return (
+                      <div
+                        key={key}
+                        className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold text-white shadow-sm"
+                        style={{
+                          backgroundColor: series?.color,
+                        }}
+                      >
+                        <div className="h-1 w-1 rounded-full bg-white/70" />
+                        {series?.label}
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
-        {/* 푸터 */}
-        <div className="sticky bottom-0 flex gap-3 border-t border-slate-200 bg-white px-8 py-4 dark:border-slate-700 dark:bg-slate-950">
+        {/* 푸터 (고정, 그림자) */}
+        <div className="flex flex-shrink-0 gap-3 border-t border-slate-200 bg-white px-8 py-4 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] dark:border-slate-700 dark:bg-slate-950">
           <Button
             variant="outline"
             onClick={() => setIsOpen(false)}
