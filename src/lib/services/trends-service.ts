@@ -36,6 +36,10 @@ interface SerpAPIResponse {
 async function callGoogleTrendsAPI(
   keyword: string
 ): Promise<TrendsDataPoint[]> {
+  if (!env.SERPAPI_KEY) {
+    throw new Error('SERPAPI_KEY is not configured')
+  }
+
   const params = new URLSearchParams({
     engine: 'google_trends',
     q: keyword,

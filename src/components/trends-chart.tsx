@@ -46,6 +46,7 @@ export function TrendsChart({ trendsData, onDownload }: TrendsChartProps) {
             margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
           >
             <defs>
+              {/* TODO: Phase 4에서 다크모드 지원 시 색상을 CSS 변수로 변경 */}
               <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
                 <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1} />

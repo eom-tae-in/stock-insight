@@ -52,7 +52,7 @@ export interface StockDetailProps {
  */
 export interface PriceChartProps {
   priceData: PriceDataPoint[]
-  ma13?: number[]
+  ma13?: (number | null)[]
   onDownload?: () => Promise<void>
 }
 

@@ -9,8 +9,10 @@ const envSchema = z.object({
     .default('development'),
   SERPAPI_KEY: z
     .string()
-    .min(1, 'SERPAPI_KEY는 필수입니다')
-    .describe('Google Trends API 키 (https://serpapi.com 발급)'),
+    .optional()
+    .describe(
+      'Google Trends API 키 (https://serpapi.com 발급) - 없으면 주가만 조회됨'
+    ),
 })
 
 /**
@@ -31,11 +33,10 @@ function validateEnv() {
         .map(issue => `- ${String(issue.path.join('.'))}: ${issue.message}`)
         .join('\n')
 
-      console.error(`❌ 환경 변수 검증 실패:\n${missing}\n`)
-      console.error('💡 .env 파일을 생성하거나 다음 변수를 설정하세요:')
-      console.error('  SERPAPI_KEY=your_api_key\n')
-
-      throw new Error('필수 환경 변수가 설정되지 않았습니다')
+      if (missing) {
+        console.error(`❌ 환경 변수 검증 실패:\n${missing}\n`)
+        throw new Error('필수 환경 변수가 설정되지 않았습니다')
+      }
     }
     throw error
   }

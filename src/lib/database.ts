@@ -38,6 +38,12 @@ export function getDatabase(): Database.Database {
 /**
  * 마이그레이션 실행
  * 모든 SQL 마이그레이션 파일을 순서대로 실행합니다
+ *
+ * NOTE: 현재 모든 마이그레이션을 매 실행마다 재실행합니다.
+ * CREATE TABLE IF NOT EXISTS이므로 중복 실행에 안전하지만,
+ * 향후 ALTER TABLE 같은 상태 변경 마이그레이션을 추가할 경우
+ * schema_migrations 테이블을 도입하여 실행 이력을 추적해야 합니다.
+ * Phase 5 이후에 개선 예정입니다.
  */
 function runMigrations(database: Database.Database): void {
   const migrationsDir = path.join(process.cwd(), 'data', 'migrations')

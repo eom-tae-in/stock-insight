@@ -14,7 +14,11 @@ import { fetchStockData } from '@/lib/services/stock-service'
 import { fetchTrendsData } from '@/lib/services/trends-service'
 import { calculateMetrics } from '@/lib/calculations'
 import { TickerInputSchema } from '@/lib/validation'
-import { getAllSearches, upsertSearch } from '@/lib/db/queries'
+import {
+  getAllSearches,
+  upsertSearch,
+  replaceStockData,
+} from '@/lib/db/queries'
 import { createSuccessResponse, createErrorResponse } from '@/lib/api-helpers'
 import type { SearchRecord, TrendsDataPoint } from '@/types'
 import crypto from 'crypto'
@@ -46,7 +50,7 @@ export async function POST(request: NextRequest) {
     if (!result.success) {
       return createErrorResponse(
         'INVALID_TICKER',
-        '올바른 종목 심볼을 입력하세요 (1-5자, 영문/숫자)',
+        '올바른 종목 심볼을 입력하세요 (1-6자, 영문/숫자/점 포함)',
         400
       )
     }
@@ -108,6 +112,9 @@ export async function POST(request: NextRequest) {
     }
 
     const id = upsertSearch(searchRecord)
+
+    // 별도 테이블(price_data, trends_data)도 동기화
+    replaceStockData(id, stockData.priceData, trendsData)
 
     // 5. 응답
     return createSuccessResponse(

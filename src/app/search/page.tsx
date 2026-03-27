@@ -25,7 +25,9 @@ export default function SearchPage() {
     setProgress({ stage: 'fetching-price', message: '' })
 
     try {
-      // 단계별 UI 진행 (실제 API는 동기 처리)
+      // 단계별 UI 진행 (더미 진행 표시)
+      // NOTE: 실제 API는 동기 처리되므로, 이 타이머는 시각적 피드백만 제공합니다.
+      // Phase 4에서 실시간 진행 상태(SSE/폴링)로 개선 예정입니다.
       const progressTimer1 = setTimeout(() => {
         setProgress({ stage: 'fetching-trends', message: '' })
       }, 2000)

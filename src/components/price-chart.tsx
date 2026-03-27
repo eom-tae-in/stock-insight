@@ -77,6 +77,7 @@ export function PriceChart({ priceData, ma13, onDownload }: PriceChartProps) {
               name="종가"
               isAnimationActive={false}
             />
+            {/* TODO: Phase 4에서 다크모드 지원 시 색상을 CSS 변수로 변경 */}
             <Line
               type="monotone"
               dataKey="ma13"

@@ -13,6 +13,15 @@ import type { PriceDataPoint } from '@/types'
 
 const yf = new YahooFinance()
 
+/**
+ * Yahoo Finance의 price 모듈 응답 형식
+ */
+interface YFPriceModule {
+  longName?: string
+  currentPrice?: number
+  previousClose?: number
+}
+
 export interface StockDataResult {
   companyName: string
   currentPrice: number
@@ -35,13 +44,10 @@ export async function fetchStockData(ticker: string): Promise<StockDataResult> {
     })
 
     if (quoteSummaryData?.price) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const price = quoteSummaryData.price as any
-      companyName = (price.longName as string | undefined) || ticker
-      currentPrice =
-        typeof price.currentPrice === 'number' ? price.currentPrice : 0
-      previousClose =
-        typeof price.previousClose === 'number' ? price.previousClose : 0
+      const price = quoteSummaryData.price as YFPriceModule
+      companyName = price.longName || ticker
+      currentPrice = price.currentPrice ?? 0
+      previousClose = price.previousClose ?? 0
     }
   } catch (error) {
     // quoteSummary 실패 시에도 historical로 진행
