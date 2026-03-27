@@ -1,9 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { Download, Check } from 'lucide-react'
+import { Download, Check, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { matchPriceAndTrends, calculateWeeklyYoY } from '@/lib/calculations'
 import {
   ComposedChart,
@@ -13,7 +19,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartTooltip,
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts'
@@ -25,36 +31,42 @@ const SERIES_CONFIG = {
     color: '#3b82f6',
     yAxisId: 'left',
     enabled: true,
+    minWeeks: 0,
   },
   ma13: {
     name: '13주 MA',
     color: '#f97316',
     yAxisId: 'left',
     enabled: true,
+    minWeeks: 13,
   },
   week52High: {
     name: '52주 최고가',
     color: '#22c55e',
     yAxisId: 'left',
     enabled: true,
+    minWeeks: 52,
   },
   week52Low: {
     name: '52주 최저가',
     color: '#ef4444',
     yAxisId: 'left',
     enabled: true,
+    minWeeks: 52,
   },
   trends: {
     name: '검색 관심도',
     color: '#a78bfa',
     yAxisId: 'middle',
     enabled: true,
+    minWeeks: 0,
   },
   yoy: {
     name: '52주 YoY',
     color: '#f59e0b',
     yAxisId: 'right',
     enabled: true,
+    minWeeks: 52,
   },
 }
 
@@ -225,31 +237,55 @@ export function UnifiedChart({
 
       {/* 토글 버튼 + PNG 다운로드 (현대적 디자인) */}
       <div className="flex items-center justify-between gap-2">
-        <div className="flex flex-wrap gap-2">
-          {Object.entries(SERIES_CONFIG).map(([key, config]) => (
-            <button
-              key={key}
-              onClick={() => toggleSeries(key as SeriesKey)}
-              className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-all ${
-                enabledSeries[key as SeriesKey]
-                  ? 'bg-opacity-100 text-white'
-                  : 'border-muted-foreground/30 text-muted-foreground hover:border-muted-foreground/50 border bg-transparent'
-              }`}
-              style={
-                enabledSeries[key as SeriesKey]
-                  ? { backgroundColor: config.color }
-                  : {}
-              }
-            >
-              <span
-                className="flex h-2 w-2 rounded-full"
-                style={{ backgroundColor: config.color }}
-              />
-              {config.name}
-              {enabledSeries[key as SeriesKey] && <Check className="h-3 w-3" />}
-            </button>
-          ))}
-        </div>
+        <TooltipProvider>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(SERIES_CONFIG).map(([key, config]) => {
+              const isDisabled = displayRange < config.minWeeks
+              return (
+                <Tooltip key={key} delayDuration={0}>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => toggleSeries(key as SeriesKey)}
+                      disabled={isDisabled}
+                      className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-all ${
+                        isDisabled
+                          ? 'cursor-not-allowed opacity-50'
+                          : enabledSeries[key as SeriesKey]
+                            ? 'bg-opacity-100 text-white'
+                            : 'border-muted-foreground/30 text-muted-foreground hover:border-muted-foreground/50 border bg-transparent'
+                      }`}
+                      style={
+                        !isDisabled && enabledSeries[key as SeriesKey]
+                          ? { backgroundColor: config.color }
+                          : {}
+                      }
+                    >
+                      <span
+                        className="flex h-2 w-2 rounded-full"
+                        style={{ backgroundColor: config.color }}
+                      />
+                      {config.name}
+                      {!isDisabled && enabledSeries[key as SeriesKey] && (
+                        <Check className="h-3 w-3" />
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  {isDisabled && (
+                    <TooltipContent
+                      side="top"
+                      className="flex items-center gap-1 bg-yellow-600/90"
+                    >
+                      <AlertCircle className="h-4 w-4" />
+                      <span>
+                        {config.minWeeks}주 이상 입력하셔야 볼 수 있어요
+                      </span>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              )
+            })}
+          </div>
+        </TooltipProvider>
 
         {/* PNG 다운로드 버튼 */}
         <Button
@@ -336,7 +372,7 @@ export function UnifiedChart({
               />
             )}
 
-            <Tooltip
+            <RechartTooltip
               contentStyle={{
                 backgroundColor: '#1f2937',
                 border: '1px solid #374151',
