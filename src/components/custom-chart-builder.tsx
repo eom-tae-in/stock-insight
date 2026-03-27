@@ -173,9 +173,10 @@ export function CustomChartBuilder({
                 min="1"
                 max="260"
                 value={timeRange}
-                onChange={e =>
-                  setTimeRange(Math.max(1, parseInt(e.target.value) || 1))
-                }
+                onChange={e => {
+                  const weeks = parseInt(e.target.value) || 1
+                  setTimeRange(Math.min(Math.max(1, weeks), 260))
+                }}
                 disabled={isSubmitting}
                 className="flex-1"
                 placeholder="예: 52"

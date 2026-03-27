@@ -146,15 +146,17 @@ export function UnifiedChart({
   }
 
   const handleCustomRange = (value: string) => {
-    setCustomRange(value)
     const weeks = parseInt(value)
-    if (weeks > 0 && weeks <= 260) {
-      setDisplayRange(weeks)
-      disableAllSeries()
+    if (value === '' || (weeks > 0 && weeks <= 260)) {
+      setCustomRange(value)
+      if (weeks > 0 && weeks <= 260) {
+        setDisplayRange(weeks)
+        disableAllSeries()
 
-      // 진동 피드백
-      if (navigator.vibrate) {
-        navigator.vibrate(50)
+        // 진동 피드백
+        if (navigator.vibrate) {
+          navigator.vibrate(50)
+        }
       }
     }
   }
