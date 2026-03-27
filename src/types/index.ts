@@ -11,7 +11,7 @@ export type {
   GoogleTrendsData,
   SerpAPIGoogleTrendsResponse,
   APIError,
-} from './api';
+} from './api'
 
 // 데이터베이스 타입
 export type {
@@ -20,7 +20,8 @@ export type {
   SearchRecord,
   SearchRecordRaw,
   Metrics,
-} from './database';
+  CalculatedMetrics,
+} from './database'
 
 // UI 타입
 export type {
@@ -33,4 +34,14 @@ export type {
   SearchFormProps,
   ProgressState,
   Downloadable,
-} from './ui';
+} from './ui'
+
+// 공통 타입
+export type {
+  ApiResponse,
+  ApiErrorResponse,
+  ApiResult,
+  PaginatedResponse,
+  AsyncStatus,
+  AsyncState,
+} from './common'
