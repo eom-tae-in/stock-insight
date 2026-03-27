@@ -24,11 +24,11 @@ const AVAILABLE_SERIES = [
 ]
 
 const TIME_RANGES = [
-  { weeks: 13, label: '13주' },
-  { weeks: 26, label: '26주' },
-  { weeks: 52, label: '52주' },
-  { weeks: 104, label: '104주' },
-  { weeks: 260, label: '260주' },
+  { weeks: 52, label: '1년' },
+  { weeks: 104, label: '2년' },
+  { weeks: 156, label: '3년' },
+  { weeks: 208, label: '4년' },
+  { weeks: 260, label: '5년' },
 ]
 
 export function CustomChartBuilder({
@@ -127,9 +127,9 @@ export function CustomChartBuilder({
         커스텀 차트 만들기
       </Button>
 
-      <DialogContent className="max-w-2xl rounded-3xl border-2 border-blue-500/20 bg-gradient-to-br from-blue-50/50 to-white p-0 dark:from-blue-950/20 dark:to-slate-950">
+      <DialogContent className="max-w-lg rounded-3xl border-2 border-blue-500/20 bg-gradient-to-br from-blue-50/50 to-white p-0 dark:from-blue-950/20 dark:to-slate-950">
         {/* 헤더 */}
-        <div className="border-b border-blue-200/30 px-8 py-8 dark:border-blue-900/30">
+        <div className="border-b border-blue-200/30 px-8 py-6 dark:border-blue-900/30">
           <button
             onClick={() => setIsOpen(false)}
             className="hover:bg-muted absolute top-8 right-8 rounded-full p-1 transition-colors"
@@ -138,40 +138,37 @@ export function CustomChartBuilder({
           </button>
 
           <DialogHeader className="text-left">
-            <DialogTitle className="text-3xl font-bold">
+            <DialogTitle className="text-2xl font-bold">
               새 커스텀 차트 만들기
             </DialogTitle>
-            <DialogDescription className="mt-2 text-base">
-              원하는 시리즈를 선택하여 독립적인 분석 차트를 생성하세요
+            <DialogDescription className="mt-1 text-sm">
+              원하는 시리즈를 선택하여 분석 차트를 생성하세요
             </DialogDescription>
           </DialogHeader>
         </div>
 
         {/* 콘텐츠 */}
-        <div className="space-y-8 px-8 py-8">
+        <div className="space-y-6 px-8 py-6">
           {/* 차트 이름 */}
-          <div className="space-y-3">
+          <div className="space-y-2">
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-blue-500" />
-              <Label className="text-lg font-semibold">차트 이름</Label>
+              <Label className="text-base font-semibold">차트 이름</Label>
             </div>
             <Input
               placeholder="예: 최근 3개월 가격 추이"
               value={chartName}
               onChange={e => setChartName(e.target.value)}
               disabled={isSubmitting}
-              className="h-11 border-blue-200/50 bg-white/80 text-base dark:border-blue-900/50 dark:bg-slate-900/50"
+              className="h-10 border-blue-200/50 bg-white/80 dark:border-blue-900/50 dark:bg-slate-900/50"
             />
-            <p className="text-muted-foreground text-sm">
-              이 차트를 구분하기 위한 이름을 입력하세요
-            </p>
           </div>
 
           {/* 시간 범위 */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-blue-500" />
-              <Label className="text-lg font-semibold">시간 범위</Label>
+              <Label className="text-base font-semibold">시간 범위</Label>
             </div>
 
             {/* 프리셋 버튼들 */}
@@ -181,10 +178,10 @@ export function CustomChartBuilder({
                   key={preset.weeks}
                   onClick={() => setTimeRange(preset.weeks)}
                   disabled={isSubmitting}
-                  className={`rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+                  className={`rounded-lg px-2 py-2.5 text-sm font-semibold transition-all duration-200 ${
                     timeRange === preset.weeks
                       ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
-                      : 'border border-blue-200/50 bg-white/60 text-slate-700 hover:bg-blue-50/80 dark:border-blue-900/50 dark:bg-slate-800/60 dark:text-slate-200 dark:hover:bg-blue-950/30'
+                      : 'border border-blue-200/50 bg-white/80 text-slate-700 hover:bg-blue-50/80 dark:border-blue-900/50 dark:bg-slate-800/70 dark:text-slate-200 dark:hover:bg-blue-950/30'
                   }`}
                 >
                   {preset.label}
@@ -225,10 +222,10 @@ export function CustomChartBuilder({
           </div>
 
           {/* 시리즈 선택 */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-blue-500" />
-              <Label className="text-lg font-semibold">포함할 시리즈</Label>
+              <Label className="text-base font-semibold">포함할 시리즈</Label>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -299,12 +296,12 @@ export function CustomChartBuilder({
         </div>
 
         {/* 푸터 */}
-        <div className="flex gap-3 border-t border-blue-200/30 px-8 py-6 dark:border-blue-900/30">
+        <div className="flex gap-3 border-t border-blue-200/30 px-8 py-5 dark:border-blue-900/30">
           <Button
             variant="outline"
             onClick={() => setIsOpen(false)}
             disabled={isSubmitting}
-            className="h-11 flex-1"
+            className="h-12 flex-1 text-base font-semibold"
           >
             취소
           </Button>
@@ -316,7 +313,7 @@ export function CustomChartBuilder({
               selectedSeries.length === 0 ||
               timeRange < minRequiredWeeks
             }
-            className="h-11 flex-1 bg-blue-500 font-medium text-white hover:bg-blue-600"
+            className="h-12 flex-1 bg-blue-500 text-base font-bold text-white hover:bg-blue-600"
           >
             {isSubmitting ? '생성 중...' : '차트 생성'}
           </Button>
