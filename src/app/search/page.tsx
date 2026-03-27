@@ -1,14 +1,16 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Header } from '@/components/layout/header'
 import { Container } from '@/components/layout/container'
 import { SearchForm } from '@/components/search-form'
 import { LoadingSkeleton } from '@/components/loading-skeleton'
 import { ProgressIndicator } from '@/components/progress-indicator'
-import type { ProgressState } from '@/types'
+import type { ProgressState, ApiResponse } from '@/types'
 
 export default function SearchPage() {
+  const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [progress, setProgress] = useState<ProgressState>({
@@ -22,13 +24,47 @@ export default function SearchPage() {
     setProgress({ stage: 'fetching-price', message: '' })
 
     try {
-      // Phase 3: 실제 API 호출로 교체 예정
-      // 여기서는 더미 데이터 표시만 함
-      await new Promise(resolve => setTimeout(resolve, 500))
+      // 단계별 UI 진행 (실제 API는 동기 처리)
+      const progressTimer1 = setTimeout(() => {
+        setProgress({ stage: 'fetching-trends', message: '' })
+      }, 2000)
+
+      const progressTimer2 = setTimeout(() => {
+        setProgress({ stage: 'calculating', message: '' })
+      }, 4000)
+
+      // POST /api/searches로 종목 조회 시작
+      const response = await fetch('/api/searches', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ticker }),
+      })
+
+      // 타이머 정리
+      clearTimeout(progressTimer1)
+      clearTimeout(progressTimer2)
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        const message =
+          errorData.error?.message || '조회 중 오류가 발생했습니다'
+        throw new Error(message)
+      }
+
+      const data: ApiResponse<{ id: string; ticker: string }> =
+        await response.json()
+
       setProgress({
         stage: 'complete',
-        message: `${ticker} 조회가 완료되었습니다. (더미 데이터)`,
+        message: `${ticker} 조회가 완료되었습니다.`,
       })
+
+      // 1초 후 상세 페이지로 리다이렉트
+      setTimeout(() => {
+        router.push(`/analysis/${data.data.id}`)
+      }, 1000)
     } catch (err) {
       const message =
         err instanceof Error ? err.message : '조회 중 오류가 발생했습니다'

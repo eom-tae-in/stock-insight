@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import { notFound } from 'next/navigation'
 import { Header } from '@/components/layout/header'
 import { Container } from '@/components/layout/container'
 import { Button } from '@/components/ui/button'
@@ -6,8 +6,8 @@ import { MetricsSummary } from '@/components/metrics-summary'
 import { PriceChart } from '@/components/price-chart'
 import { TrendsChart } from '@/components/trends-chart'
 import { ComparisonChart } from '@/components/comparison-chart'
-import { calculateMetrics, getMockSearchRecords } from '@/lib/mock-data'
-import { calculateMA13 } from '@/lib/indicators'
+import { getSearchById } from '@/lib/db/queries'
+import { calculateMetrics, calculateMA13 } from '@/lib/calculations'
 import { Download } from 'lucide-react'
 
 interface AnalysisPageProps {
@@ -16,30 +16,12 @@ interface AnalysisPageProps {
 
 export default async function AnalysisPage({ params }: AnalysisPageProps) {
   const { id } = await params
-  const records = getMockSearchRecords()
-  const record = records.find(r => r.id === id)
+
+  // DB에서 종목 데이터 직접 조회
+  const record = getSearchById(id)
 
   if (!record) {
-    return (
-      <div className="flex min-h-screen flex-col">
-        <Header />
-        <main className="flex-1">
-          <Container className="flex items-center justify-center py-20">
-            <div className="text-center">
-              <h1 className="mb-4 text-2xl font-bold">
-                종목을 찾을 수 없습니다
-              </h1>
-              <p className="text-muted-foreground mb-6">
-                요청하신 종목 분석 데이터가 없습니다.
-              </p>
-              <Button asChild>
-                <Link href="/">대시보드로 돌아가기</Link>
-              </Button>
-            </div>
-          </Container>
-        </main>
-      </div>
-    )
+    notFound()
   }
 
   const metrics = calculateMetrics(record.price_data)

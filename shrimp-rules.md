@@ -52,19 +52,19 @@ stock_insight/
 
 ### 반드시 유지해야 할 라이브러리 (제거/변경 금지)
 
-| 라이브러리 | 버전 | 용도 | 변경 금지 이유 |
-|-----------|------|------|--------------|
-| **next** | 15.5.3 | 프레임워크 | 프로젝트 기초 |
-| **react** | 19 | UI 렌더링 | PRD 기반 |
-| **better-sqlite3** | 최신 | 로컬 DB | 동기 API 필수 |
-| **recharts** | 3.x | 차트 표시 | 이중 Y축 지원 필수 |
-| **date-fns** | 최신 | 날짜 처리 | ISO week 정규화 필수 |
-| **yahoo-finance2** | 최신 | 주가 데이터 | F003 구현 필수 |
-| **serpapi** | 최신 | Google Trends | F004 구현 필수 |
-| **react-hook-form** | 최신 | 폼 관리 | 검색 폼 (F001) |
-| **zod** | 최신 | 입력 검증 | 폼 검증 |
-| **shadcn/ui** | 최신 | UI 컴포넌트 | 디자인 일관성 |
-| **tailwindcss** | v4 | 스타일 | 프로젝트 스타일링 |
+| 라이브러리          | 버전   | 용도          | 변경 금지 이유       |
+| ------------------- | ------ | ------------- | -------------------- |
+| **next**            | 15.5.3 | 프레임워크    | 프로젝트 기초        |
+| **react**           | 19     | UI 렌더링     | PRD 기반             |
+| **better-sqlite3**  | 최신   | 로컬 DB       | 동기 API 필수        |
+| **recharts**        | 3.x    | 차트 표시     | 이중 Y축 지원 필수   |
+| **date-fns**        | 최신   | 날짜 처리     | ISO week 정규화 필수 |
+| **yahoo-finance2**  | 최신   | 주가 데이터   | F003 구현 필수       |
+| **serpapi**         | 최신   | Google Trends | F004 구현 필수       |
+| **react-hook-form** | 최신   | 폼 관리       | 검색 폼 (F001)       |
+| **zod**             | 최신   | 입력 검증     | 폼 검증              |
+| **shadcn/ui**       | 최신   | UI 컴포넌트   | 디자인 일관성        |
+| **tailwindcss**     | v4     | 스타일        | 프로젝트 스타일링    |
 
 ---
 
@@ -151,6 +151,7 @@ stock_insight/
 ### Yahoo Finance (yahoo-finance2)
 
 **필수 구현:**
+
 - `historical(ticker, { interval: '1wk', period1, period2 })` 호출
 - 응답: 배열 `[{ date: Date, close: number, volume: number, ... }]`
 - 오류 처리:
@@ -158,12 +159,14 @@ stock_insight/
   - `Invalid interval`: 내부 에러 (이 경우 발생 불가, PRD 검증됨)
 
 **주의:**
+
 - `quoteSummary(ticker)` 응답에서 회사명 필드는 `longName` 또는 `shortName`일 수 있음
 - Google Trends 키워드로 우선 사용, 조회 실패 시 `"{ticker} stock"` 폴백
 
 ### SerpAPI (Google Trends)
 
 **필수 구현:**
+
 - `search({ q: 'keyword', type: 'google_trends', date: 'today 5-y' })` 호출
 - 응답: `timeline_data` 배열 `[{ date: 'May 30 - Jun 5, 2021', timestamp: 1234567890, values: [{ extracted_value: 45 }] }]`
 - 오류 처리:
@@ -171,6 +174,7 @@ stock_insight/
   - `API Key Invalid`: .env.local의 SERPAPI_KEY 확인 필요
 
 **주의:**
+
 - 응답의 `timestamp`는 주간의 시작일(일요일) 기준
 - `startOfISOWeek()`로 변환하면 ISO week의 월요일로 통일됨
 
@@ -221,6 +225,7 @@ CREATE TABLE IF NOT EXISTS trends_data (
   - ❌ 비동기 API 금지 (`db.prepare().all()` async 버전은 없음)
 
 **예시 코드 (좋은 예):**
+
 ```typescript
 const db = new Database('data/stock-insight.db');
 db.pragma('foreign_keys = ON');
@@ -251,27 +256,29 @@ transaction(ticker, prices, trends);  // 트랜잭션 실행
 **정규화 단계:**
 
 1. **수집 단계**:
+
    ```typescript
-   import { startOfISOWeek, format } from 'date-fns';
+   import { startOfISOWeek, format } from 'date-fns'
 
    // yahoo-finance 데이터
-   const yahooDate = new Date('2024-01-05'); // 금요일
-   const normalizedDate = startOfISOWeek(yahooDate); // 2024-01-01 (월요일)
+   const yahooDate = new Date('2024-01-05') // 금요일
+   const normalizedDate = startOfISOWeek(yahooDate) // 2024-01-01 (월요일)
 
    // SerpAPI 데이터
-   const serpDate = new Date('2024-01-07'); // 일요일
-   const normalizedDate = startOfISOWeek(serpDate); // 2024-01-01 (월요일)
+   const serpDate = new Date('2024-01-07') // 일요일
+   const normalizedDate = startOfISOWeek(serpDate) // 2024-01-01 (월요일)
    ```
 
 2. **저장 단계**: DB에 `normalizedDate`를 저장
 
 3. **비교 단계** (F009 비교 차트):
    ```typescript
-   const weekNumber = format(date, "YYYY-'W'II"); // "2024-W01"
+   const weekNumber = format(date, "YYYY-'W'II") // "2024-W01"
    // ISO week number로 매칭하여 두 데이터셋을 같은 주로 연결
    ```
 
 **주의:**
+
 - 일반 `startOfWeek()`은 사용 금지 (요일 기준이 다름)
 - 모든 날짜는 ISO 8601 형식으로 저장
 
@@ -283,13 +290,14 @@ transaction(ticker, prices, trends);  // 트랜잭션 실행
 
 **3가지 필수 차트:**
 
-| 차트 | 컴포넌트 | 용도 | 특징 |
-|------|---------|------|------|
-| **F007** | `LineChart` | 주가 + MA13 | 2개 라인, 범례 |
-| **F008** | `AreaChart` | Google Trends | 단일 영역, 0~100 범위 |
+| 차트     | 컴포넌트        | 용도           | 특징                   |
+| -------- | --------------- | -------------- | ---------------------- |
+| **F007** | `LineChart`     | 주가 + MA13    | 2개 라인, 범례         |
+| **F008** | `AreaChart`     | Google Trends  | 단일 영역, 0~100 범위  |
 | **F009** | `ComposedChart` | 주가 vs 트렌드 | 이중 Y축, 선+영역 혼합 |
 
 **구현 예시 (F009):**
+
 ```typescript
 <ComposedChart data={mergedData}>
   <YAxis yAxisId="left" />
@@ -329,6 +337,7 @@ SERPAPI_KEY=your_api_key_here
 ```
 
 **규칙:**
+
 - ❌ `.env.local`은 `.gitignore`에 추가됨 (커밋 금지)
 - ✅ `.env.example`은 커밋하여 필요한 환경변수 가이드 제공
 - ❌ 배포 환경 설정(`.env.production`) 불필요 (로컬 전용)
@@ -337,10 +346,10 @@ SERPAPI_KEY=your_api_key_here
 
 ```typescript
 // src/lib/env.ts
-export const SERPAPI_KEY = process.env.SERPAPI_KEY;
+export const SERPAPI_KEY = process.env.SERPAPI_KEY
 
 if (!SERPAPI_KEY) {
-  throw new Error('SERPAPI_KEY is not defined in .env.local');
+  throw new Error('SERPAPI_KEY is not defined in .env.local')
 }
 ```
 
@@ -350,15 +359,16 @@ if (!SERPAPI_KEY) {
 
 ### 다중 파일 수정이 필요한 경우
 
-| 수정 대상 | 동시 수정 필요 파일 | 확인 사항 |
-|---------|-----------------|---------|
-| **src/lib/db/** (DB 함수 추가) | API 라우트, Server Actions | 새 함수를 호출하는 곳 모두 확인 |
-| **src/components/** (컴포넌트 props 변경) | 모든 사용처 (페이지, 다른 컴포넌트) | `grep` 또는 IDE의 "Find References" 사용 |
-| **docs/PRD.md** (요구사항 변경) | docs/ROADMAP.md, 해당 Task 파일 | 일관성 확인, Task 내용 동기화 |
-| **docs/ROADMAP.md** (로드맵 업데이트) | tasks/XXX-xxx.md | Task 파일과 상태 동기화 |
-| **package.json** (의존성 추가/제거) | 관련 코드 확인 | 불필요한 의존성 제거 금지 (필수 항목 섹션 참고) |
+| 수정 대상                                 | 동시 수정 필요 파일                 | 확인 사항                                       |
+| ----------------------------------------- | ----------------------------------- | ----------------------------------------------- |
+| **src/lib/db/** (DB 함수 추가)            | API 라우트, Server Actions          | 새 함수를 호출하는 곳 모두 확인                 |
+| **src/components/** (컴포넌트 props 변경) | 모든 사용처 (페이지, 다른 컴포넌트) | `grep` 또는 IDE의 "Find References" 사용        |
+| **docs/PRD.md** (요구사항 변경)           | docs/ROADMAP.md, 해당 Task 파일     | 일관성 확인, Task 내용 동기화                   |
+| **docs/ROADMAP.md** (로드맵 업데이트)     | tasks/XXX-xxx.md                    | Task 파일과 상태 동기화                         |
+| **package.json** (의존성 추가/제거)       | 관련 코드 확인                      | 불필요한 의존성 제거 금지 (필수 항목 섹션 참고) |
 
 **예시:**
+
 ```
 1. src/lib/db/queries.ts에서 새 함수 추가
    ↓
@@ -387,16 +397,19 @@ if (!SERPAPI_KEY) {
 ## 테스트 체크리스트
 
 ### E2E 시나리오 1: 새 종목 조회 성공
+
 - [ ] `/search` 페이지에서 ticker 입력
 - [ ] 수집 로딩 상태 확인
 - [ ] `/analysis/[id]`로 리다이렉트
 - [ ] 차트 및 지표 표시 확인
 
 ### E2E 시나리오 2: 잘못된 ticker 입력
+
 - [ ] 유효하지 않은 ticker (예: "XXXXX") 입력
 - [ ] 에러 메시지 표시 확인
 
 ### API 연동 테스트
+
 - [ ] yahoo-finance2 응답 검증 (5년 데이터)
 - [ ] SerpAPI 응답 검증 (ISO week 정규화)
 - [ ] 데이터베이스 저장 확인 (트랜잭션)
@@ -464,6 +477,7 @@ if (!SERPAPI_KEY) {
 이 규칙 문서는 **AI Agent가 StockInsight 개발 시 반드시 따라야 할 기준**을 정의합니다.
 
 **핵심 원칙:**
+
 1. 로컬 전용 → 배포 설정 금지
 2. 3테이블 DB + 16개 기능 → 파일 상호작용 주의
 3. 두 API 데이터 정규화 → ISO week 기반 통일
@@ -471,6 +485,7 @@ if (!SERPAPI_KEY) {
 5. API 연동 Task마다 Playwright 테스트
 
 **불명확한 사항이 있을 때:**
+
 1. PRD.md와 ROADMAP.md를 우선 참고
 2. 기존 코드의 패턴 따르기
 3. 금지 사항 확인하기

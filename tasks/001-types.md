@@ -24,22 +24,22 @@ PRD의 16개 기능을 구현하기 위해 필요한 모든 TypeScript 타입과
 ```typescript
 // Yahoo Finance (F003 주가 데이터)
 export interface YahooFinanceHistorical {
-  date: Date;
-  open?: number;
-  high?: number;
-  low?: number;
-  close: number;
-  adjClose?: number;
-  volume?: number;
+  date: Date
+  open?: number
+  high?: number
+  low?: number
+  close: number
+  adjClose?: number
+  volume?: number
 }
 
 // SerpAPI Google Trends (F004 트렌드 데이터)
 export interface SerpAPITrendsResponse {
   timeline_data: Array<{
-    date: string;  // "May 30 - Jun 5, 2021"
-    timestamp: number;  // Unix timestamp
-    values: Array<{ extracted_value: number }>;
-  }>;
+    date: string // "May 30 - Jun 5, 2021"
+    timestamp: number // Unix timestamp
+    values: Array<{ extracted_value: number }>
+  }>
 }
 ```
 
@@ -48,27 +48,27 @@ export interface SerpAPITrendsResponse {
 ```typescript
 // searches 테이블 (F014 저장 종목 조회용)
 export interface SearchRecord {
-  id: number;
-  ticker: string;
-  company_name: string;
-  current_price: number;
-  yoy_change: number;
-  searched_at: string;  // ISO 8601
-  last_updated_at: string;
+  id: number
+  ticker: string
+  company_name: string
+  current_price: number
+  yoy_change: number
+  searched_at: string // ISO 8601
+  last_updated_at: string
 }
 
 // price_data 테이블 (F003 주가, JSON 배열 저장)
 export interface PriceDataPoint {
-  date: string;  // ISO 8601, ISO week 정규화된 월요일
-  close: number;
-  volume?: number;
-  adjClose?: number;
+  date: string // ISO 8601, ISO week 정규화된 월요일
+  close: number
+  volume?: number
+  adjClose?: number
 }
 
 // trends_data 테이블 (F004 트렌드, JSON 배열 저장)
 export interface TrendsDataPoint {
-  date: string;  // ISO 8601, ISO week 정규화된 월요일
-  value: number;  // 0~100
+  date: string // ISO 8601, ISO week 정규화된 월요일
+  value: number // 0~100
 }
 ```
 
@@ -76,18 +76,18 @@ export interface TrendsDataPoint {
 
 ```typescript
 export interface Metrics {
-  currentPrice: number;  // F002
-  ma13: number | null;  // F005
-  yoy: number;  // F006
-  high52w: number;  // F010
-  low52w: number;  // F010
+  currentPrice: number // F002
+  ma13: number | null // F005
+  yoy: number // F006
+  high52w: number // F010
+  low52w: number // F010
 }
 
 export interface ChartDataPoint {
-  date: string;
-  close?: number;
-  ma13?: number;
-  trendValue?: number;  // 0~100
+  date: string
+  close?: number
+  ma13?: number
+  trendValue?: number // 0~100
 }
 ```
 
@@ -96,27 +96,27 @@ export interface ChartDataPoint {
 ```typescript
 // 대시보드 카드 (F014, F015, F016)
 export interface StockCardProps {
-  id: number;
-  ticker: string;
-  company_name: string;
-  current_price: number;
-  yoy_change: number;
-  sparklineData: PriceDataPoint[];  // 최근 52주
-  onRefresh?: () => void;
-  onDelete?: () => void;
+  id: number
+  ticker: string
+  company_name: string
+  current_price: number
+  yoy_change: number
+  sparklineData: PriceDataPoint[] // 최근 52주
+  onRefresh?: () => void
+  onDelete?: () => void
 }
 
 // 지표 카드 (F010)
 export interface IndicatorCardProps {
-  label: string;
-  value: string | number;
-  isPositive?: boolean;
+  label: string
+  value: string | number
+  isPositive?: boolean
 }
 
 // 차트 (F007, F008, F009)
 export interface ChartProps {
-  data: ChartDataPoint[];
-  title: string;
+  data: ChartDataPoint[]
+  title: string
 }
 ```
 
@@ -124,53 +124,66 @@ export interface ChartProps {
 
 ```typescript
 export interface SearchResponse {
-  success: boolean;
-  search_id?: number;
-  error?: string;
+  success: boolean
+  search_id?: number
+  error?: string
 }
 
 export interface DashboardResponse {
-  searches: SearchRecord[];
+  searches: SearchRecord[]
 }
 
 export interface DetailResponse {
-  record: SearchRecord;
-  prices: PriceDataPoint[];
-  trends: TrendsDataPoint[];
-  metrics: Metrics;
+  record: SearchRecord
+  prices: PriceDataPoint[]
+  trends: TrendsDataPoint[]
+  metrics: Metrics
 }
 ```
 
 ### 6. Zod 검증 스키마 (F001 입력 검증용)
 
 ```typescript
-import { z } from 'zod';
+import { z } from 'zod'
 
 export const SearchFormSchema = z.object({
-  ticker: z.string()
+  ticker: z
+    .string()
     .min(1, '종목 심볼을 입력하세요')
     .max(10, '종목 심볼은 10자 이하')
     .toUpperCase(),
-});
+})
 
-export type SearchFormInput = z.infer<typeof SearchFormSchema>;
+export type SearchFormInput = z.infer<typeof SearchFormSchema>
 ```
 
 ### 7. Type Guards (런타임 검증)
 
 ```typescript
 export function isPriceDataArray(data: unknown): data is PriceDataPoint[] {
-  return Array.isArray(data) && data.every(item =>
-    typeof item === 'object' && item !== null &&
-    'date' in item && 'close' in item
-  );
+  return (
+    Array.isArray(data) &&
+    data.every(
+      item =>
+        typeof item === 'object' &&
+        item !== null &&
+        'date' in item &&
+        'close' in item
+    )
+  )
 }
 
 export function isTrendsDataArray(data: unknown): data is TrendsDataPoint[] {
-  return Array.isArray(data) && data.every(item =>
-    typeof item === 'object' && item !== null &&
-    'date' in item && 'value' in item
-  );
+  return (
+    Array.isArray(data) &&
+    data.every(
+      item =>
+        typeof item === 'object' &&
+        item !== null &&
+        'date' in item &&
+        'value' in item
+    )
+  )
 }
 ```
 

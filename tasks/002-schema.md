@@ -59,20 +59,20 @@ CREATE INDEX IF NOT EXISTS idx_trends_search_id ON trends_data(search_id);
 ### 2. 초기화 함수 (src/lib/db/schema.ts)
 
 ```typescript
-import Database from 'better-sqlite3';
-import path from 'path';
+import Database from 'better-sqlite3'
+import path from 'path'
 
-let db: Database.Database | null = null;
+let db: Database.Database | null = null
 
 export function initializeDatabase(): void {
-  const dbPath = path.join(process.cwd(), 'data', 'stock-insight.db');
+  const dbPath = path.join(process.cwd(), 'data', 'stock-insight.db')
 
   try {
-    db = new Database(dbPath);
+    db = new Database(dbPath)
 
     // PRAGMA 설정
-    db.pragma('foreign_keys = ON');
-    db.pragma('journal_mode = WAL');
+    db.pragma('foreign_keys = ON')
+    db.pragma('journal_mode = WAL')
 
     // DDL 실행
     db.exec(`
@@ -101,36 +101,34 @@ export function initializeDatabase(): void {
         FOREIGN KEY(search_id) REFERENCES searches(id) ON DELETE CASCADE
       );
       CREATE INDEX IF NOT EXISTS idx_trends_search_id ON trends_data(search_id);
-    `);
+    `)
 
-    console.log('✅ Database initialized successfully');
+    console.log('✅ Database initialized successfully')
   } catch (error) {
-    console.error('❌ Database initialization failed:', error);
-    throw error;
+    console.error('❌ Database initialization failed:', error)
+    throw error
   }
 }
 
 export function getDatabase(): Database.Database {
   if (!db) {
-    initializeDatabase();
+    initializeDatabase()
   }
-  return db!;
+  return db!
 }
 
 // 트랜잭션 헬퍼 함수
-export function withTransaction<T>(
-  fn: (database: Database.Database) => T
-): T {
-  const database = getDatabase();
-  const transaction = database.transaction(fn);
-  return transaction(database);
+export function withTransaction<T>(fn: (database: Database.Database) => T): T {
+  const database = getDatabase()
+  const transaction = database.transaction(fn)
+  return transaction(database)
 }
 ```
 
 ### 3. DB 인스턴스 export (src/lib/db/index.ts)
 
 ```typescript
-export { initializeDatabase, getDatabase, withTransaction } from './schema';
+export { initializeDatabase, getDatabase, withTransaction } from './schema'
 ```
 
 ---
@@ -139,47 +137,59 @@ export { initializeDatabase, getDatabase, withTransaction } from './schema';
 
 ### searches 테이블
 
-| 컬럼 | 타입 | 설명 |
-|------|------|------|
-| id | INTEGER PK | 자동 증가 |
-| ticker | TEXT UNIQUE | 종목 심볼 (AAPL, MSFT) |
-| company_name | TEXT | 회사명 (Apple Inc.) |
-| current_price | REAL | 현재 종가 |
-| yoy_change | REAL | YoY 변화율 (%) |
-| searched_at | TEXT | 조회 시간 (ISO 8601) |
-| last_updated_at | TEXT | 마지막 갱신 시간 |
+| 컬럼            | 타입        | 설명                   |
+| --------------- | ----------- | ---------------------- |
+| id              | INTEGER PK  | 자동 증가              |
+| ticker          | TEXT UNIQUE | 종목 심볼 (AAPL, MSFT) |
+| company_name    | TEXT        | 회사명 (Apple Inc.)    |
+| current_price   | REAL        | 현재 종가              |
+| yoy_change      | REAL        | YoY 변화율 (%)         |
+| searched_at     | TEXT        | 조회 시간 (ISO 8601)   |
+| last_updated_at | TEXT        | 마지막 갱신 시간       |
 
 **UPSERT 규칙**: 동일 ticker 재조회 시 `INSERT OR REPLACE` 대신 `INSERT ... ON CONFLICT(ticker) DO UPDATE` 사용 (id 보존)
 
 ### price_data 테이블
 
-| 컬럼 | 타입 | 설명 |
-|------|------|------|
-| id | INTEGER PK | |
-| search_id | INTEGER FK UNIQUE | searches.id 참조 |
-| data | TEXT | JSON 배열 저장: `[{"date":"2019-01-07","close":150.25,...}]` |
+| 컬럼      | 타입              | 설명                                                         |
+| --------- | ----------------- | ------------------------------------------------------------ |
+| id        | INTEGER PK        |                                                              |
+| search_id | INTEGER FK UNIQUE | searches.id 참조                                             |
+| data      | TEXT              | JSON 배열 저장: `[{"date":"2019-01-07","close":150.25,...}]` |
 
 **저장 형식 (JSON)**:
+
 ```json
 [
-  {"date":"2019-01-07","close":150.25,"volume":12345678,"adjClose":150.0},
-  {"date":"2019-01-14","close":151.50,"volume":12345678,"adjClose":151.25}
+  {
+    "date": "2019-01-07",
+    "close": 150.25,
+    "volume": 12345678,
+    "adjClose": 150.0
+  },
+  {
+    "date": "2019-01-14",
+    "close": 151.5,
+    "volume": 12345678,
+    "adjClose": 151.25
+  }
 ]
 ```
 
 ### trends_data 테이블
 
-| 컬럼 | 타입 | 설명 |
-|------|------|------|
-| id | INTEGER PK | |
-| search_id | INTEGER FK UNIQUE | searches.id 참조 |
-| data | TEXT | JSON 배열 저장: `[{"date":"2019-01-07","value":45}]` |
+| 컬럼      | 타입              | 설명                                                 |
+| --------- | ----------------- | ---------------------------------------------------- |
+| id        | INTEGER PK        |                                                      |
+| search_id | INTEGER FK UNIQUE | searches.id 참조                                     |
+| data      | TEXT              | JSON 배열 저장: `[{"date":"2019-01-07","value":45}]` |
 
 **저장 형식 (JSON)**:
+
 ```json
 [
-  {"date":"2019-01-07","value":45},
-  {"date":"2019-01-14","value":48}
+  { "date": "2019-01-07", "value": 45 },
+  { "date": "2019-01-14", "value": 48 }
 ]
 ```
 
