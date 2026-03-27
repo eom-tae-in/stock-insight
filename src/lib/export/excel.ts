@@ -1,0 +1,77 @@
+import * as XLSX from 'xlsx'
+import { format } from 'date-fns'
+import type { PriceDataPoint, TrendsDataPoint, Metrics } from '@/types/database'
+
+interface GenerateExcelParams {
+  ticker: string
+  priceData: PriceDataPoint[]
+  trendsData: TrendsDataPoint[]
+  ma13Values: (number | null)[]
+  metrics: Metrics
+}
+
+/**
+ * 종목 데이터를 xlsx 파일로 생성하고 다운로드합니다.
+ * 3개 시트: "주가 데이터", "트렌드 데이터", "지표 요약"
+ */
+export function generateExcelFile({
+  ticker,
+  priceData,
+  trendsData,
+  ma13Values,
+  metrics,
+}: GenerateExcelParams): void {
+  // 데이터 검증
+  if (!priceData || priceData.length === 0) {
+    throw new Error('주가 데이터가 없습니다.')
+  }
+
+  // 1. 주가 데이터 시트
+  const priceSheetData = [
+    ['일자', '종가 ($)', '13주 MA ($)'],
+    ...priceData.map((item, idx) => [
+      item.date,
+      item.close,
+      ma13Values[idx] ?? '',
+    ]),
+  ]
+
+  // 2. 트렌드 데이터 시트
+  const trendsSheetData = [
+    ['일자', 'Google Trends (0-100)'],
+    ...trendsData.map(item => [item.date, item.value]),
+  ]
+
+  // 3. 지표 요약 시트
+  const metricsSheetData = [
+    ['지표', '값'],
+    ['현재 종가', `$${metrics.currentPrice.toFixed(2)}`],
+    ['13주 이동평균', `$${metrics.ma13.toFixed(2)}`],
+    ['전년도 대비 (%)', `${metrics.yoyChange.toFixed(2)}%`],
+    ['52주 최고가', `$${metrics.week52High.toFixed(2)}`],
+    ['52주 최저가', `$${metrics.week52Low.toFixed(2)}`],
+  ]
+
+  // 워크북 생성
+  const workbook = XLSX.utils.book_new()
+
+  // 각 시트 추가
+  const priceSheet = XLSX.utils.aoa_to_sheet(priceSheetData)
+  const trendsSheet = XLSX.utils.aoa_to_sheet(trendsSheetData)
+  const metricsSheet = XLSX.utils.aoa_to_sheet(metricsSheetData)
+
+  // 열 너비 설정
+  priceSheet['!cols'] = [{ wch: 12 }, { wch: 15 }, { wch: 15 }]
+  trendsSheet['!cols'] = [{ wch: 12 }, { wch: 20 }]
+  metricsSheet['!cols'] = [{ wch: 15 }, { wch: 20 }]
+
+  XLSX.utils.book_append_sheet(workbook, priceSheet, '주가 데이터')
+  XLSX.utils.book_append_sheet(workbook, trendsSheet, '트렌드 데이터')
+  XLSX.utils.book_append_sheet(workbook, metricsSheet, '지표 요약')
+
+  // 파일명: {ticker}_StockInsight_{YYYYMMDD}.xlsx
+  const filename = `${ticker}_StockInsight_${format(new Date(), 'yyyyMMdd')}.xlsx`
+
+  // 파일 다운로드
+  XLSX.writeFile(workbook, filename)
+}

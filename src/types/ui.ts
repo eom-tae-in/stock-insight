@@ -113,6 +113,7 @@ export interface Downloadable {
  * 통합 차트 Props (가격 + 트렌드 + YoY를 하나로)
  */
 export interface UnifiedChartProps {
+  ticker?: string
   priceData: PriceDataPoint[]
   trendsData: TrendsDataPoint[]
   ma13?: (number | null)[]
@@ -158,4 +159,17 @@ export interface CustomChart {
 export interface CustomChartBuilderProps {
   searchId: string
   onChartCreated?: (chart: CustomChart) => void
+}
+
+/**
+ * 다운로드 섹션 Props
+ */
+export interface DownloadSectionProps {
+  ticker: string
+  priceData: PriceDataPoint[]
+  trendsData: TrendsDataPoint[]
+  ma13Values: (number | null)[]
+  metrics: import('./database').Metrics
+  onDownloadAllCharts?: () => Promise<void>
+  isPngAllLoading?: boolean
 }
