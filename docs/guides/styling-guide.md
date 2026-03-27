@@ -144,8 +144,8 @@ export function CustomButton({ className, ...props }) {
   return (
     <Button
       className={cn(
-        "transition-all duration-200",
-        "hover:shadow-lg hover:-translate-y-0.5",
+        'transition-all duration-200',
+        'hover:-translate-y-0.5 hover:shadow-lg',
         className
       )}
       {...props}
@@ -157,7 +157,7 @@ export function CustomButton({ className, ...props }) {
 export function MyButton({ className, ...props }) {
   return (
     <button
-      className="px-4 py-2 bg-blue-500..." // 긴 클래스 나열
+      className="bg-blue-500... px-4 py-2" // 긴 클래스 나열
       {...props}
     />
   )
@@ -215,8 +215,8 @@ export function ThemeToggle() {
       size="icon"
       onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
     >
-      <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-      <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+      <Sun className="h-4 w-4 scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
+      <Moon className="absolute h-4 w-4 scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
       <span className="sr-only">테마 전환</span>
     </Button>
   )
@@ -438,27 +438,32 @@ import { cn } from '@/lib/utils'
 새 컴포넌트 작성 시 확인사항:
 
 ### 기본 사항
+
 - [ ] TailwindCSS 유틸리티 클래스 우선 사용
 - [ ] cn() 함수로 클래스 조합
 - [ ] 시맨틱 색상 변수 사용
 - [ ] 반응형 디자인 적용
 
 ### 다크모드
+
 - [ ] 다크모드 대응 색상 사용
 - [ ] 하드코딩된 색상 없음
 - [ ] 테마 전환 시 깨짐 없음
 
 ### 성능
+
 - [ ] 불필요한 애니메이션 없음
 - [ ] will-change 적절히 사용
 - [ ] 인라인 스타일 없음
 
 ### 접근성
+
 - [ ] 충분한 색상 대비
 - [ ] 포커스 상태 스타일링
 - [ ] 스크린 리더 고려
 
 ### 유지보수
+
 - [ ] 일관된 클래스 순서
 - [ ] 재사용 가능한 컴포넌트 활용
 - [ ] 의미있는 클래스 조합
