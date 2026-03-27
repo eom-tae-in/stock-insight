@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
     // 4. DB 저장 (트랜잭션으로 원자성 보장)
     const now = new Date()
 
-    const id = withTransaction(db => {
+    const id = withTransaction(() => {
       const searchRecord: SearchRecord = {
         id: crypto.randomUUID(),
         ticker: validatedTicker,
