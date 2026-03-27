@@ -11,6 +11,8 @@ interface CustomTableViewProps {
   trendsData: TrendsDataPoint[]
   ma13?: (number | null)[]
   yoyChange?: number
+  week52High?: number
+  week52Low?: number
 }
 
 export function CustomTableView({
@@ -19,6 +21,8 @@ export function CustomTableView({
   trendsData,
   ma13,
   yoyChange,
+  week52High,
+  week52Low,
 }: CustomTableViewProps) {
   const [customTables, setCustomTables] = useState<CustomTable[]>([])
   const [expandedTableId, setExpandedTableId] = useState<string | null>(null)
@@ -69,6 +73,14 @@ export function CustomTableView({
           : '-'
       }
 
+      if (table.columns.includes('week52High')) {
+        row.week52High = week52High ? `$${week52High.toFixed(2)}` : '-'
+      }
+
+      if (table.columns.includes('week52Low')) {
+        row.week52Low = week52Low ? `$${week52Low.toFixed(2)}` : '-'
+      }
+
       if (table.columns.includes('trends')) {
         row.trends = trendsMap.get(point.date)?.toFixed(1) ?? '-'
       }
@@ -113,6 +125,8 @@ export function CustomTableView({
                         date: '날짜',
                         close: '종가',
                         ma13: '13주 MA',
+                        week52High: '52주 최고가',
+                        week52Low: '52주 최저가',
                         trends: '검색 관심도',
                         yoy: 'YoY',
                       }

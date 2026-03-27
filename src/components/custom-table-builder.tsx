@@ -19,6 +19,8 @@ import type { CustomTable, CustomTableBuilderProps } from '@/types'
 const AVAILABLE_COLUMNS = [
   { key: 'close', label: '종가 ($)', required: false },
   { key: 'ma13', label: '13주 MA ($)', required: false },
+  { key: 'week52High', label: '52주 최고가 ($)', required: false },
+  { key: 'week52Low', label: '52주 최저가 ($)', required: false },
   { key: 'trends', label: '검색 관심도', required: false },
   { key: 'yoy', label: '전년도 대비 (%)', required: false },
 ]

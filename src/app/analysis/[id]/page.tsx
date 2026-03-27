@@ -77,6 +77,8 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
               trendsData={record.trends_data}
               ma13={ma13Values}
               yoyChange={metrics.yoyChange}
+              week52High={metrics.week52High}
+              week52Low={metrics.week52Low}
             />
           </section>
 
