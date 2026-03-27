@@ -42,3 +42,6 @@ next-env.d.ts
 
 # local SQLite database
 /data/*.db
+
+# Shrimp Task Manager data
+/shrimp_data/
