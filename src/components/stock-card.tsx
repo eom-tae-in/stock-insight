@@ -73,21 +73,21 @@ export function StockCard({
           onClick={() => setShowOverlay(!showOverlay)}
         >
           <div className="p-6">
-            {/* 헤더: Ticker와 회사명 */}
-            <div className="mb-5">
-              <h3 className="text-lg font-bold">{ticker}</h3>
+            {/* 헤더: Ticker와 회사명 (가로 배치) */}
+            <div className="mb-6 flex items-baseline gap-2">
+              <h3 className="text-2xl font-bold">{ticker}</h3>
               <p className="text-muted-foreground text-sm">{companyName}</p>
             </div>
 
             {/* 현재가 + 전일 대비 변화 */}
-            <div className="mb-4 space-y-1">
-              <p className="text-3xl font-bold">${currentPrice.toFixed(2)}</p>
+            <div className="mb-4 space-y-2">
+              <p className="text-4xl font-bold">${currentPrice.toFixed(2)}</p>
               {previousClose !== undefined && (
                 <p
                   className={cn(
                     'text-sm font-medium',
                     isPricePositive
-                      ? 'text-green-600 dark:text-green-400'
+                      ? 'text-blue-600 dark:text-blue-400'
                       : 'text-red-600 dark:text-red-400'
                   )}
                 >
@@ -98,15 +98,15 @@ export function StockCard({
             </div>
 
             {/* 52주 수익률 */}
-            <div className="mb-5 space-y-1">
+            <div className="mb-6 space-y-2">
               <p className="text-muted-foreground text-xs font-semibold uppercase">
                 52주 수익률
               </p>
               <p
                 className={cn(
-                  'text-lg font-bold',
+                  'text-2xl font-bold',
                   isPositive
-                    ? 'text-green-600 dark:text-green-400'
+                    ? 'text-blue-600 dark:text-blue-400'
                     : 'text-red-600 dark:text-red-400'
                 )}
               >

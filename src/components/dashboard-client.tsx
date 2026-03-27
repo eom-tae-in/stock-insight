@@ -103,8 +103,8 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
           </Button>
         </div>
       ) : (
-        /* 종목 카드 그리드 */
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        /* 종목 카드 그리드 - 한 줄에 3개씩 표시 */
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {records.map(record => (
             <StockCard
               key={record.id}
