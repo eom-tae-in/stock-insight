@@ -9,7 +9,6 @@
  * - 가격-트렌드 데이터 매칭
  */
 
-import { getISOWeek } from 'date-fns'
 import { calculateMA13 } from './indicators'
 import type { PriceDataPoint, TrendsDataPoint, Metrics } from '@/types'
 
@@ -95,38 +94,25 @@ export function calculateMetrics(priceData: PriceDataPoint[]): Metrics {
 }
 
 /**
- * 가격 데이터와 트렌드 데이터를 ISO week 기준으로 매칭
+ * 가격 데이터와 트렌드 데이터를 날짜 기준으로 매칭
+ * 이미 두 데이터 모두 startOfISOWeek로 정규화되어 있어 직접 매칭 가능
  * 비교 차트(ComparisonChart)용으로 사용됩니다.
  */
 export function matchPriceAndTrends(
   priceData: PriceDataPoint[],
   trendsData: TrendsDataPoint[]
 ): Array<{ date: string; price: number; trend: number }> {
-  // ISO week 맵 생성
-  const priceMap = new Map<number, number>()
-  const trendsMap = new Map<number, number>()
-
-  // 주가 데이터를 ISO week로 매핑
-  for (const point of priceData) {
-    const date = new Date(point.date)
-    const weekNum = getISOWeek(date)
-    priceMap.set(weekNum, point.close)
-  }
-
-  // 트렌드 데이터를 ISO week로 매핑
+  // 트렌드 데이터를 날짜 기준으로 매핑
+  const trendsMap = new Map<string, number>()
   for (const point of trendsData) {
-    const date = new Date(point.date)
-    const weekNum = getISOWeek(date)
-    trendsMap.set(weekNum, point.value)
+    trendsMap.set(point.date, point.value)
   }
 
-  // 양쪽 데이터가 모두 있는 week만 결합
+  // 양쪽 데이터가 모두 있는 날짜만 결합
   const result: Array<{ date: string; price: number; trend: number }> = []
 
   for (const point of priceData) {
-    const date = new Date(point.date)
-    const weekNum = getISOWeek(date)
-    const trend = trendsMap.get(weekNum)
+    const trend = trendsMap.get(point.date)
 
     if (trend !== undefined) {
       result.push({

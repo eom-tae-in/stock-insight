@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
         id,
         ticker: validatedTicker,
       },
-      200
+      201
     )
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'

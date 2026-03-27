@@ -5,26 +5,21 @@
  * Response: ApiResponse<{ trendsData, keyword }>
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { fetchTrendsData } from '@/lib/services/trends-service'
 import { TickerInputSchema } from '@/lib/validation'
 import { env } from '@/lib/env'
-import type { ApiErrorResponse, ApiResponse } from '@/types'
-import type { TrendsDataResult } from '@/lib/services/trends-service'
+import { createSuccessResponse, createErrorResponse } from '@/lib/api-helpers'
 
 export async function GET(request: NextRequest) {
   try {
     // 환경 변수 검증
     if (!env.SERPAPI_KEY) {
-      const response: ApiErrorResponse = {
-        success: false,
-        error: {
-          code: 'SERPAPI_KEY_MISSING',
-          message: 'SerpAPI 키가 설정되지 않았습니다.',
-        },
-        timestamp: new Date().toISOString(),
-      }
-      return NextResponse.json(response, { status: 503 })
+      return createErrorResponse(
+        'SERPAPI_KEY_MISSING',
+        'SerpAPI 키가 설정되지 않았습니다.',
+        503
+      )
     }
 
     // 쿼리 파라미터 추출
@@ -35,15 +30,11 @@ export async function GET(request: NextRequest) {
     // ticker 검증
     const result = TickerInputSchema.safeParse(ticker)
     if (!result.success) {
-      const response: ApiErrorResponse = {
-        success: false,
-        error: {
-          code: 'INVALID_TICKER',
-          message: '올바른 종목 심볼을 입력하세요 (1-5자, 영문/숫자)',
-        },
-        timestamp: new Date().toISOString(),
-      }
-      return NextResponse.json(response, { status: 400 })
+      return createErrorResponse(
+        'INVALID_TICKER',
+        '올바른 종목 심볼을 입력하세요 (1-5자, 영문/숫자)',
+        400
+      )
     }
 
     const validatedTicker = result.data
@@ -55,29 +46,18 @@ export async function GET(request: NextRequest) {
     )
 
     // 성공 응답
-    const response: ApiResponse<TrendsDataResult> = {
-      success: true,
-      data: trendsResult,
-      timestamp: new Date().toISOString(),
-    }
-
-    return NextResponse.json(response, { status: 200 })
+    return createSuccessResponse(trendsResult, 200)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
 
     console.error('Trends data fetch error:', error)
 
     // 트렌드 데이터를 가져올 수 없음
-    const response: ApiErrorResponse = {
-      success: false,
-      error: {
-        code: 'TRENDS_FETCH_FAILED',
-        message:
-          '트렌드 데이터를 가져오지 못했습니다. 나중에 다시 시도해주세요.',
-        details: { message },
-      },
-      timestamp: new Date().toISOString(),
-    }
-    return NextResponse.json(response, { status: 502 })
+    return createErrorResponse(
+      'TRENDS_FETCH_FAILED',
+      '트렌드 데이터를 가져오지 못했습니다. 나중에 다시 시도해주세요.',
+      502,
+      { message }
+    )
   }
 }

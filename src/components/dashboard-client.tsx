@@ -55,8 +55,9 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
       console.error('Refresh failed:', error)
     } finally {
       setLoadingIds(prev => {
-        prev.delete(id)
-        return new Set(prev)
+        const next = new Set(prev)
+        next.delete(id)
+        return next
       })
     }
   }
@@ -79,8 +80,9 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
       console.error('Delete failed:', error)
     } finally {
       setLoadingIds(prev => {
-        prev.delete(id)
-        return new Set(prev)
+        const next = new Set(prev)
+        next.delete(id)
+        return next
       })
     }
   }

@@ -10,6 +10,8 @@ import { Container } from '@/components/layout/container'
 import { DashboardClient } from '@/components/dashboard-client'
 import { getAllSearches } from '@/lib/db/queries'
 
+export const dynamic = 'force-dynamic'
+
 export default function DashboardPage() {
   // Server Component에서 DB 직접 조회
   const records = getAllSearches()

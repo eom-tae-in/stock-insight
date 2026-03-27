@@ -70,11 +70,21 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
           <section className="bg-card rounded-lg border p-6">
             <h3 className="mb-4 text-lg font-semibold">데이터 다운로드</h3>
             <div className="flex flex-col gap-3 sm:flex-row">
-              <Button variant="outline" className="flex-1 sm:flex-none">
+              <Button
+                variant="outline"
+                disabled
+                title="준비 중입니다"
+                className="flex-1 sm:flex-none"
+              >
                 <Download className="mr-2 h-4 w-4" />
                 엑셀 다운로드
               </Button>
-              <Button variant="outline" className="flex-1 sm:flex-none">
+              <Button
+                variant="outline"
+                disabled
+                title="준비 중입니다"
+                className="flex-1 sm:flex-none"
+              >
                 <Download className="mr-2 h-4 w-4" />
                 전체 차트 PNG 다운로드
               </Button>

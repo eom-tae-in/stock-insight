@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Header } from '@/components/layout/header'
 import { Container } from '@/components/layout/container'
@@ -17,6 +17,7 @@ export default function SearchPage() {
     stage: 'idle',
     message: '',
   })
+  const timerRefsRef = useRef<Array<NodeJS.Timeout>>([])
 
   const handleSubmit = async (ticker: string) => {
     setIsLoading(true)
@@ -28,10 +29,12 @@ export default function SearchPage() {
       const progressTimer1 = setTimeout(() => {
         setProgress({ stage: 'fetching-trends', message: '' })
       }, 2000)
+      timerRefsRef.current.push(progressTimer1)
 
       const progressTimer2 = setTimeout(() => {
         setProgress({ stage: 'calculating', message: '' })
       }, 4000)
+      timerRefsRef.current.push(progressTimer2)
 
       // POST /api/searches로 종목 조회 시작
       const response = await fetch('/api/searches', {
@@ -42,9 +45,9 @@ export default function SearchPage() {
         body: JSON.stringify({ ticker }),
       })
 
-      // 타이머 정리
-      clearTimeout(progressTimer1)
-      clearTimeout(progressTimer2)
+      // 진행 상황 타이머 정리
+      timerRefsRef.current.forEach(clearTimeout)
+      timerRefsRef.current = []
 
       if (!response.ok) {
         const errorData = await response.json()
@@ -62,10 +65,15 @@ export default function SearchPage() {
       })
 
       // 1초 후 상세 페이지로 리다이렉트
-      setTimeout(() => {
+      const redirectTimer = setTimeout(() => {
         router.push(`/analysis/${data.data.id}`)
       }, 1000)
+      timerRefsRef.current.push(redirectTimer)
     } catch (err) {
+      // 진행 상황 타이머 정리
+      timerRefsRef.current.forEach(clearTimeout)
+      timerRefsRef.current = []
+
       const message =
         err instanceof Error ? err.message : '조회 중 오류가 발생했습니다'
       setError(message)
