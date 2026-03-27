@@ -178,43 +178,55 @@ export function UnifiedChart({
   return (
     <div className="space-y-4">
       {/* 제목 및 컨트롤 */}
-      <div className="flex items-center justify-between gap-4">
-        <h3 className="text-lg font-semibold">통합 분석 차트</h3>
+      <div className="space-y-2">
+        {/* 첫 번째 줄: 제목 + 시간 범위 */}
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">통합 분석 차트</h3>
 
-        {/* 우측 시간 범위 컨트롤 패널 */}
-        <div className="flex items-center gap-2">
-          {/* Preset 버튼들 */}
-          <div className="flex gap-1">
-            {TIME_RANGE_PRESETS.map(preset => (
-              <button
-                key={preset.weeks}
-                onClick={() => handleRangeChange(preset.weeks, preset.label)}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                  displayRange === preset.weeks && customRange === ''
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                }`}
-              >
-                {preset.label}
-              </button>
-            ))}
+          {/* 우측 시간 범위 컨트롤 패널 */}
+          <div className="flex items-center gap-2">
+            {/* Preset 버튼들 */}
+            <div className="flex gap-1">
+              {TIME_RANGE_PRESETS.map(preset => (
+                <button
+                  key={preset.weeks}
+                  onClick={() => handleRangeChange(preset.weeks, preset.label)}
+                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                    displayRange === preset.weeks && customRange === ''
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Custom 입력 */}
+            <div className="flex items-center gap-1">
+              <Input
+                type="number"
+                min="1"
+                max="260"
+                value={customRange}
+                onChange={e => handleCustomRange(e.target.value)}
+                placeholder="주"
+                className="h-8 w-16 text-xs"
+              />
+              <span className="text-muted-foreground text-xs">주</span>
+            </div>
+
+            {/* 임시 레이블 표시 */}
+            {rangeLabel && (
+              <div className="rounded-md bg-blue-500/10 px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400">
+                {rangeLabel}
+              </div>
+            )}
           </div>
+        </div>
 
-          {/* Custom 입력 */}
-          <div className="flex items-center gap-1">
-            <Input
-              type="number"
-              min="1"
-              max="260"
-              value={customRange}
-              onChange={e => handleCustomRange(e.target.value)}
-              placeholder="주"
-              className="h-8 w-16 text-xs"
-            />
-            <span className="text-muted-foreground text-xs">주</span>
-          </div>
-
-          {/* 다운로드 버튼 */}
+        {/* 두 번째 줄: 다운로드 버튼 */}
+        <div className="flex justify-end">
           <Button
             size="sm"
             variant="outline"
@@ -225,13 +237,6 @@ export function UnifiedChart({
             <Download className="mr-2 h-4 w-4" />
             PNG 다운로드
           </Button>
-
-          {/* 임시 레이블 표시 */}
-          {rangeLabel && (
-            <div className="ml-2 rounded-md bg-blue-500/10 px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400">
-              {rangeLabel}
-            </div>
-          )}
         </div>
       </div>
 
