@@ -55,13 +55,21 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
   }
 
   // 드래그 시작
-  const handleDragStart = (id: string) => {
+  const handleDragStart = (e: React.DragEvent, id: string) => {
     setDraggedId(id)
+
+    // 드래그 이미지 설정 (투명한 이미지)
+    const dragImage = new Image()
+    dragImage.src =
+      'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100"><rect width="200" height="100" fill="rgba(59, 130, 246, 0.3)" rx="8"/></svg>'
+    e.dataTransfer!.setDragImage(dragImage, 100, 50)
+    e.dataTransfer!.effectAllowed = 'move'
   }
 
   // 드래그 오버
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
+    e.dataTransfer!.dropEffect = 'move'
   }
 
   // 드롭
@@ -70,6 +78,8 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
 
     const draggedIndex = records.findIndex(r => r.id === draggedId)
     const targetIndex = records.findIndex(r => r.id === targetId)
+
+    if (draggedIndex === -1 || targetIndex === -1) return
 
     const newRecords = [...records]
     ;[newRecords[draggedIndex], newRecords[targetIndex]] = [
@@ -199,14 +209,16 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
               <div
                 key={record.id}
                 draggable={isEditMode}
-                onDragStart={() => handleDragStart(record.id)}
+                onDragStart={e => handleDragStart(e, record.id)}
                 onDragOver={handleDragOver}
                 onDrop={() => handleDrop(record.id)}
-                className={
-                  isEditMode
-                    ? 'cursor-move opacity-100 transition-opacity hover:opacity-80'
-                    : ''
-                }
+                className={`transition-all duration-300 ${
+                  isEditMode ? 'cursor-move' : ''
+                } ${draggedId === record.id ? 'scale-95 opacity-50' : ''}`}
+                style={{
+                  transform:
+                    draggedId === record.id ? 'scale(0.95)' : 'scale(1)',
+                }}
               >
                 <StockCard
                   id={record.id}
