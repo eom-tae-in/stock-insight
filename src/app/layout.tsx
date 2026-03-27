@@ -39,7 +39,7 @@ export default function RootLayout({
         <ThemeProvider
           attribute="class"
           defaultTheme="calm"
-          enableSystem
+          enableSystem={false}
           disableTransitionOnChange
           themes={['light', 'dark', 'calm']}
         >
