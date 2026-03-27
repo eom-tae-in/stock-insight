@@ -115,8 +115,8 @@ export function StockCard({
               </p>
             </div>
 
-            {/* Sparkline */}
-            <div className="mb-3 h-20">
+            {/* Sparkline - 더 크게 표시 */}
+            <div className="mb-3 h-32">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
                   data={sparklineData.slice(-52)}
@@ -125,7 +125,7 @@ export function StockCard({
                   <Line
                     type="monotone"
                     dataKey="close"
-                    stroke={isPositive ? '#22c55e' : '#ef4444'}
+                    stroke={isPositive ? '#3b82f6' : '#ef4444'}
                     strokeWidth={2}
                     dot={false}
                     animationDuration={0}
