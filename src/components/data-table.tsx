@@ -4,13 +4,13 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { ArrowUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { calculateWeeklyYoY } from '@/lib/calculations'
 import type { PriceDataPoint, TrendsDataPoint } from '@/types'
 
 interface DataTableProps {
   priceData: PriceDataPoint[]
   trendsData: TrendsDataPoint[]
   ma13Values: (number | null)[]
-  yoyChange: number
 }
 
 const ITEMS_PER_PAGE = 20
@@ -19,7 +19,6 @@ export function DataTable({
   priceData,
   trendsData,
   ma13Values,
-  yoyChange,
 }: DataTableProps) {
   const [loadedCount, setLoadedCount] = useState(ITEMS_PER_PAGE)
   const [sortConfig, setSortConfig] = useState<{
@@ -40,14 +39,15 @@ export function DataTable({
 
   // 테이블 데이터 구성
   const tableData = useMemo(() => {
+    const weeklyYoY = calculateWeeklyYoY(priceData)
     return priceData.map((price, index) => ({
       date: price.date,
       close: price.close,
       trends: trendsMap.get(price.date) ?? 0,
       ma13: ma13Values[index] ?? 0,
-      yoy: yoyChange,
+      yoy: weeklyYoY[index] ?? 0,
     }))
-  }, [priceData, trendsMap, ma13Values, yoyChange])
+  }, [priceData, trendsMap, ma13Values])
 
   // 정렬
   const sortedData = useMemo(() => {

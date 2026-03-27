@@ -17,12 +17,20 @@ import {
 import type { CustomChart, CustomChartBuilderProps } from '@/types'
 
 const AVAILABLE_SERIES = [
-  { key: 'close', label: '종가', color: '#3b82f6' },
-  { key: 'ma13', label: '13주 MA', color: '#f97316' },
-  { key: 'week52High', label: '52주 최고가', color: '#22c55e' },
-  { key: 'week52Low', label: '52주 최저가', color: '#ef4444' },
-  { key: 'trends', label: '검색 관심도', color: '#a78bfa' },
-  { key: 'yoy', label: '52주 YoY', color: '#f59e0b' },
+  { key: 'close', label: '종가', color: '#3b82f6', minWeeks: 0 },
+  { key: 'ma13', label: '13주 MA', color: '#f97316', minWeeks: 13 },
+  { key: 'week52High', label: '52주 최고가', color: '#22c55e', minWeeks: 52 },
+  { key: 'week52Low', label: '52주 최저가', color: '#ef4444', minWeeks: 52 },
+  { key: 'trends', label: '검색 관심도', color: '#a78bfa', minWeeks: 0 },
+  { key: 'yoy', label: '52주 YoY', color: '#f59e0b', minWeeks: 52 },
+]
+
+const TIME_RANGES = [
+  { weeks: 13, label: '13주 (3개월)' },
+  { weeks: 26, label: '26주 (6개월)' },
+  { weeks: 52, label: '52주 (1년)' },
+  { weeks: 104, label: '104주 (2년)' },
+  { weeks: 260, label: '260주 (5년)' },
 ]
 
 export function CustomChartBuilder({
@@ -35,14 +43,39 @@ export function CustomChartBuilder({
     'close',
     'trends',
   ])
+  const [timeRange, setTimeRange] = useState(52) // 기본값: 52주 (1년)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // 선택된 시리즈의 최소 주 수
+  const minRequiredWeeks = Math.max(
+    0,
+    ...selectedSeries.map(key => {
+      const series = AVAILABLE_SERIES.find(s => s.key === key)
+      return series?.minWeeks || 0
+    })
+  )
+
   const toggleSeries = (seriesKey: string) => {
-    setSelectedSeries(prev =>
-      prev.includes(seriesKey)
+    setSelectedSeries(prev => {
+      const newSeries = prev.includes(seriesKey)
         ? prev.filter(s => s !== seriesKey)
         : [...prev, seriesKey]
-    )
+
+      // 시리즈 선택에 따라 timeRange 자동 조정
+      const minWeeks = Math.max(
+        0,
+        ...newSeries.map(key => {
+          const series = AVAILABLE_SERIES.find(s => s.key === key)
+          return series?.minWeeks || 0
+        })
+      )
+
+      if (timeRange < minWeeks) {
+        setTimeRange(minWeeks)
+      }
+
+      return newSeries
+    })
   }
 
   const handleSave = async () => {
@@ -69,6 +102,7 @@ export function CustomChartBuilder({
         id: crypto.randomUUID(),
         name: chartName.trim(),
         series: selectedSeries,
+        timeRange,
         createdAt: new Date().toISOString(),
       }
 
@@ -127,6 +161,39 @@ export function CustomChartBuilder({
             </p>
           </div>
 
+          {/* 시간 범위 입력 */}
+          <div className="space-y-3">
+            <Label htmlFor="time-range" className="text-base font-semibold">
+              시간 범위 (주 단위) *
+            </Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="time-range"
+                type="number"
+                min="1"
+                max="260"
+                value={timeRange}
+                onChange={e =>
+                  setTimeRange(Math.max(1, parseInt(e.target.value) || 1))
+                }
+                disabled={isSubmitting}
+                className="flex-1"
+                placeholder="예: 52"
+              />
+              <span className="text-muted-foreground text-sm font-medium">
+                주
+              </span>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              1~260주 범위에서 자유롭게 입력하세요
+            </p>
+            {timeRange < minRequiredWeeks && minRequiredWeeks > 0 && (
+              <p className="text-xs text-red-600 dark:text-red-500">
+                ⚠️ {minRequiredWeeks}주 이상이 필요합니다 (현재: {timeRange}주)
+              </p>
+            )}
+          </div>
+
           {/* 시리즈 선택 */}
           <div className="space-y-3">
             <div>
@@ -157,6 +224,11 @@ export function CustomChartBuilder({
                       className="cursor-pointer text-sm font-normal"
                     >
                       {series.label}
+                      {series.minWeeks > 0 && (
+                        <span className="text-muted-foreground ml-1 text-xs">
+                          (최소 {series.minWeeks}주)
+                        </span>
+                      )}
                     </Label>
                   </div>
                 </div>
@@ -202,7 +274,10 @@ export function CustomChartBuilder({
             <Button
               onClick={handleSave}
               disabled={
-                isSubmitting || !chartName.trim() || selectedSeries.length === 0
+                isSubmitting ||
+                !chartName.trim() ||
+                selectedSeries.length === 0 ||
+                timeRange < minRequiredWeeks
               }
               className="flex-1"
             >

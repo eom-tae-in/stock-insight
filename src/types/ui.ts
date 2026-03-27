@@ -17,6 +17,7 @@ export interface StockCardProps {
   previousClose?: number
   yoyChange: number // %
   sparklineData: PriceDataPoint[] // 최근 52주 주가 배열
+  lastUpdatedAt: string // ISO 8601 형식
   onRefresh?: () => Promise<void>
   onDelete?: () => Promise<void>
   isLoading?: boolean
@@ -146,7 +147,8 @@ export interface CustomChart {
   id: string // crypto.randomUUID()
   name: string // 사용자가 지정한 차트 이름
   series: string[] // 선택된 시리즈 키 배열
-  createdAt: string // ISO 8601 타임스탬프
+  timeRange: number // 표시할 주 수 (13, 26, 52 등)
+  createdAt: string // ISO 8601 타임스탐프
 }
 
 /**

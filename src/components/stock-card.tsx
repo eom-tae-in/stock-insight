@@ -30,6 +30,7 @@ export function StockCard({
   previousClose,
   yoyChange,
   sparklineData,
+  lastUpdatedAt,
   onRefresh,
   onDelete,
   isLoading = false,
@@ -153,32 +154,41 @@ export function StockCard({
               </ResponsiveContainer>
             </div>
 
-            {/* 캡션 */}
-            <p className="text-muted-foreground text-xs">1년 가격 추이</p>
+            {/* 캡션 + 저장 날짜 */}
+            <div className="flex items-center justify-between">
+              <p className="text-muted-foreground text-xs">1년 가격 추이</p>
+              <p className="text-muted-foreground text-xs">
+                {(() => {
+                  const date = new Date(lastUpdatedAt)
+                  const year = date.getFullYear()
+                  const month = String(date.getMonth() + 1).padStart(2, '0')
+                  const day = String(date.getDate()).padStart(2, '0')
+                  return `${year}.${month}.${day}`
+                })()}
+              </p>
+            </div>
           </div>
 
           {/* 호버/터치 오버레이 (수정 모드가 아닐 때만) */}
           {!isEditMode && showOverlay && (
-            <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/50 transition-opacity">
+            <div className="absolute inset-0 flex items-center justify-center gap-4 bg-black/50 backdrop-blur-sm transition-opacity">
               <Button
-                size="icon"
-                variant="ghost"
-                className="bg-white/90 hover:bg-white"
+                size="lg"
+                className="h-14 w-14 rounded-xl border border-slate-500/30 bg-gradient-to-br from-slate-600 to-slate-700 text-cyan-300 shadow-md transition-all hover:from-slate-500 hover:to-slate-600 hover:shadow-lg"
                 onClick={e => {
                   e.preventDefault()
                   handleRefresh()
                 }}
                 disabled={isRefreshing || isLoading}
-                aria-label="새로고침"
+                aria-label="최신화"
               >
                 <RefreshCw
-                  className={cn('h-4 w-4', isRefreshing && 'animate-spin')}
+                  className={cn('h-6 w-6', isRefreshing && 'animate-spin')}
                 />
               </Button>
               <Button
-                size="icon"
-                variant="ghost"
-                className="bg-white/90 hover:bg-white"
+                size="lg"
+                className="h-14 w-14 rounded-xl border border-slate-500/30 bg-gradient-to-br from-slate-600 to-slate-700 text-rose-300 shadow-md transition-all hover:from-slate-500 hover:to-slate-600 hover:shadow-lg"
                 onClick={e => {
                   e.preventDefault()
                   setShowDeleteDialog(true)
@@ -186,7 +196,7 @@ export function StockCard({
                 disabled={isDeleting || isLoading}
                 aria-label="삭제"
               >
-                <Trash2 className="h-4 w-4" />
+                <Trash2 className="h-6 w-6" />
               </Button>
             </div>
           )}

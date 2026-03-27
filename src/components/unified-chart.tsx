@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Download, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { matchPriceAndTrends, calculateWeeklyYoY } from '@/lib/calculations'
 import {
   ComposedChart,
@@ -59,6 +60,14 @@ const SERIES_CONFIG = {
 
 type SeriesKey = keyof typeof SERIES_CONFIG
 
+const TIME_RANGE_PRESETS = [
+  { weeks: 52, label: '1년' },
+  { weeks: 104, label: '2년' },
+  { weeks: 156, label: '3년' },
+  { weeks: 208, label: '4년' },
+  { weeks: 260, label: '5년' },
+]
+
 export function UnifiedChart({
   priceData,
   trendsData,
@@ -66,8 +75,10 @@ export function UnifiedChart({
   metrics,
   onDownload,
   initialEnabledSeries,
+  timeRange,
 }: UnifiedChartProps & {
   initialEnabledSeries?: string[]
+  timeRange?: number
 }) {
   const [enabledSeries, setEnabledSeries] = useState<
     Record<SeriesKey, boolean>
@@ -91,6 +102,42 @@ export function UnifiedChart({
         }
   )
 
+  // 기간 선택 상태
+  const [displayRange, setDisplayRange] = useState(timeRange || 260) // 기본값: 5년
+  const [customRange, setCustomRange] = useState('')
+  const [rangeLabel, setRangeLabel] = useState<string | null>(null)
+
+  const handleRangeChange = (weeks: number, label: string) => {
+    setDisplayRange(weeks)
+    setCustomRange('')
+    setRangeLabel(label)
+
+    // 진동 피드백
+    if (navigator.vibrate) {
+      navigator.vibrate(50)
+    }
+
+    // 레이블 2초 후 사라짐
+    setTimeout(() => setRangeLabel(null), 2000)
+  }
+
+  const handleCustomRange = (value: string) => {
+    setCustomRange(value)
+    const weeks = parseInt(value)
+    if (weeks > 0 && weeks <= 260) {
+      setDisplayRange(weeks)
+      setRangeLabel(`${weeks}주`)
+
+      // 진동 피드백
+      if (navigator.vibrate) {
+        navigator.vibrate(50)
+      }
+
+      // 레이블 2초 후 사라짐
+      setTimeout(() => setRangeLabel(null), 2000)
+    }
+  }
+
   // 데이터 병합: price + trends (matchPriceAndTrends 재사용)
   const matchedData = matchPriceAndTrends(priceData, trendsData)
 
@@ -98,7 +145,7 @@ export function UnifiedChart({
   const weeklyYoY = calculateWeeklyYoY(priceData)
 
   // 모든 데이터 병합
-  const chartData = priceData.map((point, index) => ({
+  const fullChartData = priceData.map((point, index) => ({
     date: point.date,
     close: point.close,
     ma13: ma13?.[index] ?? null,
@@ -107,6 +154,16 @@ export function UnifiedChart({
     trends: matchedData.find(d => d.date === point.date)?.trend ?? null,
     yoy: weeklyYoY[index] ?? null,
   }))
+
+  // timeRange에 따라 초기 데이터 제한 (커스텀 차트의 경우)
+  const timeRangeData = timeRange
+    ? fullChartData.slice(Math.max(0, fullChartData.length - timeRange))
+    : fullChartData
+
+  // displayRange에 따라 차트 데이터 슬라이싱
+  const chartData = timeRangeData.slice(
+    Math.max(0, timeRangeData.length - displayRange)
+  )
 
   // X축 레이블 간격 (매 12주마다 표시)
   const tickInterval = Math.max(1, Math.floor(chartData.length / 12))
@@ -120,19 +177,62 @@ export function UnifiedChart({
 
   return (
     <div className="space-y-4">
-      {/* 제목 및 다운로드 */}
-      <div className="flex items-center justify-between">
+      {/* 제목 및 컨트롤 */}
+      <div className="flex items-center justify-between gap-4">
         <h3 className="text-lg font-semibold">통합 분석 차트</h3>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={onDownload}
-          disabled={!onDownload}
-          aria-label="통합 분석 차트를 PNG로 다운로드"
-        >
-          <Download className="mr-2 h-4 w-4" />
-          PNG 다운로드
-        </Button>
+
+        {/* 우측 시간 범위 컨트롤 패널 */}
+        <div className="flex items-center gap-2">
+          {/* Preset 버튼들 */}
+          <div className="flex gap-1">
+            {TIME_RANGE_PRESETS.map(preset => (
+              <button
+                key={preset.weeks}
+                onClick={() => handleRangeChange(preset.weeks, preset.label)}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                  displayRange === preset.weeks && customRange === ''
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                }`}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Custom 입력 */}
+          <div className="flex items-center gap-1">
+            <Input
+              type="number"
+              min="1"
+              max="260"
+              value={customRange}
+              onChange={e => handleCustomRange(e.target.value)}
+              placeholder="주"
+              className="h-8 w-16 text-xs"
+            />
+            <span className="text-muted-foreground text-xs">주</span>
+          </div>
+
+          {/* 다운로드 버튼 */}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onDownload}
+            disabled={!onDownload}
+            aria-label="통합 분석 차트를 PNG로 다운로드"
+          >
+            <Download className="mr-2 h-4 w-4" />
+            PNG 다운로드
+          </Button>
+
+          {/* 임시 레이블 표시 */}
+          {rangeLabel && (
+            <div className="ml-2 rounded-md bg-blue-500/10 px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400">
+              {rangeLabel}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 토글 버튼 (현대적 디자인) */}
@@ -163,7 +263,10 @@ export function UnifiedChart({
       </div>
 
       {/* 차트 */}
-      <div className="bg-card rounded-lg border p-4">
+      <div
+        className="bg-card rounded-lg border p-4"
+        style={{ overflow: 'hidden' }}
+      >
         <ResponsiveContainer width="100%" height={500}>
           <ComposedChart
             data={chartData}
