@@ -25,8 +25,10 @@ function validateEnv() {
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       const missing = error.issues
-        .filter((issue) => issue.code === 'too_small' || issue.message.includes('필수'))
-        .map((issue) => `- ${String(issue.path.join('.'))}: ${issue.message}`)
+        .filter(
+          issue => issue.code === 'too_small' || issue.message.includes('필수')
+        )
+        .map(issue => `- ${String(issue.path.join('.'))}: ${issue.message}`)
         .join('\n')
 
       console.error(`❌ 환경 변수 검증 실패:\n${missing}\n`)
@@ -39,7 +41,7 @@ function validateEnv() {
   }
 }
 
-export let env = validateEnv()
+export const env = validateEnv()
 
 export type Env = z.infer<typeof envSchema>
 
