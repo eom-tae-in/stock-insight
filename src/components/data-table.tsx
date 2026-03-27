@@ -85,7 +85,7 @@ export function DataTable({
     }
 
     return () => observer.disconnect()
-  }, [loadedCount, sortedData.length])
+  }, [loadedCount, sortedData])
 
   // 표시할 데이터
   const displayedData = sortedData.slice(0, loadedCount)
