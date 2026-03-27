@@ -4,9 +4,9 @@ import { Header } from '@/components/layout/header'
 import { Container } from '@/components/layout/container'
 import { Button } from '@/components/ui/button'
 import { MetricsSummary } from '@/components/metrics-summary'
-import { PriceChart } from '@/components/price-chart'
-import { TrendsChart } from '@/components/trends-chart'
-import { ComparisonChart } from '@/components/comparison-chart'
+import { UnifiedChart } from '@/components/unified-chart'
+import { CustomTableBuilder } from '@/components/custom-table-builder'
+import { CustomTableView } from '@/components/custom-table-view'
 import { getSearchById } from '@/lib/db/queries'
 import { calculateMetrics, calculateMA13 } from '@/lib/calculations'
 import { Download, Table } from 'lucide-react'
@@ -49,21 +49,34 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
             <MetricsSummary metrics={metrics} />
           </section>
 
-          {/* 주가 + MA13 차트 */}
+          {/* 통합 분석 차트 */}
           <section className="mb-8">
-            <PriceChart priceData={record.price_data} ma13={ma13Values} />
-          </section>
-
-          {/* Google Trends 차트 */}
-          <section className="mb-8">
-            <TrendsChart trendsData={record.trends_data} />
-          </section>
-
-          {/* 주가 vs 트렌드 비교 차트 */}
-          <section className="mb-8">
-            <ComparisonChart
+            <UnifiedChart
               priceData={record.price_data}
               trendsData={record.trends_data}
+              ma13={ma13Values}
+              metrics={metrics}
+            />
+          </section>
+
+          {/* 커스텀 테이블 빌더 */}
+          <section className="mb-8">
+            <CustomTableBuilder
+              searchId={record.id}
+              priceData={record.price_data}
+              trendsData={record.trends_data}
+              ma13={ma13Values}
+            />
+          </section>
+
+          {/* 저장된 커스텀 테이블 */}
+          <section className="mb-8">
+            <CustomTableView
+              searchId={record.id}
+              priceData={record.price_data}
+              trendsData={record.trends_data}
+              ma13={ma13Values}
+              yoyChange={metrics.yoyChange}
             />
           </section>
 

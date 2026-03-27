@@ -106,3 +106,35 @@ export interface Downloadable {
   onDownload?: () => Promise<void>
   isDownloading?: boolean
 }
+
+/**
+ * 통합 차트 Props (가격 + 트렌드 + YoY를 하나로)
+ */
+export interface UnifiedChartProps {
+  priceData: PriceDataPoint[]
+  trendsData: TrendsDataPoint[]
+  ma13?: (number | null)[]
+  metrics: Metrics
+  onDownload?: () => Promise<void>
+}
+
+/**
+ * 커스텀 테이블 설정
+ */
+export interface CustomTable {
+  id: string // crypto.randomUUID()
+  name: string // 사용자가 지정한 테이블 이름
+  columns: string[] // 선택된 컬럼 키 배열
+  createdAt: string // ISO 8601 타임스탬프
+}
+
+/**
+ * 커스텀 테이블 빌더 Props
+ */
+export interface CustomTableBuilderProps {
+  searchId: string
+  priceData: PriceDataPoint[]
+  trendsData: TrendsDataPoint[]
+  ma13?: (number | null)[]
+  onTableCreated?: (table: CustomTable) => void
+}
