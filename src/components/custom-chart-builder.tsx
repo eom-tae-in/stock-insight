@@ -164,7 +164,7 @@ export function CustomChartBuilder({
           </div>
 
           {/* 시간 범위 & 시리즈 선택 */}
-          <div className="grid grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
             {/* 시간 범위 */}
             <div className="space-y-3">
               <Label className="text-sm font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
