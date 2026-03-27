@@ -112,6 +112,7 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
               ticker={record.ticker}
               companyName={record.company_name}
               currentPrice={record.current_price}
+              previousClose={record.previous_close}
               yoyChange={record.yoy_change}
               sparklineData={record.price_data}
               onRefresh={() => handleRefresh(record.id)}

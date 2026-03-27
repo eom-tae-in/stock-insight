@@ -7,7 +7,13 @@ import { Container } from '@/components/layout/container'
 import { SearchForm } from '@/components/search-form'
 import { LoadingSkeleton } from '@/components/loading-skeleton'
 import { ProgressIndicator } from '@/components/progress-indicator'
+import { Button } from '@/components/ui/button'
 import type { ProgressState, ApiResponse } from '@/types'
+
+interface TickerCandidate {
+  symbol: string
+  longname: string
+}
 
 export default function SearchPage() {
   const router = useRouter()
@@ -17,11 +23,19 @@ export default function SearchPage() {
     stage: 'idle',
     message: '',
   })
+  const [candidates, setCandidates] = useState<TickerCandidate[]>([])
   const timerRefsRef = useRef<Array<NodeJS.Timeout>>([])
 
-  const handleSubmit = async (ticker: string) => {
-    setIsLoading(true)
+  // ticker 형식인지 확인 (/^[A-Z0-9.]{1,6}$/)
+  const isTickerFormat = (input: string): boolean => {
+    const upperInput = input.toUpperCase()
+    return /^[A-Z0-9.]{1,6}$/.test(upperInput)
+  }
+
+  const performTickerSearch = async (ticker: string) => {
     setError(null)
+    setCandidates([])
+    setIsLoading(true)
     setProgress({ stage: 'fetching-price', message: '' })
 
     try {
@@ -89,6 +103,48 @@ export default function SearchPage() {
     }
   }
 
+  const handleSubmit = async (input: string) => {
+    setError(null)
+    setCandidates([])
+
+    // ticker 형식이 아니면 회사명 검색
+    if (!isTickerFormat(input)) {
+      setIsLoading(true)
+      try {
+        const response = await fetch(
+          `/api/ticker-search?q=${encodeURIComponent(input)}`
+        )
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error?.message || '검색에 실패했습니다')
+        }
+
+        const data = await response.json()
+        setCandidates(data.data || [])
+
+        if (data.data.length === 0) {
+          setError('검색 결과가 없습니다')
+        }
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : '검색 중 오류가 발생했습니다'
+        setError(message)
+      } finally {
+        setIsLoading(false)
+      }
+      return
+    }
+
+    // ticker 형식이면 바로 조회
+    const ticker = input.toUpperCase()
+    await performTickerSearch(ticker)
+  }
+
+  const handleCandidateSelect = (symbol: string) => {
+    performTickerSearch(symbol)
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
@@ -113,6 +169,32 @@ export default function SearchPage() {
               error={error || undefined}
             />
           </div>
+
+          {/* 회사명 검색 결과 (후보 목록) */}
+          {candidates.length > 0 && !isLoading && (
+            <div className="mb-8">
+              <div className="space-y-2">
+                <p className="text-muted-foreground text-sm font-semibold">
+                  검색 결과
+                </p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {candidates.map(candidate => (
+                    <Button
+                      key={candidate.symbol}
+                      variant="outline"
+                      className="h-auto flex-col items-start justify-start px-4 py-3"
+                      onClick={() => handleCandidateSelect(candidate.symbol)}
+                    >
+                      <span className="font-bold">{candidate.symbol}</span>
+                      <span className="text-muted-foreground text-xs">
+                        {candidate.longname}
+                      </span>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* 진행 상태 표시 */}
           {progress.stage !== 'idle' && (

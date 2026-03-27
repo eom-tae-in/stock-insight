@@ -14,6 +14,7 @@ export interface StockCardProps {
   ticker: string
   companyName: string
   currentPrice: number
+  previousClose?: number
   yoyChange: number // %
   sparklineData: PriceDataPoint[] // 최근 52주 주가 배열
   onRefresh?: () => Promise<void>

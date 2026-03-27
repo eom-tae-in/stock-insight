@@ -22,6 +22,7 @@ export function StockCard({
   ticker,
   companyName,
   currentPrice,
+  previousClose,
   yoyChange,
   sparklineData,
   onRefresh,
@@ -34,6 +35,12 @@ export function StockCard({
   const [showOverlay, setShowOverlay] = useState(false)
 
   const isPositive = yoyChange >= 0
+  // 전일 대비 변화율
+  const priceChange =
+    previousClose !== undefined && previousClose > 0
+      ? ((currentPrice - previousClose) / previousClose) * 100
+      : 0
+  const isPricePositive = priceChange >= 0
 
   const handleRefresh = async () => {
     if (!onRefresh) return
@@ -65,23 +72,39 @@ export function StockCard({
           onMouseLeave={() => setShowOverlay(false)}
           onClick={() => setShowOverlay(!showOverlay)}
         >
-          <div className="p-4">
+          <div className="p-6">
             {/* 헤더: Ticker와 회사명 */}
-            <div className="mb-4">
+            <div className="mb-5">
               <h3 className="text-lg font-bold">{ticker}</h3>
               <p className="text-muted-foreground text-sm">{companyName}</p>
             </div>
 
-            {/* 현재가 */}
-            <div className="mb-3">
-              <p className="text-2xl font-bold">${currentPrice.toFixed(2)}</p>
+            {/* 현재가 + 전일 대비 변화 */}
+            <div className="mb-4 space-y-1">
+              <p className="text-3xl font-bold">${currentPrice.toFixed(2)}</p>
+              {previousClose !== undefined && (
+                <p
+                  className={cn(
+                    'text-sm font-medium',
+                    isPricePositive
+                      ? 'text-green-600 dark:text-green-400'
+                      : 'text-red-600 dark:text-red-400'
+                  )}
+                >
+                  전일 대비 {isPricePositive ? '+' : ''}
+                  {priceChange.toFixed(2)}%
+                </p>
+              )}
             </div>
 
-            {/* YoY 변화율 */}
-            <div className="mb-4">
+            {/* 52주 수익률 */}
+            <div className="mb-5 space-y-1">
+              <p className="text-muted-foreground text-xs font-semibold uppercase">
+                52주 수익률
+              </p>
               <p
                 className={cn(
-                  'text-sm font-semibold',
+                  'text-lg font-bold',
                   isPositive
                     ? 'text-green-600 dark:text-green-400'
                     : 'text-red-600 dark:text-red-400'
@@ -93,7 +116,7 @@ export function StockCard({
             </div>
 
             {/* Sparkline */}
-            <div className="h-10">
+            <div className="mb-3 h-20">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
                   data={sparklineData.slice(-52)}
@@ -102,7 +125,7 @@ export function StockCard({
                   <Line
                     type="monotone"
                     dataKey="close"
-                    stroke="#3b82f6"
+                    stroke={isPositive ? '#22c55e' : '#ef4444'}
                     strokeWidth={2}
                     dot={false}
                     animationDuration={0}
@@ -110,6 +133,9 @@ export function StockCard({
                 </LineChart>
               </ResponsiveContainer>
             </div>
+
+            {/* 캡션 */}
+            <p className="text-muted-foreground text-xs">1년 가격 추이</p>
           </div>
 
           {/* 호버/터치 오버레이 */}

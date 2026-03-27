@@ -1,15 +1,56 @@
+'use client'
+
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { Container } from './container'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { cn } from '@/lib/utils'
 
 export function Header() {
+  const pathname = usePathname()
+
+  const isActiveLink = (href: string) => {
+    return pathname === href
+  }
+
   return (
     <header className="bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 w-full border-b backdrop-blur">
       <Container>
         <div className="flex h-16 items-center justify-between">
-          <Link href="/" className="flex items-center space-x-2">
-            <span className="text-xl font-bold">StockInsight</span>
-          </Link>
+          {/* 로고 + 네비게이션 */}
+          <div className="flex items-center space-x-8">
+            <Link href="/" className="text-xl font-bold">
+              StockInsight
+            </Link>
+
+            {/* 네비게이션 링크 */}
+            <nav className="hidden space-x-1 sm:flex">
+              <Link
+                href="/"
+                className={cn(
+                  'rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  isActiveLink('/')
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:bg-accent'
+                )}
+              >
+                내 종목
+              </Link>
+              <Link
+                href="/search"
+                className={cn(
+                  'rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  isActiveLink('/search')
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:bg-accent'
+                )}
+              >
+                새 종목 검색
+              </Link>
+            </nav>
+          </div>
+
+          {/* 테마 토글 */}
           <ThemeToggle />
         </div>
       </Container>
