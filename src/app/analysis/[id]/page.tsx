@@ -1,5 +1,14 @@
+import Link from 'next/link'
 import { Header } from '@/components/layout/header'
 import { Container } from '@/components/layout/container'
+import { Button } from '@/components/ui/button'
+import { MetricsSummary } from '@/components/metrics-summary'
+import { PriceChart } from '@/components/price-chart'
+import { TrendsChart } from '@/components/trends-chart'
+import { ComparisonChart } from '@/components/comparison-chart'
+import { calculateMetrics, getMockSearchRecords } from '@/lib/mock-data'
+import { calculateMA13 } from '@/lib/indicators'
+import { Download } from 'lucide-react'
 
 interface AnalysisPageProps {
   params: Promise<{ id: string }>
@@ -7,48 +16,87 @@ interface AnalysisPageProps {
 
 export default async function AnalysisPage({ params }: AnalysisPageProps) {
   const { id } = await params
+  const records = getMockSearchRecords()
+  const record = records.find(r => r.id === id)
+
+  if (!record) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <Header />
+        <main className="flex-1">
+          <Container className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <h1 className="mb-4 text-2xl font-bold">
+                종목을 찾을 수 없습니다
+              </h1>
+              <p className="text-muted-foreground mb-6">
+                요청하신 종목 분석 데이터가 없습니다.
+              </p>
+              <Button asChild>
+                <Link href="/">대시보드로 돌아가기</Link>
+              </Button>
+            </div>
+          </Container>
+        </main>
+      </div>
+    )
+  }
+
+  const metrics = calculateMetrics(record.price_data)
+  const ma13Values = calculateMA13(record.price_data)
 
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
       <main className="flex-1">
         <Container className="py-8">
-          <h1 className="mb-8 text-2xl font-bold">종목 분석 #{id}</h1>
-
-          {/* 지표 요약 섹션 - 구현 예정 (F002, F005, F006, F010) */}
-          <section className="bg-muted/50 mb-6 rounded-lg border p-8 text-center">
-            <p className="text-muted-foreground text-sm">
-              지표 요약 카드 구현 예정 (현재 종가 / MA13 / YoY / 52주 최고가 /
-              52주 최저가)
+          {/* 제목 및 종목 정보 */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold">
+              {record.ticker} - {record.company_name}
+            </h1>
+            <p className="text-muted-foreground mt-2 text-sm">
+              마지막 업데이트:{' '}
+              {new Date(record.last_updated_at).toLocaleDateString('ko-KR')}
             </p>
+          </div>
+
+          {/* 지표 요약 */}
+          <section className="mb-8">
+            <MetricsSummary metrics={metrics} />
           </section>
 
-          {/* 주가 + MA13 차트 - 구현 예정 (F007) */}
-          <section className="bg-muted/50 mb-6 rounded-lg border p-8 text-center">
-            <p className="text-muted-foreground text-sm">
-              주가 + MA13 차트 구현 예정 (F007)
-            </p>
+          {/* 주가 + MA13 차트 */}
+          <section className="mb-8">
+            <PriceChart priceData={record.price_data} ma13={ma13Values} />
           </section>
 
-          {/* Google Trends 차트 - 구현 예정 (F008) */}
-          <section className="bg-muted/50 mb-6 rounded-lg border p-8 text-center">
-            <p className="text-muted-foreground text-sm">
-              Google Trends 차트 구현 예정 (F008)
-            </p>
+          {/* Google Trends 차트 */}
+          <section className="mb-8">
+            <TrendsChart trendsData={record.trends_data} />
           </section>
 
-          {/* 주가 vs 트렌드 비교 차트 - 구현 예정 (F009) */}
-          <section className="bg-muted/50 mb-6 rounded-lg border p-8 text-center">
-            <p className="text-muted-foreground text-sm">
-              주가 vs 트렌드 비교 차트 구현 예정 (F009)
-            </p>
+          {/* 주가 vs 트렌드 비교 차트 */}
+          <section className="mb-8">
+            <ComparisonChart
+              priceData={record.price_data}
+              trendsData={record.trends_data}
+            />
           </section>
 
-          {/* 다운로드 섹션 - 구현 예정 (F011, F012) */}
-          <section className="bg-muted/50 rounded-lg border p-8 text-center">
-            <p className="text-muted-foreground text-sm">
-              엑셀/PNG 다운로드 구현 예정 (F011, F012)
-            </p>
+          {/* 다운로드 섹션 */}
+          <section className="bg-card rounded-lg border p-6">
+            <h3 className="mb-4 text-lg font-semibold">데이터 다운로드</h3>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button variant="outline" className="flex-1 sm:flex-none">
+                <Download className="mr-2 h-4 w-4" />
+                엑셀 다운로드
+              </Button>
+              <Button variant="outline" className="flex-1 sm:flex-none">
+                <Download className="mr-2 h-4 w-4" />
+                전체 차트 PNG 다운로드
+              </Button>
+            </div>
           </section>
         </Container>
       </main>
