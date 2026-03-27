@@ -122,31 +122,27 @@ export function UnifiedChart({
   // 기간 선택 상태
   const [displayRange, setDisplayRange] = useState(timeRange || 260) // 기본값: 5년
   const [customRange, setCustomRange] = useState('')
-  const [rangeLabel, setRangeLabel] = useState<string | null>(null)
 
-  const autoEnableSeries = (weeks: number) => {
-    setEnabledSeries(prev => ({
-      ...prev,
-      ma13: weeks >= 13 ? true : prev.ma13,
-      week52High: weeks >= 52 ? true : prev.week52High,
-      week52Low: weeks >= 52 ? true : prev.week52Low,
-      yoy: weeks >= 52 ? true : prev.yoy,
-    }))
+  const disableAllSeries = () => {
+    setEnabledSeries({
+      close: true,
+      ma13: false,
+      week52High: false,
+      week52Low: false,
+      trends: false,
+      yoy: false,
+    })
   }
 
-  const handleRangeChange = (weeks: number, label: string) => {
+  const handleRangeChange = (weeks: number) => {
     setDisplayRange(weeks)
-    setCustomRange('')
-    setRangeLabel(label)
-    autoEnableSeries(weeks)
+    setCustomRange(weeks.toString())
+    disableAllSeries()
 
     // 진동 피드백
     if (navigator.vibrate) {
       navigator.vibrate(50)
     }
-
-    // 레이블 2초 후 사라짐
-    setTimeout(() => setRangeLabel(null), 2000)
   }
 
   const handleCustomRange = (value: string) => {
@@ -154,16 +150,12 @@ export function UnifiedChart({
     const weeks = parseInt(value)
     if (weeks > 0 && weeks <= 260) {
       setDisplayRange(weeks)
-      setRangeLabel(`${weeks}주`)
-      autoEnableSeries(weeks)
+      disableAllSeries()
 
       // 진동 피드백
       if (navigator.vibrate) {
         navigator.vibrate(50)
       }
-
-      // 레이블 2초 후 사라짐
-      setTimeout(() => setRangeLabel(null), 2000)
     }
   }
 
@@ -221,9 +213,9 @@ export function UnifiedChart({
             {TIME_RANGE_PRESETS.map(preset => (
               <button
                 key={preset.weeks}
-                onClick={() => handleRangeChange(preset.weeks, preset.label)}
+                onClick={() => handleRangeChange(preset.weeks)}
                 className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                  displayRange === preset.weeks && customRange === ''
+                  displayRange === preset.weeks
                     ? 'bg-blue-500 text-white'
                     : 'bg-muted text-muted-foreground hover:bg-muted/80'
                 }`}
@@ -246,13 +238,6 @@ export function UnifiedChart({
             />
             <span className="text-muted-foreground text-xs">주</span>
           </div>
-
-          {/* 임시 레이블 표시 */}
-          {rangeLabel && (
-            <div className="rounded-md bg-blue-500/10 px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400">
-              {rangeLabel}
-            </div>
-          )}
         </div>
       </div>
 
