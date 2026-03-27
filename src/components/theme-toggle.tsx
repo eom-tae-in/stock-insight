@@ -29,9 +29,7 @@ export function ThemeToggle() {
       />
       <Moon
         className={`absolute h-5 w-5 transition-all ${
-          resolvedTheme === 'dark' || !resolvedTheme
-            ? 'scale-100 rotate-0'
-            : 'scale-0 rotate-90'
+          resolvedTheme === 'dark' ? 'scale-100 rotate-0' : 'scale-0 rotate-90'
         }`}
       />
       <Leaf
