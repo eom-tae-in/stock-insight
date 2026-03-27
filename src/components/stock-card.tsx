@@ -78,10 +78,11 @@ export function StockCard({
       >
         <Card
           className={cn(
-            'group relative overflow-hidden transition-all',
+            'group relative overflow-hidden transition-all duration-300',
             !isEditMode && 'cursor-pointer hover:shadow-lg',
-            isEditMode && 'cursor-move border-blue-500 bg-blue-500/5',
-            isDragging && 'opacity-50'
+            isEditMode &&
+              'cursor-move border-2 border-blue-500 bg-blue-500/5 hover:shadow-lg hover:shadow-blue-500/20',
+            isDragging && 'ring-2 ring-blue-500 ring-offset-2'
           )}
           onMouseEnter={() => !isEditMode && setShowOverlay(true)}
           onMouseLeave={() => !isEditMode && setShowOverlay(false)}
