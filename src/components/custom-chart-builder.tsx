@@ -78,6 +78,13 @@ export function CustomChartBuilder({
       // 콜백 호출
       onChartCreated?.(newChart)
 
+      // CustomChartView에 업데이트 알림
+      window.dispatchEvent(
+        new CustomEvent('customChartUpdated', {
+          detail: { searchId, newChart },
+        })
+      )
+
       // UI 리셋
       setChartName('')
       setSelectedSeries(['close', 'trends'])
