@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, X } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -127,14 +127,6 @@ export function CustomChartBuilder({
       </Button>
 
       <DialogContent className="m-2 flex max-h-[70vh] w-[950px] flex-col rounded-2xl border-0 bg-white p-0 shadow-2xl sm:m-4 dark:bg-slate-950">
-        {/* 닫기 버튼 */}
-        <button
-          onClick={() => setIsOpen(false)}
-          className="absolute top-5 right-5 rounded-full p-1 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
-        >
-          <X className="h-5 w-5" />
-        </button>
-
         {/* 헤더 (고정) */}
         <div className="flex-shrink-0 border-b border-slate-200 px-8 py-6 dark:border-slate-700">
           <DialogHeader className="text-left">
