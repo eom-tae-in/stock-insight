@@ -34,9 +34,7 @@ export function ThemeToggle() {
       />
       <Leaf
         className={`absolute h-5 w-5 transition-all ${
-          resolvedTheme === 'calm' || !resolvedTheme
-            ? 'scale-100 rotate-0'
-            : 'scale-0 rotate-90'
+          resolvedTheme === 'calm' ? 'scale-100 rotate-0' : 'scale-0 rotate-90'
         }`}
       />
       <span className="sr-only">테마 전환</span>
