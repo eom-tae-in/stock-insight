@@ -108,21 +108,21 @@ export function DataTable({
       {/* 테이블 */}
       <div className="bg-card overflow-x-auto rounded-lg border">
         <table className="w-full text-sm">
-          <thead className="bg-muted/50 border-b">
+          <thead className="bg-muted/70 border-b">
             <tr>
-              <th className="border-muted/30 border-r px-4 py-3 text-left">
+              <th className="border-muted/60 border-r px-4 py-3 text-left">
                 <SortHeader label="일정" sortKey="date" />
               </th>
-              <th className="border-muted/30 border-r px-4 py-3 text-right">
+              <th className="border-muted/60 border-r px-4 py-3 text-center">
                 <SortHeader label="주가 ($)" sortKey="close" />
               </th>
-              <th className="border-muted/30 border-r px-4 py-3 text-center">
+              <th className="border-muted/60 border-r px-4 py-3 text-center">
                 <SortHeader label="Google Trends (0-100)" sortKey="trends" />
               </th>
-              <th className="border-muted/30 border-r px-4 py-3 text-right">
+              <th className="border-muted/60 border-r px-4 py-3 text-center">
                 <SortHeader label="13주 MA ($)" sortKey="ma13" />
               </th>
-              <th className="px-4 py-3 text-right">
+              <th className="px-4 py-3 text-center">
                 <SortHeader label="전년도 대비 (%)" sortKey="yoy" />
               </th>
             </tr>
@@ -133,13 +133,13 @@ export function DataTable({
                 key={`${row.date}-${index}`}
                 className="hover:bg-muted/30 border-b transition-colors"
               >
-                <td className="border-muted/20 border-r px-4 py-3 font-medium">
+                <td className="border-muted/60 border-r px-4 py-3 font-medium">
                   {row.date}
                 </td>
-                <td className="border-muted/20 border-r px-4 py-3 text-right">
+                <td className="border-muted/60 border-r px-4 py-3 text-center">
                   ${row.close.toFixed(2)}
                 </td>
-                <td className="border-muted/20 border-r px-4 py-3 text-center">
+                <td className="border-muted/60 border-r px-4 py-3 text-center">
                   <div className="flex items-center justify-center gap-2">
                     <div className="bg-muted relative h-6 w-16 overflow-hidden rounded">
                       <div
@@ -150,12 +150,12 @@ export function DataTable({
                     <span className="w-8 text-center">{row.trends}</span>
                   </div>
                 </td>
-                <td className="border-muted/20 border-r px-4 py-3 text-right">
+                <td className="border-muted/60 border-r px-4 py-3 text-center">
                   ${row.ma13.toFixed(2)}
                 </td>
                 <td
                   className={cn(
-                    'px-4 py-3 text-right font-semibold',
+                    'px-4 py-3 text-center font-semibold',
                     row.yoy >= 0
                       ? 'text-blue-600 dark:text-blue-400'
                       : 'text-red-600 dark:text-red-400'
