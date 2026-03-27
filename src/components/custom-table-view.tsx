@@ -177,7 +177,7 @@ export function CustomTableView({
                           return (
                             <th
                               key={col}
-                              className="text-muted-foreground px-4 py-2 text-left font-semibold"
+                              className="text-muted-foreground px-4 py-2 text-center font-semibold"
                             >
                               {colMap[col]}
                             </th>
@@ -201,7 +201,7 @@ export function CustomTableView({
                             'date',
                             ...table.columns.filter(c => c !== 'date'),
                           ].map(col => (
-                            <td key={col} className="px-4 py-2">
+                            <td key={col} className="px-4 py-2 text-center">
                               {String(row[col] ?? '-')}
                             </td>
                           ))}
