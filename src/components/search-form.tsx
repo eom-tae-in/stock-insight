@@ -18,8 +18,8 @@ import type { SearchFormProps } from '@/types'
 const searchSchema = z.object({
   ticker: z
     .string()
-    .min(1, '종목 심볼을 입력해주세요')
-    .max(6, '종목 심볼은 최대 6자입니다 (예: BRK.B)')
+    .min(1, '종목 심볼 또는 회사명을 입력해주세요')
+    .max(50, '입력이 너무 깁니다')
     .transform(val => val.toUpperCase()),
 })
 
