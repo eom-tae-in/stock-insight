@@ -23,7 +23,7 @@ export async function DELETE(
     }
 
     // DB에서 삭제
-    const deleted = deleteSearch(id)
+    const deleted = await deleteSearch(id)
 
     if (!deleted) {
       return createErrorResponse(
