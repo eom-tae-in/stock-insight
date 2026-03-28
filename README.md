@@ -3,7 +3,7 @@
 > **특정 종목의 5년 가격 흐름과 Google Trends 검색 관심도를 한눈에 비교하는 개인 투자자용 주식 분석 도구**
 
 특정 종목의 장기 가격 추세와 대중의 검색 관심도 변화를 비교 분석하여, 투자 판단을 지원합니다.
-조회한 모든 데이터는 로컬 SQLite 데이터베이스에 저장되어 언제든지 재조회 가능합니다.
+조회한 모든 데이터는 Supabase 클라우드 데이터베이스에 저장되어 언제든지 재조회 가능합니다.
 
 ---
 
@@ -25,7 +25,8 @@
 
 ### 💾 데이터 관리
 
-- **자동 저장**: 새로 조회한 종목은 자동으로 로컬 DB에 저장
+- **자동 저장**: 새로 조회한 종목은 자동으로 Supabase에 저장
+- **클라우드 동기화**: 어디서든 저장된 종목 데이터에 접근 가능
 - **재조회**: 저장된 종목 재클릭으로 즉시 데이터 확인
 - **삭제**: 더 이상 필요 없는 종목 한 번에 삭제
 - **새로고침**: 최신 데이터로 업데이트
@@ -57,21 +58,30 @@ cd stock_insight
 npm install
 ```
 
-### 2단계: API 키 설정 (선택 사항)
+### 2단계: 환경 변수 설정
 
 `.env.local` 파일 생성:
 
 ```
-FINNHUB_API_KEY=your_finnhub_api_key_here
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your_anon_public_key
+FINNHUB_API_KEY=your_finnhub_api_key_here  # 선택사항
 ```
 
-**API 정보:**
+**설정 정보:**
 
-- **Finnhub**: [가입](https://finnhub.io) 후 발급 가능 (무료 계정 지원)
-  - 주식 데이터 수집 시 사용
-  - 없으면 로컬 데모 데이터로 자동 사용
+- **Supabase** (필수)
+  - [Supabase 대시보드](https://supabase.com/dashboard)에서 프로젝트 생성
+  - Settings → API 메뉴에서 Project URL과 anon public key 복사
+  - 모든 종목 데이터는 Supabase에 저장됨
+
+- **Finnhub** (선택사항)
+  - [가입](https://finnhub.io) 후 발급 가능 (무료 계정 지원)
+  - 현재가와 회사명 조회 시 사용
+  - 없어도 Yahoo Finance에서 자동으로 데이터 수집
+
 - **Google Trends**: 별도 API 키 불필요
-  - pytrends 라이브러리로 자동 수집
+  - 자동으로 검색 관심도 수집
 
 ### 3단계: 개발 서버 실행
 
@@ -138,17 +148,17 @@ npm run format         # 자동 포맷
 
 ## 📊 기술 스택
 
-| 분야             | 기술                                     |
-| ---------------- | ---------------------------------------- |
-| **프레임워크**   | Next.js 15.5.3 (App Router + Turbopack)  |
-| **런타임**       | React 19.1.0, TypeScript 5               |
-| **UI/스타일**    | TailwindCSS v4, shadcn/ui, Radix UI      |
-| **데이터베이스** | better-sqlite3 (로컬 SQLite)             |
-| **데이터 소스**  | Finnhub (주식), pytrends (Google Trends) |
-| **폼/유효성**    | React Hook Form, Zod                     |
-| **아이콘**       | Lucide Icons                             |
-| **차트**         | Recharts                                 |
-| **개발 도구**    | ESLint, Prettier, Husky, lint-staged     |
+| 분야             | 기술                                    |
+| ---------------- | --------------------------------------- |
+| **프레임워크**   | Next.js 15.5.3 (App Router + Turbopack) |
+| **런타임**       | React 19.1.0, TypeScript 5              |
+| **UI/스타일**    | TailwindCSS v4, shadcn/ui, Radix UI     |
+| **데이터베이스** | Supabase (PostgreSQL 클라우드)          |
+| **데이터 소스**  | Yahoo Finance (주식), Google Trends     |
+| **폼/유효성**    | React Hook Form, Zod                    |
+| **아이콘**       | Lucide Icons                            |
+| **차트**         | Recharts                                |
+| **개발 도구**    | ESLint, Prettier, Husky, lint-staged    |
 
 ---
 
@@ -167,12 +177,13 @@ stock_insight/
 │   │   ├── custom-chart-builder.tsx  # 커스텀 차트 생성
 │   │   └── ...
 │   ├── lib/
-│   │   ├── db/                   # SQLite 쿼리
+│   │   ├── db/                   # Supabase 쿼리
+│   │   ├── adapters/             # DB 어댑터
 │   │   ├── calculations/         # MA13, YoY 계산
 │   │   └── export/               # Excel, PNG 내보내기
 │   └── types/                    # TypeScript 타입 정의
-├── data/
-│   └── stock-insight.db          # SQLite 데이터베이스 (자동 생성)
+├── migrations/
+│   └── *.sql                     # Supabase 마이그레이션 파일
 ├── docs/
 │   ├── PRD.md                    # 상세 요구사항
 │   └── ROADMAP.md                # 개발 로드맵
@@ -185,15 +196,20 @@ stock_insight/
 
 ### 위치
 
-`data/stock-insight.db` (앱 첫 시작 시 자동 생성)
+Supabase 클라우드 (PostgreSQL)
 
 ### 테이블 구조
 
 | 테이블          | 설명                 | 주요 컬럼                                                |
 | --------------- | -------------------- | -------------------------------------------------------- |
 | **searches**    | 종목 메타데이터      | id, ticker, company_name, current_price, last_updated_at |
-| **price_data**  | 5년 주간 주가        | search_id, date, close, volume                           |
+| **price_data**  | 5년 주간 주가        | search_id, date, close, open, high, low, volume          |
 | **trends_data** | 5년 주간 검색 관심도 | search_id, date, value (0-100)                           |
+
+**마이그레이션 상태**: Phase 6 완료 ✅
+
+- SQLite에서 Supabase PostgreSQL로 완전 마이그레이션
+- 모든 데이터는 Supabase 클라우드에 저장되어 어디서든 접근 가능
 
 상세 스키마는 [PRD 문서](./docs/PRD.md#데이터-모델) 참조
 
@@ -233,17 +249,17 @@ stock_insight/
 
 ## 💡 팁 & 자주 묻는 질문
 
-### Q: 왜 로컬 데이터베이스를 사용하나요?
+### Q: 왜 Supabase 클라우드를 사용하나요?
 
-**A**: 개인 투자자가 자신의 컴퓨터에서 독립적으로 사용하기 위해 설계되었습니다. 클라우드 저장소나 계정이 필요 없고, 모든 데이터가 본인 PC에 안전하게 저장됩니다.
+**A**: Phase 6 마이그레이션을 통해 SQLite 로컬 DB에서 Supabase PostgreSQL로 전환했습니다. 이제 모든 데이터가 클라우드에 저장되어 여러 기기에서 동시에 접근 가능하며, 데이터 손실 위험이 없습니다.
 
-### Q: SerpAPI 무료 플랜으로 충분한가요?
+### Q: 데이터 프라이버시는 어떻게 보장하나요?
 
-**A**: 네, 월 100회 무료 요청으로 시작할 수 있습니다. 정기적인 사용자라면 유료 플랜 전환을 추천합니다. ([SerpAPI 가격](https://serpapi.com/pricing))
+**A**: Supabase는 업계 표준의 PostgreSQL 데이터베이스로, 프로젝트별 고유의 인증 키(API key)로 보호됩니다. SUPABASE_KEY만 관리하면 안전합니다.
 
-### Q: 데이터를 어떻게 백업하나요?
+### Q: Google Trends 데이터는 어떻게 수집하나요?
 
-**A**: `data/stock-insight.db` 파일을 복사해서 안전한 위치에 보관하면 됩니다.
+**A**: 공개된 Google Trends 데이터를 실시간으로 수집합니다. API 키나 인증이 필요하지 않습니다.
 
 ### Q: 모바일에서도 사용 가능한가요?
 
@@ -272,5 +288,5 @@ MIT License - 자유롭게 사용, 수정, 배포 가능합니다.
 
 ---
 
-**마지막 업데이트**: 2026년 3월 27일
-**버전**: 1.0.0 ✅ (개발 완료)
+**마지막 업데이트**: 2026년 3월 28일
+**버전**: 1.0.1 ✅ (Supabase 마이그레이션 완료)
