@@ -730,10 +730,10 @@ const fallbackAdapter: DbAdapter = {
 function getAdapter(): DbAdapter {
   // Phase 5: DB_READ_MODE and DB_WRITE_MODE based selection (highest priority)
 
-  // Supabase Primary mode: read from Supabase (with SQLite fallback), write to both
-  // Using supabaseAdapter for dual-write which ensures SQLite first, then Supabase
+  // Supabase Primary mode: read from Supabase (with SQLite fallback), write to Supabase only
+  // Using fallbackAdapter to avoid unintended SQLite writes via dual-write pattern
   if (env.DB_READ_MODE === 'supabase' && env.DB_WRITE_MODE === 'supabase') {
-    return supabaseAdapter
+    return fallbackAdapter
   }
 
   // Shadow Read mode: read from Supabase (with comparison), write to SQLite only
@@ -744,8 +744,8 @@ function getAdapter(): DbAdapter {
 
   // Dual-Write mode: read from SQLite, write to both SQLite and Supabase
   if (env.DB_WRITE_MODE === 'supabase' && env.DB_READ_MODE === 'sqlite') {
-    // Phase 5: Dual-Write with Shadow Read validation
-    return shadowReadAdapter
+    // Phase 5: Dual-Write (SQLite mandatory first, then Supabase optional)
+    return supabaseAdapter
   }
 
   // Legacy mode: USE_SUPABASE=true (backward compatibility)

@@ -14,6 +14,7 @@ import { fetchStockData } from '@/lib/services/stock-service'
 import { fetchTrendsData } from '@/lib/services/trends-service'
 import { calculateMetrics } from '@/lib/calculations'
 import { TickerInputSchema } from '@/lib/validation'
+import { env } from '@/lib/env'
 import {
   getAllSearches,
   upsertSearch,
@@ -22,6 +23,8 @@ import {
 import { createSuccessResponse, createErrorResponse } from '@/lib/api-helpers'
 import type { SearchRecord, TrendsDataPoint } from '@/types'
 import crypto from 'crypto'
+
+export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
@@ -114,11 +117,10 @@ export async function POST(request: NextRequest) {
 
     const id = await upsertSearch(searchRecord)
 
-    // Phase 2: searches 테이블에만 저장
-    // price_data/trends_data JSONB 컬럼에는 이미 저장되었으므로,
-    // 별도 테이블(price_data/trends_data)은 Phase 5에서 마이그레이션
-    // USE_SUPABASE=false일 때만 SQLite의 별도 테이블에 저장
-    if (process.env.USE_SUPABASE !== 'true') {
+    // Phase 5: SQLite 기반 저장 (USE_SUPABASE=false 또는 Supabase Primary가 아닐 때)
+    // Supabase Primary 모드(DB_READ_MODE='supabase' && DB_WRITE_MODE='supabase')에서는
+    // adapter가 price_data/trends_data 별도 테이블에 자동으로 저장함
+    if (!env.USE_SUPABASE) {
       await replaceStockData(id, stockData.priceData, trendsData)
     }
 

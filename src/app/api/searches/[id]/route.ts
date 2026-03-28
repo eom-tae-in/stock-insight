@@ -10,6 +10,8 @@ import { deleteSearch } from '@/lib/db/queries'
 import { createErrorResponse } from '@/lib/api-helpers'
 import type { ApiResponse } from '@/types'
 
+export const dynamic = 'force-dynamic'
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
