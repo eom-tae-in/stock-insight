@@ -6,6 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { deleteSearch } from '@/lib/db/queries'
 import { createErrorResponse } from '@/lib/api-helpers'
 import type { ApiResponse } from '@/types'
@@ -17,6 +18,16 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // 인증 확인
+    const supabase = await createSupabaseServerClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+    if (!user || authError) {
+      return createErrorResponse('UNAUTHORIZED', '로그인이 필요합니다.', 401)
+    }
+
     const { id } = await params
 
     // ID 검증 (UUID 형식 확인)
@@ -24,8 +35,8 @@ export async function DELETE(
       return createErrorResponse('INVALID_ID', '유효하지 않은 ID입니다.', 400)
     }
 
-    // DB에서 삭제
-    const deleted = await deleteSearch(id)
+    // 인증된 클라이언트로 삭제 (RLS가 본인 데이터만 삭제 보장)
+    const deleted = await deleteSearch(id, supabase)
 
     if (!deleted) {
       return createErrorResponse(

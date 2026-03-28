@@ -10,6 +10,7 @@
  */
 
 import { NextRequest } from 'next/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { fetchStockData } from '@/lib/services/stock-service'
 import { fetchTrendsData } from '@/lib/services/trends-service'
 import { calculateMetrics } from '@/lib/calculations'
@@ -28,8 +29,18 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
-    // DB에서 모든 저장된 종목 조회
-    const records = await getAllSearches()
+    // 인증 확인
+    const supabase = await createSupabaseServerClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+    if (!user || authError) {
+      return createErrorResponse('UNAUTHORIZED', '로그인이 필요합니다.', 401)
+    }
+
+    // 인증된 클라이언트로 DB에서 자신의 저장된 종목 조회 (RLS 적용)
+    const records = await getAllSearches(supabase)
 
     return createSuccessResponse(records, 200)
   } catch (error) {
@@ -44,6 +55,16 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    // 인증 확인
+    const supabase = await createSupabaseServerClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+    if (!user || authError) {
+      return createErrorResponse('UNAUTHORIZED', '로그인이 필요합니다.', 401)
+    }
+
     // 요청 본문 파싱
     const body = await request.json()
     const { ticker } = body
@@ -113,17 +134,19 @@ export async function POST(request: NextRequest) {
       last_updated_at: now.toISOString(),
       searched_at: now.toISOString(),
       created_at: now.toISOString(),
+      user_id: user.id, // 인증된 사용자의 ID 설정
     }
 
-    const id = await upsertSearch(searchRecord)
+    // 인증된 클라이언트로 저장 (RLS 적용)
+    const id = await upsertSearch(searchRecord, supabase)
 
     // Phase 6: Supabase 단일 기반 - 가격 및 트렌드 데이터 저장
     // 원자성 보장: replaceStockData 실패 시 search 레코드를 롤백하여 데이터 불일치 방지
     try {
-      await replaceStockData(id, stockData.priceData, trendsData)
+      await replaceStockData(id, stockData.priceData, trendsData, supabase)
     } catch (error) {
       // 보상 로직: 이미 저장된 search 레코드 삭제
-      await deleteSearch(id)
+      await deleteSearch(id, supabase)
       throw error
     }
 

@@ -43,6 +43,7 @@ export interface SearchRecord {
   last_updated_at: string // ISO 8601 타임스탬프
   searched_at: string // ISO 8601 타임스탬프
   created_at: string // ISO 8601 타임스탬프
+  user_id?: string // 사용자 UUID (OAuth 로그인한 사용자)
 }
 
 /**
@@ -63,6 +64,7 @@ export interface SearchRecordRaw {
   last_updated_at: string
   searched_at: string
   created_at: string
+  user_id?: string // 사용자 UUID
 }
 
 /**
@@ -81,3 +83,45 @@ export interface Metrics {
  * 계산된 지표 (Metrics의 별칭, ROADMAP 요구사항)
  */
 export type CalculatedMetrics = Metrics
+
+/**
+ * 키워드 기반 검색 기록 (keyword_searches 테이블)
+ * Google Trends 데이터를 키워드 기준으로 저장
+ */
+export interface KeywordSearchRecord {
+  id: string // UUID
+  user_id: string // 사용자 UUID (OAuth 로그인한 사용자)
+  keyword: string // Google Trends 검색어
+  ma13?: number // 트렌드 지수 기반 13주 이동평균 (0-100)
+  yoy_change?: number // 트렌드 지수 기반 52주 YoY (%)
+  trends_data: TrendsDataPoint[] // 5년 주간 트렌드 배열
+  searched_at: string // ISO 8601 타임스탬프
+  created_at: string // ISO 8601 타임스탬프
+  updated_at: string // ISO 8601 타임스탬프
+}
+
+/**
+ * DB에서 조회한 Keyword Search 레코드 (trends_data는 JSON 문자열)
+ */
+export interface KeywordSearchRecordRaw {
+  id: string
+  user_id: string
+  keyword: string
+  ma13?: number
+  yoy_change?: number
+  trends_data: string // JSON 문자열
+  searched_at: string
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * 키워드에 연결된 주식 오버레이 (keyword_stock_overlays 테이블)
+ */
+export interface KeywordStockOverlay {
+  id: string // UUID
+  keyword_search_id: string // keyword_searches.id
+  search_id: string // searches.id
+  display_order: number // 그래프에서 표시할 순서
+  created_at: string // ISO 8601 타임스탬프
+}

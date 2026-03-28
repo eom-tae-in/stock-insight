@@ -3,18 +3,22 @@
  *
  * DB에서 저장된 종목 목록을 조회하고
  * Client Component에 전달
+ *
+ * Phase 7: 인증된 클라이언트로 자신의 데이터만 조회 (RLS 적용)
  */
 
 import { Header } from '@/components/layout/header'
 import { Container } from '@/components/layout/container'
 import { DashboardClient } from '@/components/dashboard-client'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getAllSearches } from '@/lib/db/queries'
 
 export const dynamic = 'force-dynamic'
 
 export default async function DashboardPage() {
-  // Server Component에서 DB 직접 조회
-  const records = await getAllSearches()
+  // 인증된 서버 클라이언트로 DB 조회 (RLS 적용됨)
+  const supabase = await createSupabaseServerClient()
+  const records = await getAllSearches(supabase)
 
   return (
     <div className="flex min-h-screen flex-col">

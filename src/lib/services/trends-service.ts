@@ -26,7 +26,7 @@ interface PyTrendsDataPoint {
 /**
  * pytrends Python 스크립트 호출
  */
-function callPyTrendsAPI(keyword: string): TrendsDataPoint[] {
+export function callPyTrendsAPI(keyword: string): TrendsDataPoint[] {
   try {
     const pythonPath = path.join(process.cwd(), 'venv', 'bin', 'python3')
     const scriptPath = path.join(process.cwd(), 'src', 'lib', 'get_trends.py')
