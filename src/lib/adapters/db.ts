@@ -240,7 +240,8 @@ export const supabaseAdapter: DbAdapter = {
       return
     }
 
-    // 배치 UPSERT (100개씩) - 원자성 보장
+    // 배치 UPSERT (100개씩)
+    // 주의: 부분 실패 시 이전 배치는 저장되고 이후 배치는 누락됨 (원자성 미보장)
     for (let i = 0; i < priceData.length; i += 100) {
       const batch = priceData.slice(i, i + 100)
       const { error } = await supabase.from('price_data').upsert(
@@ -298,7 +299,8 @@ export const supabaseAdapter: DbAdapter = {
       return
     }
 
-    // 배치 UPSERT (100개씩) - 원자성 보장
+    // 배치 UPSERT (100개씩)
+    // 주의: 부분 실패 시 이전 배치는 저장되고 이후 배치는 누락됨 (원자성 미보장)
     for (let i = 0; i < trendsData.length; i += 100) {
       const batch = trendsData.slice(i, i + 100)
       const { error } = await supabase.from('trends_data').upsert(

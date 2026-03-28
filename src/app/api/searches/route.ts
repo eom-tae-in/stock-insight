@@ -18,6 +18,7 @@ import {
   getAllSearches,
   upsertSearch,
   replaceStockData,
+  deleteSearch,
 } from '@/lib/db/queries'
 import { createSuccessResponse, createErrorResponse } from '@/lib/api-helpers'
 import type { SearchRecord, TrendsDataPoint } from '@/types'
@@ -117,7 +118,14 @@ export async function POST(request: NextRequest) {
     const id = await upsertSearch(searchRecord)
 
     // Phase 6: Supabase 단일 기반 - 가격 및 트렌드 데이터 저장
-    await replaceStockData(id, stockData.priceData, trendsData)
+    // 원자성 보장: replaceStockData 실패 시 search 레코드를 롤백하여 데이터 불일치 방지
+    try {
+      await replaceStockData(id, stockData.priceData, trendsData)
+    } catch (error) {
+      // 보상 로직: 이미 저장된 search 레코드 삭제
+      await deleteSearch(id)
+      throw error
+    }
 
     // 5. 응답
     return createSuccessResponse(

@@ -1,13 +1,11 @@
 /**
- * DB CRUD 레이어 - Adapter Pattern
+ * DB CRUD 레이어 - Supabase 위임 레이어
  *
- * 모든 DB 작업을 adapters/db.ts의 어댑터를 통해 수행합니다.
- * Phase 2 마이그레이션: SQLite → Supabase 점진적 전환 시작
+ * Phase 6: Supabase 단일 기반
+ * 모든 DB 작업을 adapters/db.ts의 supabaseAdapter를 통해 수행합니다.
  *
- * IMPORTANT: 이 파일의 export 시그니처는 비동기로 업데이트되었습니다.
- * - SQLite와 Supabase를 모두 지원하기 위해 필수
- * - 앱 코드는 모두 Server Component 또는 API Route이므로 async 지원
- * - API 응답 형식은 변경되지 않음 (마이그레이션 원칙 준수)
+ * 이 레이어는 호출부를 adapters/db.ts로부터 분리하는 추상화 계층입니다.
+ * 모든 메서드는 async이며, Server Component와 API Route에서 호출됩니다.
  */
 
 import { SearchRecord, PriceDataPoint, TrendsDataPoint } from '@/types/database'
@@ -53,8 +51,11 @@ export const getTrendsDataBySearchId = async (
 
 /**
  * 종목 데이터 완전 교체 (주가 + 트렌드)
- * insertPriceData/insertTrendsData 각각이 내부적으로 트랜잭션을 관리하므로,
- * 이 함수는 단순히 두 작업을 순차적으로 호출합니다.
+ *
+ * Supabase 클라이언트는 분산 트랜잭션을 지원하지 않으므로,
+ * 이 함수는 두 작업을 순차적으로 호출합니다.
+ * insertPriceData/insertTrendsData 중 하나가 실패하면 부분 저장 상태가 될 수 있습니다.
+ * 호출부(API 핸들러)에서 보상 로직을 구현하여 데이터 일관성을 유지합니다.
  */
 export async function replaceStockData(
   searchId: string,

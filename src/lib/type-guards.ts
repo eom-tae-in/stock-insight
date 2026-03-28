@@ -216,7 +216,9 @@ export function parseSearchRecordRaw(
   raw: SearchRecordRaw | Record<string, unknown>
 ): SearchRecord {
   try {
-    // Supabase JSONB (이미 객체) vs SQLite JSON (문자열) 처리
+    // Phase 6: Supabase 단일 기반 (SQLite 제거 완료)
+    // Supabase JSONB는 이미 객체로 반환되지만, 안전상 문자열 처리 분기도 유지합니다.
+    // (향후 환경 변경 시 이전 데이터 호환성 유지)
     const priceData =
       typeof raw.price_data === 'string'
         ? JSON.parse(raw.price_data as string)
@@ -247,16 +249,5 @@ export function parseSearchRecordRaw(
     throw new Error(
       `Failed to parse SearchRecord JSON: ${error instanceof Error ? error.message : 'Unknown error'}`
     )
-  }
-}
-
-/**
- * SearchRecord를 SearchRecordRaw로 변환 (JSON 직렬화 포함)
- */
-export function stringifySearchRecord(record: SearchRecord): SearchRecordRaw {
-  return {
-    ...record,
-    price_data: JSON.stringify(record.price_data),
-    trends_data: JSON.stringify(record.trends_data),
   }
 }
