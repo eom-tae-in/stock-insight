@@ -205,12 +205,43 @@ export function isProgressState(value: unknown): value is ProgressState {
 /**
  * SearchRecordRaw를 SearchRecord로 변환 (JSON 파싱 포함)
  */
-export function parseSearchRecordRaw(raw: SearchRecordRaw): SearchRecord {
+/**
+ * SearchRecordRaw를 SearchRecord로 변환 (JSON 파싱 포함)
+ *
+ * Supabase JSONB는 이미 객체로 반환되므로, 문자열인 경우만 파싱합니다.
+ * SQLite는 JSON 문자열로 저장되므로 파싱이 필요합니다.
+ * 이 함수는 양쪽 어댑터를 모두 지원합니다.
+ */
+export function parseSearchRecordRaw(
+  raw: SearchRecordRaw | Record<string, unknown>
+): SearchRecord {
   try {
+    // Supabase JSONB (이미 객체) vs SQLite JSON (문자열) 처리
+    const priceData =
+      typeof raw.price_data === 'string'
+        ? JSON.parse(raw.price_data as string)
+        : (raw.price_data as PriceDataPoint[])
+
+    const trendsData =
+      typeof raw.trends_data === 'string'
+        ? JSON.parse(raw.trends_data as string)
+        : (raw.trends_data as TrendsDataPoint[])
+
     return {
-      ...raw,
-      price_data: JSON.parse(raw.price_data),
-      trends_data: JSON.parse(raw.trends_data),
+      id: raw.id as string,
+      ticker: raw.ticker as string,
+      company_name: raw.company_name as string,
+      current_price: raw.current_price as number,
+      previous_close: raw.previous_close as number | undefined,
+      ma13: raw.ma13 as number | undefined,
+      yoy_change: raw.yoy_change as number,
+      week52_high: raw.week52_high as number | undefined,
+      week52_low: raw.week52_low as number | undefined,
+      price_data: priceData,
+      trends_data: trendsData,
+      last_updated_at: raw.last_updated_at as string,
+      searched_at: raw.searched_at as string,
+      created_at: raw.created_at as string,
     }
   } catch (error) {
     throw new Error(

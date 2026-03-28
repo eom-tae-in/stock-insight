@@ -94,14 +94,22 @@ export type Env = z.infer<typeof envSchema>
 /**
  * 앱 초기화
  * 데이터베이스 및 환경 설정을 초기화합니다
+ *
+ * - USE_SUPABASE=true: Supabase 사용 (SQLite 초기화 스킵)
+ * - USE_SUPABASE=false: SQLite 사용 (로컬 데이터베이스 초기화)
  */
 export async function initializeApp(): Promise<void> {
-  // 데이터베이스 초기화
+  if (env.USE_SUPABASE) {
+    console.log('✓ Supabase 모드: SQLite 초기화 스킵')
+    return
+  }
+
+  // SQLite 데이터베이스 초기화 (USE_SUPABASE=false일 때만)
   const { getDatabase } = await import('./database')
 
   try {
     getDatabase()
-    console.log('✓ 데이터베이스 초기화 완료')
+    console.log('✓ SQLite 데이터베이스 초기화 완료')
   } catch (error) {
     console.error('❌ 데이터베이스 초기화 실패:', error)
     throw error

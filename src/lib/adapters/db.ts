@@ -323,10 +323,8 @@ export const supabaseAdapter: DbAdapter = {
  */
 function getAdapter(): DbAdapter {
   if (env.USE_SUPABASE) {
-    console.log('[DB] Using Supabase adapter')
     return supabaseAdapter
   } else {
-    console.log('[DB] Using SQLite adapter')
     return sqliteAdapter
   }
 }

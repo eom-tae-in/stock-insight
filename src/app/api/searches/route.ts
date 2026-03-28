@@ -113,7 +113,14 @@ export async function POST(request: NextRequest) {
     }
 
     const id = await upsertSearch(searchRecord)
-    await replaceStockData(id, stockData.priceData, trendsData)
+
+    // Phase 2: searches 테이블에만 저장
+    // price_data/trends_data JSONB 컬럼에는 이미 저장되었으므로,
+    // 별도 테이블(price_data/trends_data)은 Phase 5에서 마이그레이션
+    // USE_SUPABASE=false일 때만 SQLite의 별도 테이블에 저장
+    if (process.env.USE_SUPABASE !== 'true') {
+      await replaceStockData(id, stockData.priceData, trendsData)
+    }
 
     // 5. 응답
     return createSuccessResponse(
