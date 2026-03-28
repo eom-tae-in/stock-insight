@@ -27,6 +27,9 @@ import {
 // Import Supabase client
 import { getSupabaseClient } from '@/lib/supabase'
 
+// Import type guards (moved to top level to avoid repeated dynamic imports)
+import { parseSearchRecordRaw } from '../type-guards'
+
 /**
  * Database Adapter Interface
  * Defines all database operations required by the application.
@@ -154,8 +157,6 @@ export const sqliteAdapter: DbAdapter = {
  */
 async function performSupabaseUpsert(record: SearchRecord): Promise<string> {
   const supabase = getSupabaseClient()
-  const { stringifySearchRecord } = await import('../type-guards')
-  const raw = stringifySearchRecord(record)
 
   const { data: existing } = await supabase
     .from('searches')
@@ -168,17 +169,17 @@ async function performSupabaseUpsert(record: SearchRecord): Promise<string> {
     const { error } = await supabase
       .from('searches')
       .update({
-        company_name: raw.company_name,
-        current_price: raw.current_price,
-        previous_close: raw.previous_close,
-        ma13: raw.ma13,
-        yoy_change: raw.yoy_change,
-        week52_high: raw.week52_high,
-        week52_low: raw.week52_low,
-        price_data: raw.price_data,
-        trends_data: raw.trends_data,
-        last_updated_at: raw.last_updated_at,
-        searched_at: raw.searched_at,
+        company_name: record.company_name,
+        current_price: record.current_price,
+        previous_close: record.previous_close,
+        ma13: record.ma13,
+        yoy_change: record.yoy_change,
+        week52_high: record.week52_high,
+        week52_low: record.week52_low,
+        price_data: record.price_data,
+        trends_data: record.trends_data,
+        last_updated_at: record.last_updated_at,
+        searched_at: record.searched_at,
       })
       .eq('id', existing.id)
 
@@ -189,20 +190,20 @@ async function performSupabaseUpsert(record: SearchRecord): Promise<string> {
     const { data, error } = await supabase
       .from('searches')
       .insert({
-        id: raw.id,
-        ticker: raw.ticker,
-        company_name: raw.company_name,
-        current_price: raw.current_price,
-        previous_close: raw.previous_close,
-        ma13: raw.ma13,
-        yoy_change: raw.yoy_change,
-        week52_high: raw.week52_high,
-        week52_low: raw.week52_low,
-        price_data: raw.price_data,
-        trends_data: raw.trends_data,
-        last_updated_at: raw.last_updated_at,
-        searched_at: raw.searched_at,
-        created_at: raw.created_at,
+        id: record.id,
+        ticker: record.ticker,
+        company_name: record.company_name,
+        current_price: record.current_price,
+        previous_close: record.previous_close,
+        ma13: record.ma13,
+        yoy_change: record.yoy_change,
+        week52_high: record.week52_high,
+        week52_low: record.week52_low,
+        price_data: record.price_data,
+        trends_data: record.trends_data,
+        last_updated_at: record.last_updated_at,
+        searched_at: record.searched_at,
+        created_at: record.created_at,
       })
       .select('id')
       .single()
@@ -247,7 +248,6 @@ export const supabaseAdapter: DbAdapter = {
 
   async getSearch(searchId: string): Promise<SearchRecord | null> {
     const supabase = getSupabaseClient()
-    const { parseSearchRecordRaw } = await import('../type-guards')
 
     const { data, error } = await supabase
       .from('searches')
@@ -266,7 +266,6 @@ export const supabaseAdapter: DbAdapter = {
 
   async getSearchByTicker(ticker: string): Promise<SearchRecord | null> {
     const supabase = getSupabaseClient()
-    const { parseSearchRecordRaw } = await import('../type-guards')
 
     const { data, error } = await supabase
       .from('searches')
@@ -285,7 +284,6 @@ export const supabaseAdapter: DbAdapter = {
 
   async getAllSearches(): Promise<SearchRecord[]> {
     const supabase = getSupabaseClient()
-    const { parseSearchRecordRaw } = await import('../type-guards')
 
     const { data, error } = await supabase
       .from('searches')
@@ -312,47 +310,262 @@ export const supabaseAdapter: DbAdapter = {
   },
 
   async insertPriceData(
-    _searchId: string,
-    _priceData: PriceDataPoint[]
+    searchId: string,
+    priceData: PriceDataPoint[]
   ): Promise<void> {
-    // TODO: Phase 5 - Implement price_data table migration
-    throw new Error('supabaseAdapter.insertPriceData not implemented (Phase 5)')
+    const supabase = getSupabaseClient()
+
+    // 기존 price_data 삭제
+    const { error: deleteError } = await supabase
+      .from('price_data')
+      .delete()
+      .eq('search_id', searchId)
+
+    if (deleteError) throw deleteError
+
+    // 빈 배열이면 여기서 종료
+    if (priceData.length === 0) {
+      return
+    }
+
+    // 배치 INSERT (100개씩)
+    for (let i = 0; i < priceData.length; i += 100) {
+      const batch = priceData.slice(i, i + 100)
+      const { error } = await supabase.from('price_data').insert(
+        batch.map(p => ({
+          search_id: searchId,
+          date: p.date,
+          close: p.close,
+          open: p.open,
+          high: p.high,
+          low: p.low,
+          volume: p.volume,
+        }))
+      )
+
+      if (error) throw error
+    }
   },
 
-  async getPriceDataBySearchId(_searchId: string): Promise<PriceDataPoint[]> {
-    // TODO: Phase 5 - Implement price_data table migration
-    throw new Error(
-      'supabaseAdapter.getPriceDataBySearchId not implemented (Phase 5)'
-    )
+  async getPriceDataBySearchId(searchId: string): Promise<PriceDataPoint[]> {
+    const supabase = getSupabaseClient()
+
+    const { data, error } = await supabase
+      .from('price_data')
+      .select('*')
+      .eq('search_id', searchId)
+      .order('date', { ascending: true })
+
+    if (error) throw error
+
+    return (data || []).map(row => ({
+      date: row.date,
+      close: row.close,
+      open: row.open,
+      high: row.high,
+      low: row.low,
+      volume: row.volume,
+    }))
   },
 
   async insertTrendsData(
-    _searchId: string,
-    _trendsData: TrendsDataPoint[]
+    searchId: string,
+    trendsData: TrendsDataPoint[]
   ): Promise<void> {
-    // TODO: Phase 5 - Implement trends_data table migration
-    throw new Error(
-      'supabaseAdapter.insertTrendsData not implemented (Phase 5)'
-    )
+    const supabase = getSupabaseClient()
+
+    // 기존 trends_data 삭제
+    const { error: deleteError } = await supabase
+      .from('trends_data')
+      .delete()
+      .eq('search_id', searchId)
+
+    if (deleteError) throw deleteError
+
+    // 빈 배열이면 여기서 종료
+    if (trendsData.length === 0) {
+      return
+    }
+
+    // 배치 INSERT (100개씩)
+    for (let i = 0; i < trendsData.length; i += 100) {
+      const batch = trendsData.slice(i, i + 100)
+      const { error } = await supabase.from('trends_data').insert(
+        batch.map(t => ({
+          search_id: searchId,
+          date: t.date,
+          value: t.value,
+        }))
+      )
+
+      if (error) throw error
+    }
   },
 
-  async getTrendsDataBySearchId(_searchId: string): Promise<TrendsDataPoint[]> {
-    // TODO: Phase 5 - Implement trends_data table migration
-    throw new Error(
-      'supabaseAdapter.getTrendsDataBySearchId not implemented (Phase 5)'
-    )
+  async getTrendsDataBySearchId(searchId: string): Promise<TrendsDataPoint[]> {
+    const supabase = getSupabaseClient()
+
+    const { data, error } = await supabase
+      .from('trends_data')
+      .select('*')
+      .eq('search_id', searchId)
+      .order('date', { ascending: true })
+
+    if (error) throw error
+
+    return (data || []).map(row => ({
+      date: row.date,
+      value: row.value,
+    }))
+  },
+}
+
+/**
+ * Fallback Adapter Implementation
+ * Supabase Primary 모드에서 Supabase 실패 시 SQLite로 자동 폴백합니다.
+ *
+ * 읽기 메서드: try Supabase → catch → SQLite 폴백
+ * 쓰기 메서드: Supabase 전용 (SQLite 이중 쓰기 없음, 폴백 불가)
+ *
+ * NOTE: Phase 5 Primary 모드에서 실제로는 Supabase만 씁니다.
+ * supabaseAdapter.upsertSearch()가 SQLite 이중 쓰기를 포함하므로,
+ * performSupabaseUpsert()를 직접 호출하여 Supabase 전용 경로를 사용합니다.
+ */
+const fallbackAdapter: DbAdapter = {
+  async upsertSearch(record: SearchRecord): Promise<string> {
+    try {
+      // Supabase only (no SQLite dual-write)
+      return await performSupabaseUpsert(record)
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      throw new Error(
+        `[Fallback] upsertSearch failed (no fallback for writes): ${errorMsg}`
+      )
+    }
+  },
+
+  async getSearch(searchId: string): Promise<SearchRecord | null> {
+    try {
+      return await supabaseAdapter.getSearch(searchId)
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      console.warn(
+        `[Fallback] getSearch failed for searchId=${searchId}, falling back to SQLite: ${errorMsg}`
+      )
+      return await sqliteAdapter.getSearch(searchId)
+    }
+  },
+
+  async getSearchByTicker(ticker: string): Promise<SearchRecord | null> {
+    try {
+      return await supabaseAdapter.getSearchByTicker(ticker)
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      console.warn(
+        `[Fallback] getSearchByTicker failed for ticker=${ticker}, falling back to SQLite: ${errorMsg}`
+      )
+      return await sqliteAdapter.getSearchByTicker(ticker)
+    }
+  },
+
+  async getAllSearches(): Promise<SearchRecord[]> {
+    try {
+      return await supabaseAdapter.getAllSearches()
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      console.warn(
+        `[Fallback] getAllSearches failed, falling back to SQLite: ${errorMsg}`
+      )
+      return await sqliteAdapter.getAllSearches()
+    }
+  },
+
+  async deleteSearch(searchId: string): Promise<boolean> {
+    try {
+      return await supabaseAdapter.deleteSearch(searchId)
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      throw new Error(
+        `[Fallback] deleteSearch failed (no fallback for writes): ${errorMsg}`
+      )
+    }
+  },
+
+  async insertPriceData(
+    searchId: string,
+    priceData: PriceDataPoint[]
+  ): Promise<void> {
+    try {
+      return await supabaseAdapter.insertPriceData(searchId, priceData)
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      throw new Error(
+        `[Fallback] insertPriceData failed (no fallback for writes): ${errorMsg}`
+      )
+    }
+  },
+
+  async getPriceDataBySearchId(searchId: string): Promise<PriceDataPoint[]> {
+    try {
+      return await supabaseAdapter.getPriceDataBySearchId(searchId)
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      console.warn(
+        `[Fallback] getPriceDataBySearchId failed for searchId=${searchId}, falling back to SQLite: ${errorMsg}`
+      )
+      return await sqliteAdapter.getPriceDataBySearchId(searchId)
+    }
+  },
+
+  async insertTrendsData(
+    searchId: string,
+    trendsData: TrendsDataPoint[]
+  ): Promise<void> {
+    try {
+      return await supabaseAdapter.insertTrendsData(searchId, trendsData)
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      throw new Error(
+        `[Fallback] insertTrendsData failed (no fallback for writes): ${errorMsg}`
+      )
+    }
+  },
+
+  async getTrendsDataBySearchId(searchId: string): Promise<TrendsDataPoint[]> {
+    try {
+      return await supabaseAdapter.getTrendsDataBySearchId(searchId)
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      console.warn(
+        `[Fallback] getTrendsDataBySearchId failed for searchId=${searchId}, falling back to SQLite: ${errorMsg}`
+      )
+      return await sqliteAdapter.getTrendsDataBySearchId(searchId)
+    }
   },
 }
 
 /**
  * Adapter Provider Selection
  * Determines which database adapter to use based on validated environment variables.
- * Uses env.USE_SUPABASE (already boolean from env.ts Zod validation).
+ *
+ * Phase 4 Logic:
+ * - DB_READ_MODE='supabase' && DB_WRITE_MODE='supabase': fallbackAdapter (Supabase Primary + SQLite fallback for reads)
+ * - DB_WRITE_MODE='supabase' && DB_READ_MODE='sqlite': supabaseAdapter (Phase 3 dual-write)
+ * - DB_WRITE_MODE='sqlite': sqliteAdapter (SQLite Primary)
+ * - Fallback: USE_SUPABASE=true (legacy, for backward compatibility)
  */
 function getAdapter(): DbAdapter {
-  if (env.USE_SUPABASE) {
+  // Phase 4: DB_READ_MODE and DB_WRITE_MODE based selection (highest priority)
+  if (env.DB_WRITE_MODE === 'supabase' && env.DB_READ_MODE === 'supabase') {
+    return fallbackAdapter
+  } else if (env.DB_WRITE_MODE === 'supabase') {
+    // Phase 3: Dual-write mode (supabaseAdapter already implements dual-write in upsertSearch)
+    return supabaseAdapter
+  } else if (env.USE_SUPABASE) {
+    // Legacy: USE_SUPABASE=true (backward compatibility)
     return supabaseAdapter
   } else {
+    // SQLite Primary (default)
     return sqliteAdapter
   }
 }
@@ -363,6 +576,6 @@ function getAdapter(): DbAdapter {
  * Use this for all database operations.
  *
  * NOTE: Selection happens at module load time.
- * Changing USE_SUPABASE environment variable requires server restart.
+ * Changing DB_READ_MODE, DB_WRITE_MODE, or USE_SUPABASE environment variables requires server restart.
  */
 export const db = getAdapter()
