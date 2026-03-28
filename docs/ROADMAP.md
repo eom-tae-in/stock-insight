@@ -9,6 +9,7 @@ StockInsight은 개인 투자자를 위한 로컬 주식 분석 도구로 다음
 - **주가 및 트렌드 수집**: Yahoo Finance 5년 주간 주가 + SerpAPI Google Trends 검색 관심도 수집
 - **시각적 분석**: 주가+MA13 차트, Trends 차트, 주가 vs 트렌드 비교 차트 3종 제공
 - **로컬 데이터 관리**: better-sqlite3 기반 SQLite DB에 종목 데이터 저장/조회/삭제/갱신
+- **Supabase 마이그레이션**: SQLite에서 Supabase(PostgreSQL)로 점진적 무중단 전환
 
 ## 개발 워크플로우
 
@@ -40,7 +41,7 @@ StockInsight은 개인 투자자를 위한 로컬 주식 분석 도구로 다음
 
 ---
 
-## 개발 단계
+## MVP 개발 단계
 
 ### Phase 1: 애플리케이션 골격 구축 -- 완료
 
@@ -221,3 +222,203 @@ StockInsight은 개인 투자자를 위한 로컬 주식 분석 도구로 다음
   - 접근성 개선: 키보드 네비게이션, aria 속성, 색상 대비
   - `npm run check-all` 및 `npm run build` 통과 확인
   - Playwright MCP를 활용한 전체 앱 최종 E2E 테스트
+
+---
+
+## Supabase 마이그레이션 단계
+
+> SQLite(better-sqlite3)에서 Supabase(PostgreSQL)로의 점진적 무중단 마이그레이션.
+> 8가지 마이그레이션 원칙: (1) 점진적 전환, (2) 하위 호환성, (3) 이중 쓰기, (4) 읽기 우선 전환,
+> (5) 롤백 가능성, (6) 데이터 무결성 검증, (7) 타입 안전성, (8) 환경 변수 기반 전환.
+
+### Migration Phase 1: Adapter 구조 설계 및 환경 설정 -- 완료
+
+> DB Adapter 패턴을 도입하여 SQLite와 Supabase를 동일한 인터페이스로 추상화한다.
+> 이 Phase에서는 기존 기능이 깨지지 않는 것을 최우선으로 한다.
+
+- **Task M-001: DbAdapter 인터페이스 및 SQLite 구현체 작성** -- 완료
+  - See: `/tasks/M-001-db-adapter.md` (해당 시 생성)
+  - `src/lib/adapters/db.ts`에 `DbAdapter` 인터페이스 정의
+  - `sqliteAdapter` 구현 (기존 db-helpers.ts 함수 위임)
+  - `supabaseAdapter` 스텁 작성 (모든 메서드 NotImplementedError)
+  - `getAdapter()` 함수로 `USE_SUPABASE` 환경 변수 기반 선택 로직 구현
+  - `.env.example`에 `USE_SUPABASE`, `SUPABASE_URL`, `SUPABASE_KEY` 추가
+
+---
+
+### Migration Phase 2: Adapter 통합 및 결함 수정 -- 우선순위
+
+> Phase 1에서 발견된 3가지 결함을 수정하고, adapter를 실제 앱 코드에 연결한다.
+> 이 Phase 완료 후 `USE_SUPABASE=false` 상태에서 기존 기능이 동일하게 동작해야 한다.
+
+- **Task M-002: queries.ts를 adapter 경유하도록 리팩토링** - 우선순위
+  - `src/lib/db/queries.ts`가 `db-helpers.ts` 직접 import를 제거
+  - `src/lib/adapters/db.ts`의 `db` (adapter 인스턴스)를 import하여 모든 CRUD 함수를 adapter 메서드로 위임
+  - 기존 export 시그니처 유지 (하위 호환성): `upsertSearch`, `getSearchById`, `getAllSearches`, `deleteSearch` 등
+  - `replaceStockData()` 함수도 adapter 메서드 기반으로 전환
+  - 기존 앱 코드(`page.tsx`, `route.ts` 등)는 변경 없이 동작해야 함
+  - `npm run check-all` 및 `npm run build` 통과 확인
+  - Playwright MCP를 활용한 기존 기능 회귀 테스트
+
+- **Task M-003: withTransaction 콜백 타입 불일치 수정**
+  - 현재 문제: `DbAdapter.withTransaction`의 콜백 파라미터가 `(db: unknown) => T`이나, SQLite 구현은 `(db: Database.Database) => T`를 기대
+  - 해결 방안: adapter 수준에서 트랜잭션을 추상화하여 콜백이 DB 인스턴스를 직접 받지 않도록 변경
+  - `withTransaction` 시그니처를 `<T>(callback: () => T | Promise<T>) => T | Promise<T>`로 변경
+  - SQLite adapter 내부에서 `db.transaction()` 래핑하여 콜백에 DB를 노출하지 않음
+  - Supabase adapter는 향후 `supabase.rpc()` 또는 개별 쿼리 순차 실행으로 구현
+  - `replaceStockData` 등 트랜잭션 사용처가 adapter 메서드만으로 동작하도록 조정
+  - 타입 검사 통과 확인: `npm run check-all`
+
+- **Task M-004: 조건부 환경 변수 검증 구현**
+  - 현재 문제: `USE_SUPABASE=true`일 때 `SUPABASE_URL`, `SUPABASE_KEY`가 optional이라 누락해도 에러 없음
+  - `src/lib/env.ts`의 Zod 스키마에 `superRefine()` 추가
+  - `USE_SUPABASE=true`일 때 `SUPABASE_URL`과 `SUPABASE_KEY`가 반드시 존재하고 유효한 값인지 검증
+  - `SUPABASE_URL`은 `https://*.supabase.co` 형식 검증
+  - `SUPABASE_KEY`는 빈 문자열/placeholder 값(`your_supabase_anon_key`) 거부
+  - `USE_SUPABASE=false`일 때는 Supabase 관련 변수 검증 스킵
+  - 검증 실패 시 명확한 에러 메시지 출력 (어떤 변수가 누락/잘못되었는지)
+  - `npm run check-all` 통과 확인
+
+- **Task M-004-1: Adapter 통합 회귀 테스트**
+  - `USE_SUPABASE=false` 상태에서 모든 기존 기능 정상 동작 확인
+  - Playwright MCP를 활용한 E2E 테스트
+    - 시나리오 1: 종목 검색 -> DB 저장 -> 대시보드 카드 표시
+    - 시나리오 2: 종목 상세 페이지 차트/지표 정상 렌더링
+    - 시나리오 3: 종목 삭제 -> 대시보드에서 제거 확인
+    - 시나리오 4: 동일 ticker 재조회 -> UPSERT 정상 처리
+  - `npm run build` 성공 확인
+
+---
+
+### Migration Phase 3: Supabase 연결 및 searches 테이블 마이그레이션
+
+> Supabase 프로젝트에 테이블을 생성하고, supabaseAdapter의 searches 관련 메서드를 실제 구현한다.
+> 읽기를 먼저 전환하여 안전하게 검증한 후, 쓰기를 전환한다.
+
+- **Task M-005: Supabase 클라이언트 설정 및 테이블 생성** - 우선순위
+  - `@supabase/supabase-js` 패키지 설치
+  - `src/lib/supabase/client.ts`에 Supabase 클라이언트 싱글턴 생성
+  - 환경 변수 (`SUPABASE_URL`, `SUPABASE_KEY`)로 클라이언트 초기화
+  - Supabase Dashboard 또는 SQL Editor에서 테이블 생성 SQL 작성
+    - `searches` 테이블: SQLite 스키마와 동일한 컬럼 구조 (PostgreSQL 타입 매핑)
+    - `price_data` 테이블: `search_id` FK, `(search_id, date)` 유니크 제약
+    - `trends_data` 테이블: `search_id` FK, `(search_id, date)` 유니크 제약
+  - RLS(Row Level Security) 정책 설정 (anon key 사용 시 필수)
+  - `data/migrations/supabase/` 디렉토리에 SQL 마이그레이션 파일 보관
+  - Supabase TypeScript 타입 생성: `npx supabase gen types typescript`
+
+- **Task M-006: supabaseAdapter searches CRUD 구현**
+  - `supabaseAdapter.upsertSearch()`: `supabase.from('searches').upsert()` 구현
+  - `supabaseAdapter.getSearch()`: `supabase.from('searches').select().eq('id', searchId).single()` 구현
+  - `supabaseAdapter.getSearchByTicker()`: ticker 기반 조회 구현
+  - `supabaseAdapter.getAllSearches()`: 전체 조회 + `searched_at` 정렬 구현
+  - `supabaseAdapter.deleteSearch()`: CASCADE 삭제 구현 (PostgreSQL FK ON DELETE CASCADE 활용)
+  - SQLite의 `SearchRecordRaw` JSON 문자열과 PostgreSQL의 JSONB 차이 처리
+  - 반환 타입이 `SearchRecord`와 정확히 일치하도록 데이터 변환 레이어 구현
+  - Playwright MCP를 활용한 Supabase CRUD 테스트 (USE_SUPABASE=true 환경)
+
+- **Task M-007: searches 읽기 전환 (Shadow Read)**
+  - adapter에 `shadowRead` 모드 추가: SQLite에서 읽되, Supabase에서도 병렬 읽기 후 결과 비교
+  - `getAdapter()` 함수에 `DB_READ_MODE` 환경 변수 추가 (`sqlite` | `supabase` | `shadow`)
+  - shadow 모드에서 두 결과가 불일치하면 경고 로그 출력 (에러는 발생시키지 않음)
+  - 불일치 로그 형식: `[Shadow Read Mismatch] table=searches, id=xxx, field=yyy`
+  - 충분한 검증 후 `DB_READ_MODE=supabase`로 전환하여 Supabase 읽기 활성화
+  - Playwright MCP를 활용한 shadow read 모드 테스트
+
+---
+
+### Migration Phase 4: 이중 쓰기 (Dual-Write)
+
+> SQLite와 Supabase에 동시 쓰기하여 데이터 동기화를 유지한다.
+> 부분 실패 처리와 데이터 정합성 검증이 핵심이다.
+
+- **Task M-008: 이중 쓰기 Adapter 구현**
+  - `src/lib/adapters/dual-write.ts`에 `DualWriteAdapter` 구현
+  - `DualWriteAdapter`는 `DbAdapter` 인터페이스를 구현하되, 내부에서 `sqliteAdapter`와 `supabaseAdapter`를 모두 호출
+  - 쓰기 순서: SQLite 먼저 (primary) -> Supabase (secondary)
+  - 부분 실패 전략:
+    - SQLite 실패: 전체 실패 (throw)
+    - Supabase 실패: SQLite 성공 유지 + 에러 로그 + 실패 큐에 기록
+  - 읽기: `DB_READ_MODE` 환경 변수에 따라 SQLite 또는 Supabase에서 읽기
+  - `getAdapter()` 함수에 `DB_WRITE_MODE` 환경 변수 추가 (`sqlite` | `supabase` | `dual`)
+  - `DB_WRITE_MODE=dual` 설정 시 DualWriteAdapter 반환
+
+- **Task M-009: 기존 데이터 Supabase 동기화**
+  - `scripts/sync-to-supabase.ts` 마이그레이션 스크립트 작성
+  - SQLite의 모든 searches + price_data + trends_data를 Supabase로 복사
+  - 배치 처리: 한 번에 100개씩 INSERT (Supabase API rate limit 고려)
+  - 중복 방지: `ON CONFLICT DO NOTHING` 또는 upsert 사용
+  - 실행 로그: 성공/실패/스킵 건수 출력
+  - 데이터 정합성 검증: SQLite와 Supabase의 레코드 수 + 샘플 데이터 비교
+  - `npx tsx scripts/sync-to-supabase.ts` 명령으로 실행
+
+- **Task M-009-1: 이중 쓰기 검증 테스트**
+  - Playwright MCP를 활용한 이중 쓰기 E2E 테스트
+    - 시나리오 1: 종목 검색 -> SQLite와 Supabase 모두에 데이터 존재 확인
+    - 시나리오 2: 종목 삭제 -> 양쪽 DB에서 모두 삭제 확인
+    - 시나리오 3: Supabase 연결 실패 시뮬레이션 -> SQLite만 성공, 에러 로그 확인
+    - 시나리오 4: 동일 ticker 재조회 -> 양쪽 DB에서 UPSERT 정합성 확인
+  - 데이터 정합성 비교 스크립트 실행 검증
+
+---
+
+### Migration Phase 5: Supabase Primary 전환
+
+> Supabase를 주 데이터베이스로 전환하고, SQLite를 폴백으로 유지한다.
+> 문제 발생 시 즉시 롤백할 수 있는 안전장치를 갖춘다.
+
+- **Task M-010: Supabase Primary 모드 구현**
+  - `DB_WRITE_MODE=supabase` + `DB_READ_MODE=supabase` 설정 시 Supabase만 사용
+  - 폴백 메커니즘: Supabase 요청 실패 시 자동으로 SQLite로 폴백 (읽기만)
+  - 폴백 발생 시 경고 로그: `[Fallback] Supabase read failed, falling back to SQLite`
+  - 환경 변수 한 줄 변경으로 롤백 가능: `DB_WRITE_MODE=sqlite`, `DB_READ_MODE=sqlite`
+  - 상태 확인 API: `GET /api/health` 엔드포인트에 DB 연결 상태 포함
+  - `supabaseAdapter`의 비동기 처리 정리 (모든 메서드 `Promise<T>` 반환으로 통일)
+
+- **Task M-011: price_data, trends_data Supabase 구현**
+  - `supabaseAdapter.insertPriceData()`: 배치 INSERT 구현 (기존 데이터 DELETE 후 INSERT)
+  - `supabaseAdapter.getPriceDataBySearchId()`: search_id 기반 조회 + date 정렬
+  - `supabaseAdapter.insertTrendsData()`: 배치 INSERT 구현
+  - `supabaseAdapter.getTrendsDataBySearchId()`: search_id 기반 조회 + date 정렬
+  - `supabaseAdapter.withTransaction()`: 개별 쿼리 순차 실행 (PostgreSQL RPC 또는 Edge Function)
+  - 대량 데이터 처리 최적화: 260개 데이터포인트 배치 INSERT 성능 확인
+  - Playwright MCP를 활용한 시계열 데이터 CRUD 테스트
+
+- **Task M-011-1: Supabase Primary 통합 테스트**
+  - `USE_SUPABASE=true` + `DB_WRITE_MODE=supabase` + `DB_READ_MODE=supabase` 환경에서 전체 기능 테스트
+  - Playwright MCP를 활용한 E2E 테스트
+    - 시나리오 1: 종목 검색 -> Supabase에 저장 -> 대시보드 표시
+    - 시나리오 2: 상세 페이지 차트/지표 정상 렌더링 (Supabase 데이터)
+    - 시나리오 3: 삭제 -> Supabase CASCADE 삭제 확인
+    - 시나리오 4: Supabase 장애 시뮬레이션 -> SQLite 폴백 동작 확인
+    - 시나리오 5: 롤백 테스트 -> 환경 변수 변경 후 SQLite 모드 복귀 확인
+  - 성능 비교: SQLite vs Supabase 응답 시간 측정
+
+---
+
+### Migration Phase 6: SQLite 제거 및 정리
+
+> 충분한 안정화 기간 후 SQLite 관련 코드와 의존성을 완전히 제거한다.
+> 이 Phase는 Supabase Primary 모드에서 최소 2주간 문제 없이 운영된 후 진행한다.
+
+- **Task M-012: SQLite 코드 및 의존성 제거**
+  - 제거 대상 파일:
+    - `src/lib/database.ts` (better-sqlite3 싱글턴)
+    - `src/lib/db-helpers.ts` (SQLite 직접 쿼리)
+    - `src/lib/adapters/db.ts`에서 `sqliteAdapter` 제거
+    - `src/lib/adapters/dual-write.ts` 제거
+    - `data/migrations/*.sql` (SQLite 마이그레이션 파일)
+  - `src/lib/db/queries.ts`를 `supabaseAdapter` 직접 사용으로 단순화
+  - `getAdapter()` 함수 제거, `supabaseAdapter`를 직접 export
+  - 환경 변수 정리: `USE_SUPABASE`, `DB_READ_MODE`, `DB_WRITE_MODE` 제거 (더 이상 불필요)
+  - `src/lib/env.ts`에서 `SUPABASE_URL`, `SUPABASE_KEY`를 필수 환경 변수로 변경 (optional 제거)
+
+- **Task M-013: 의존성 정리 및 최종 검증**
+  - `npm uninstall better-sqlite3 @types/better-sqlite3`
+  - `next.config.ts`에서 `serverExternalPackages: ['better-sqlite3']` 제거
+  - `data/` 디렉토리 및 `.gitignore` 규칙 정리 (로컬 DB 파일 관련)
+  - `package.json` 정리: 불필요한 스크립트/의존성 확인
+  - `.env.example` 업데이트: SQLite 관련 주석 제거, Supabase 변수만 남김
+  - `CLAUDE.md` 및 `docs/PRD.md` 업데이트: 기술 스택에서 better-sqlite3 제거, Supabase 반영
+  - `npm run check-all` 및 `npm run build` 최종 통과 확인
+  - Playwright MCP를 활용한 전체 앱 최종 E2E 회귀 테스트

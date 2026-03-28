@@ -18,7 +18,6 @@ import {
   getAllSearches,
   upsertSearch,
   replaceStockData,
-  withTransaction,
 } from '@/lib/db/queries'
 import { createSuccessResponse, createErrorResponse } from '@/lib/api-helpers'
 import type { SearchRecord, TrendsDataPoint } from '@/types'
@@ -27,7 +26,7 @@ import crypto from 'crypto'
 export async function GET() {
   try {
     // DB에서 모든 저장된 종목 조회
-    const records = getAllSearches()
+    const records = await getAllSearches()
 
     return createSuccessResponse(records, 200)
   } catch (error) {
@@ -93,31 +92,28 @@ export async function POST(request: NextRequest) {
     // 3. 지표 계산
     const metrics = calculateMetrics(stockData.priceData)
 
-    // 4. DB 저장 (트랜잭션으로 원자성 보장)
+    // 4. DB 저장 (어댑터가 내부적으로 트랜잭션 처리)
     const now = new Date()
 
-    const id = withTransaction(() => {
-      const searchRecord: SearchRecord = {
-        id: crypto.randomUUID(),
-        ticker: validatedTicker,
-        company_name: stockData.companyName,
-        current_price: metrics.currentPrice,
-        previous_close: metrics.previousClose,
-        ma13: metrics.ma13,
-        yoy_change: metrics.yoyChange,
-        week52_high: metrics.week52High,
-        week52_low: metrics.week52Low,
-        price_data: stockData.priceData,
-        trends_data: trendsData,
-        last_updated_at: now.toISOString(),
-        searched_at: now.toISOString(),
-        created_at: now.toISOString(),
-      }
+    const searchRecord: SearchRecord = {
+      id: crypto.randomUUID(),
+      ticker: validatedTicker,
+      company_name: stockData.companyName,
+      current_price: metrics.currentPrice,
+      previous_close: metrics.previousClose,
+      ma13: metrics.ma13,
+      yoy_change: metrics.yoyChange,
+      week52_high: metrics.week52High,
+      week52_low: metrics.week52Low,
+      price_data: stockData.priceData,
+      trends_data: trendsData,
+      last_updated_at: now.toISOString(),
+      searched_at: now.toISOString(),
+      created_at: now.toISOString(),
+    }
 
-      const recordId = upsertSearch(searchRecord)
-      replaceStockData(recordId, stockData.priceData, trendsData)
-      return recordId
-    })
+    const id = await upsertSearch(searchRecord)
+    await replaceStockData(id, stockData.priceData, trendsData)
 
     // 5. 응답
     return createSuccessResponse(

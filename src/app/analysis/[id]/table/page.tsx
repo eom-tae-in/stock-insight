@@ -17,7 +17,7 @@ export default async function TablePage({ params }: TablePageProps) {
   const { id } = await params
 
   // DB에서 종목 데이터 직접 조회
-  const record = getSearchById(id)
+  const record = await getSearchById(id)
 
   if (!record) {
     notFound()

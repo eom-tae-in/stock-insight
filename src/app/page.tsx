@@ -12,9 +12,9 @@ import { getAllSearches } from '@/lib/db/queries'
 
 export const dynamic = 'force-dynamic'
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
   // Server Component에서 DB 직접 조회
-  const records = getAllSearches()
+  const records = await getAllSearches()
 
   return (
     <div className="flex min-h-screen flex-col">
