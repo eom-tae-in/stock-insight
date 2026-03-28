@@ -430,7 +430,7 @@ StockInsight은 개인 투자자를 위한 로컬 주식 분석 도구로 다음
 ### Migration Phase 6: SQLite 제거 및 정리
 
 > 충분한 안정화 기간 후 SQLite 관련 코드와 의존성을 완전히 제거한다.
-> 이 Phase는 Supabase Primary 모드에서 최소 2주간 문제 없이 운영된 후 진행한다.
+> Supabase로 완전 전환하여 기술 스택을 단순화한다.
 
 - **Task M-012: SQLite 코드 및 의존성 제거**
   - 제거 대상 파일:
