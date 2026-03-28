@@ -320,23 +320,21 @@ export const supabaseAdapter: DbAdapter = {
     try {
       const supabase = getSupabaseClient()
 
-      // 기존 price_data 삭제
-      const { error: deleteError } = await supabase
-        .from('price_data')
-        .delete()
-        .eq('search_id', searchId)
-
-      if (deleteError) throw deleteError
-
-      // 빈 배열이면 여기서 종료
+      // 빈 배열이면 기존 데이터 삭제만 수행
       if (priceData.length === 0) {
+        const { error: deleteError } = await supabase
+          .from('price_data')
+          .delete()
+          .eq('search_id', searchId)
+
+        if (deleteError) throw deleteError
         return
       }
 
-      // 배치 INSERT (100개씩)
+      // 배치 UPSERT (100개씩) - 원자성 보장
       for (let i = 0; i < priceData.length; i += 100) {
         const batch = priceData.slice(i, i + 100)
-        const { error } = await supabase.from('price_data').insert(
+        const { error } = await supabase.from('price_data').upsert(
           batch.map(p => ({
             search_id: searchId,
             date: p.date,
@@ -345,7 +343,8 @@ export const supabaseAdapter: DbAdapter = {
             high: p.high,
             low: p.low,
             volume: p.volume,
-          }))
+          })),
+          { onConflict: 'search_id,date' }
         )
 
         if (error) throw error
@@ -391,28 +390,27 @@ export const supabaseAdapter: DbAdapter = {
     try {
       const supabase = getSupabaseClient()
 
-      // 기존 trends_data 삭제
-      const { error: deleteError } = await supabase
-        .from('trends_data')
-        .delete()
-        .eq('search_id', searchId)
-
-      if (deleteError) throw deleteError
-
-      // 빈 배열이면 여기서 종료
+      // 빈 배열이면 기존 데이터 삭제만 수행
       if (trendsData.length === 0) {
+        const { error: deleteError } = await supabase
+          .from('trends_data')
+          .delete()
+          .eq('search_id', searchId)
+
+        if (deleteError) throw deleteError
         return
       }
 
-      // 배치 INSERT (100개씩)
+      // 배치 UPSERT (100개씩) - 원자성 보장
       for (let i = 0; i < trendsData.length; i += 100) {
         const batch = trendsData.slice(i, i + 100)
-        const { error } = await supabase.from('trends_data').insert(
+        const { error } = await supabase.from('trends_data').upsert(
           batch.map(t => ({
             search_id: searchId,
             date: t.date,
             value: t.value,
-          }))
+          })),
+          { onConflict: 'search_id,date' }
         )
 
         if (error) throw error
@@ -459,6 +457,81 @@ export const supabaseAdapter: DbAdapter = {
  * - DB_READ_MODE='supabase' && DB_WRITE_MODE='sqlite': Shadow Read + 새 데이터는 SQLite만 쓰기
  * - DB_READ_MODE='supabase' && DB_WRITE_MODE='supabase': 아직 구현 안 함 (fallbackAdapter 사용)
  */
+/**
+ * Helper function to compare price data arrays
+ */
+function comparePriceDataArrays(
+  sqlite: PriceDataPoint[],
+  supabase: PriceDataPoint[]
+): boolean {
+  if (sqlite.length !== supabase.length) return false
+
+  for (let i = 0; i < sqlite.length; i++) {
+    const s = sqlite[i]
+    const sb = supabase[i]
+    if (
+      s.date !== sb.date ||
+      s.close !== sb.close ||
+      s.open !== sb.open ||
+      s.high !== sb.high ||
+      s.low !== sb.low ||
+      s.volume !== sb.volume
+    ) {
+      return false
+    }
+  }
+
+  return true
+}
+
+/**
+ * Helper function to compare trends data arrays
+ */
+function compareTrendsDataArrays(
+  sqlite: TrendsDataPoint[],
+  supabase: TrendsDataPoint[]
+): boolean {
+  if (sqlite.length !== supabase.length) return false
+
+  for (let i = 0; i < sqlite.length; i++) {
+    const s = sqlite[i]
+    const sb = supabase[i]
+    if (s.date !== sb.date || s.value !== sb.value) {
+      return false
+    }
+  }
+
+  return true
+}
+
+/**
+ * Helper function to compare search records
+ */
+function compareSearchRecords(
+  sqlite: SearchRecord | null,
+  supabase: SearchRecord | null
+): boolean {
+  if (!sqlite && !supabase) return true
+  if (!sqlite || !supabase) return false
+
+  return (
+    sqlite.id === supabase.id &&
+    sqlite.ticker === supabase.ticker &&
+    sqlite.company_name === supabase.company_name &&
+    sqlite.current_price === supabase.current_price &&
+    sqlite.previous_close === supabase.previous_close &&
+    sqlite.ma13 === supabase.ma13 &&
+    sqlite.yoy_change === supabase.yoy_change &&
+    sqlite.week52_high === supabase.week52_high &&
+    sqlite.week52_low === supabase.week52_low &&
+    JSON.stringify(sqlite.price_data) === JSON.stringify(supabase.price_data) &&
+    JSON.stringify(sqlite.trends_data) ===
+      JSON.stringify(supabase.trends_data) &&
+    sqlite.last_updated_at === supabase.last_updated_at &&
+    sqlite.searched_at === supabase.searched_at
+  )
+}
+
 const shadowReadAdapter: DbAdapter = {
   async upsertSearch(record: SearchRecord): Promise<string> {
     return await sqliteAdapter.upsertSearch(record)
@@ -467,21 +540,23 @@ const shadowReadAdapter: DbAdapter = {
   async getSearch(searchId: string): Promise<SearchRecord | null> {
     const sqliteResult = await sqliteAdapter.getSearch(searchId)
 
-    // Supabase 병렬 읽기 (비교용)
-    try {
-      const supabaseResult = await supabaseAdapter.getSearch(searchId)
+    // Supabase 비교는 비블로킹 (fire-and-forget)
+    void (async () => {
+      try {
+        const supabaseResult = await supabaseAdapter.getSearch(searchId)
 
-      if (JSON.stringify(sqliteResult) !== JSON.stringify(supabaseResult)) {
+        if (!compareSearchRecords(sqliteResult, supabaseResult)) {
+          console.warn(
+            `[Shadow Read] table=searches, searchId=${searchId}, mismatch detected`
+          )
+        }
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error)
         console.warn(
-          `[Shadow Read] table=searches, searchId=${searchId}, mismatch detected`
+          `[Shadow Read] Supabase getSearch failed for searchId=${searchId}: ${errorMsg}`
         )
       }
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error)
-      console.warn(
-        `[Shadow Read] Supabase getSearch failed for searchId=${searchId}: ${errorMsg}`
-      )
-    }
+    })()
 
     return sqliteResult
   },
@@ -489,21 +564,23 @@ const shadowReadAdapter: DbAdapter = {
   async getSearchByTicker(ticker: string): Promise<SearchRecord | null> {
     const sqliteResult = await sqliteAdapter.getSearchByTicker(ticker)
 
-    // Supabase 병렬 읽기 (비교용)
-    try {
-      const supabaseResult = await supabaseAdapter.getSearchByTicker(ticker)
+    // Supabase 비교는 비블로킹 (fire-and-forget)
+    void (async () => {
+      try {
+        const supabaseResult = await supabaseAdapter.getSearchByTicker(ticker)
 
-      if (JSON.stringify(sqliteResult) !== JSON.stringify(supabaseResult)) {
+        if (!compareSearchRecords(sqliteResult, supabaseResult)) {
+          console.warn(
+            `[Shadow Read] table=searches, ticker=${ticker}, mismatch detected`
+          )
+        }
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error)
         console.warn(
-          `[Shadow Read] table=searches, ticker=${ticker}, mismatch detected`
+          `[Shadow Read] Supabase getSearchByTicker failed for ticker=${ticker}: ${errorMsg}`
         )
       }
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error)
-      console.warn(
-        `[Shadow Read] Supabase getSearchByTicker failed for ticker=${ticker}: ${errorMsg}`
-      )
-    }
+    })()
 
     return sqliteResult
   },
@@ -511,19 +588,23 @@ const shadowReadAdapter: DbAdapter = {
   async getAllSearches(): Promise<SearchRecord[]> {
     const sqliteResult = await sqliteAdapter.getAllSearches()
 
-    // Supabase 병렬 읽기 (비교용)
-    try {
-      const supabaseResult = await supabaseAdapter.getAllSearches()
+    // Supabase 비교는 비블로킹 (fire-and-forget)
+    void (async () => {
+      try {
+        const supabaseResult = await supabaseAdapter.getAllSearches()
 
-      if (JSON.stringify(sqliteResult) !== JSON.stringify(supabaseResult)) {
+        if (sqliteResult.length !== supabaseResult.length) {
+          console.warn(
+            `[Shadow Read] table=searches, getAllSearches mismatch: sqlite=${sqliteResult.length}, supabase=${supabaseResult.length}`
+          )
+        }
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error)
         console.warn(
-          `[Shadow Read] table=searches, getAllSearches mismatch: sqlite=${sqliteResult.length}, supabase=${supabaseResult.length}`
+          `[Shadow Read] Supabase getAllSearches failed: ${errorMsg}`
         )
       }
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error)
-      console.warn(`[Shadow Read] Supabase getAllSearches failed: ${errorMsg}`)
-    }
+    })()
 
     return sqliteResult
   },
@@ -542,22 +623,24 @@ const shadowReadAdapter: DbAdapter = {
   async getPriceDataBySearchId(searchId: string): Promise<PriceDataPoint[]> {
     const sqliteResult = await sqliteAdapter.getPriceDataBySearchId(searchId)
 
-    // Supabase 병렬 읽기 (비교용)
-    try {
-      const supabaseResult =
-        await supabaseAdapter.getPriceDataBySearchId(searchId)
+    // Supabase 비교는 비블로킹 (fire-and-forget)
+    void (async () => {
+      try {
+        const supabaseResult =
+          await supabaseAdapter.getPriceDataBySearchId(searchId)
 
-      if (JSON.stringify(sqliteResult) !== JSON.stringify(supabaseResult)) {
+        if (!comparePriceDataArrays(sqliteResult, supabaseResult)) {
+          console.warn(
+            `[Shadow Read] table=price_data, searchId=${searchId}, mismatch: sqlite=${sqliteResult.length}, supabase=${supabaseResult.length}`
+          )
+        }
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error)
         console.warn(
-          `[Shadow Read] table=price_data, searchId=${searchId}, mismatch: sqlite=${sqliteResult.length}, supabase=${supabaseResult.length}`
+          `[Shadow Read] Supabase getPriceDataBySearchId failed for searchId=${searchId}: ${errorMsg}`
         )
       }
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error)
-      console.warn(
-        `[Shadow Read] Supabase getPriceDataBySearchId failed for searchId=${searchId}: ${errorMsg}`
-      )
-    }
+    })()
 
     return sqliteResult
   },
@@ -572,22 +655,24 @@ const shadowReadAdapter: DbAdapter = {
   async getTrendsDataBySearchId(searchId: string): Promise<TrendsDataPoint[]> {
     const sqliteResult = await sqliteAdapter.getTrendsDataBySearchId(searchId)
 
-    // Supabase 병렬 읽기 (비교용)
-    try {
-      const supabaseResult =
-        await supabaseAdapter.getTrendsDataBySearchId(searchId)
+    // Supabase 비교는 비블로킹 (fire-and-forget)
+    void (async () => {
+      try {
+        const supabaseResult =
+          await supabaseAdapter.getTrendsDataBySearchId(searchId)
 
-      if (JSON.stringify(sqliteResult) !== JSON.stringify(supabaseResult)) {
+        if (!compareTrendsDataArrays(sqliteResult, supabaseResult)) {
+          console.warn(
+            `[Shadow Read] table=trends_data, searchId=${searchId}, mismatch: sqlite=${sqliteResult.length}, supabase=${supabaseResult.length}`
+          )
+        }
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error)
         console.warn(
-          `[Shadow Read] table=trends_data, searchId=${searchId}, mismatch: sqlite=${sqliteResult.length}, supabase=${supabaseResult.length}`
+          `[Shadow Read] Supabase getTrendsDataBySearchId failed for searchId=${searchId}: ${errorMsg}`
         )
       }
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error)
-      console.warn(
-        `[Shadow Read] Supabase getTrendsDataBySearchId failed for searchId=${searchId}: ${errorMsg}`
-      )
-    }
+    })()
 
     return sqliteResult
   },
