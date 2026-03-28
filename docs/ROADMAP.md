@@ -43,81 +43,81 @@ StockInsight은 개인 투자자를 위한 로컬 주식 분석 도구로 다음
 
 ## MVP 개발 단계
 
-### Phase 1: 애플리케이션 골격 구축 -- 완료
+### Phase 1: 애플리케이션 골격 구축 ✅ -- 완료
 
 > 라우팅, 레이아웃, 기본 UI 컴포넌트 골격이 이미 구성되어 있음.
 > 이 Phase에서는 나머지 타입 정의, DB 스키마 설계, 환경 설정을 완료한다.
 
-- **Task 001: 타입 정의 및 인터페이스 설계** - 우선순위
-  - `src/types/` 디렉토리에 전체 TypeScript 타입/인터페이스 정의
-  - `StockSearch`, `PriceData`, `TrendsData` DB 모델 타입 정의
-  - `StockData`, `TrendsDataPoint`, `CalculatedMetrics` API 응답 DTO 타입 정의
-  - 차트 데이터 타입 (`PriceChartData`, `TrendsChartData`, `ComparisonChartData`) 정의
-  - 공통 API 응답 래퍼 타입 (`ApiResponse<T>`, `ApiError`) 정의
+- **Task 001: 타입 정의 및 인터페이스 설계** ✅ -- 완료
+  - ✅ `src/types/` 디렉토리에 전체 TypeScript 타입/인터페이스 정의
+  - ✅ `StockSearch`, `PriceData`, `TrendsData` DB 모델 타입 정의
+  - ✅ `StockData`, `TrendsDataPoint`, `CalculatedMetrics` API 응답 DTO 타입 정의
+  - ✅ 차트 데이터 타입 (`PriceChartData`, `TrendsChartData`, `ComparisonChartData`) 정의
+  - ✅ 공통 API 응답 래퍼 타입 (`ApiResponse<T>`, `ApiError`) 정의
 
-- **Task 002: 데이터베이스 스키마 및 초기화 설정**
-  - `src/lib/db.ts`에 better-sqlite3 싱글턴 인스턴스 생성 로직 구현
-  - `PRAGMA foreign_keys = ON` 설정 포함
-  - `searches`, `price_data`, `trends_data` 테이블 CREATE TABLE IF NOT EXISTS DDL 작성
-  - `(search_id, date)` 복합 인덱스 생성
-  - `next.config.ts`에 `serverExternalPackages: ['better-sqlite3']` 추가
-  - `data/` 디렉토리 생성 및 `.gitignore`에 `data/*.db` 추가
+- **Task 002: 데이터베이스 스키마 및 초기화 설정** ✅ -- 완료
+  - ✅ `src/lib/db.ts`에 better-sqlite3 싱글턴 인스턴스 생성 로직 구현
+  - ✅ `PRAGMA foreign_keys = ON` 설정 포함
+  - ✅ `searches`, `price_data`, `trends_data` 테이블 CREATE TABLE IF NOT EXISTS DDL 작성
+  - ✅ `(search_id, date)` 복합 인덱스 생성
+  - ✅ `next.config.ts`에 `serverExternalPackages: ['better-sqlite3']` 추가
+  - ✅ `data/` 디렉토리 생성 및 `.gitignore`에 `data/*.db` 추가
 
-- **Task 003: 환경 변수 및 프로젝트 설정**
-  - `.env.local` 및 `.env.example` 파일 구성 (`SERPAPI_KEY`)
-  - `src/lib/env.ts` 환경 변수 검증 유틸리티 구현
-  - 필요한 npm 패키지 설치 (`better-sqlite3`, `yahoo-finance2`, `date-fns`, `recharts`, `xlsx`, `html-to-image`)
-  - `@types/better-sqlite3` 개발 의존성 추가
+- **Task 003: 환경 변수 및 프로젝트 설정** ✅ -- 완료
+  - ✅ `.env.local` 및 `.env.example` 파일 구성 (`SERPAPI_KEY`)
+  - ✅ `src/lib/env.ts` 환경 변수 검증 유틸리티 구현
+  - ✅ 필요한 npm 패키지 설치 (`better-sqlite3`, `yahoo-finance2`, `date-fns`, `recharts`, `xlsx`, `html-to-image`)
+  - ✅ `@types/better-sqlite3` 개발 의존성 추가
 
 ---
 
-### Phase 2: UI/UX 완성 (더미 데이터 활용)
+### Phase 2: UI/UX 완성 (더미 데이터 활용) ✅ -- 완료
 
 > 모든 페이지의 UI를 더미 데이터로 완성하여 전체 사용자 플로우를 체험할 수 있도록 한다.
 > 이 단계에서는 실제 API 호출이나 DB 연동 없이, 하드코딩된 데이터로 화면을 구성한다.
 
-- **Task 004: 더미 데이터 및 목업 유틸리티 작성**
-  - `src/lib/mock-data.ts`에 더미 데이터 생성 함수 구현
-  - 5년치 주간 주가 더미 데이터 (260개 데이터포인트) 생성
-  - 5년치 주간 트렌드 더미 데이터 (260개 데이터포인트) 생성
-  - MA13, YoY, 52주 최고/최저가 등 계산 지표 더미 데이터 포함
-  - 저장된 종목 목록 더미 데이터 (3-5개 종목) 생성
+- **Task 004: 더미 데이터 및 목업 유틸리티 작성** ✅ -- 완료
+  - ✅ `src/lib/mock-data.ts`에 더미 데이터 생성 함수 구현
+  - ✅ 5년치 주간 주가 더미 데이터 (260개 데이터포인트) 생성
+  - ✅ 5년치 주간 트렌드 더미 데이터 (260개 데이터포인트) 생성
+  - ✅ MA13, YoY, 52주 최고/최저가 등 계산 지표 더미 데이터 포함
+  - ✅ 저장된 종목 목록 더미 데이터 (3-5개 종목) 생성
 
-- **Task 005: 대시보드 페이지 UI 구현 (F014, F015, F016)**
-  - 종목 카드 컴포넌트 (`StockCard`) 구현: ticker, 회사명, 현재가, YoY, 스파크라인
-  - 4열 반응형 카드 그리드 레이아웃 구현 (모바일 1열, 태블릿 2열, 데스크톱 4열)
-  - 카드 호버 시 새로고침/삭제 버튼 오버레이 구현
-  - 삭제 확인 다이얼로그(AlertDialog) 구현
-  - 빈 상태 UI ("저장된 종목이 없습니다") 개선
-  - 하단 [+ 추가] 버튼 고정 배치
-  - 스파크라인 미니 차트 컴포넌트 구현 (Recharts LineChart 간소화 버전)
+- **Task 005: 대시보드 페이지 UI 구현 (F014, F015, F016)** ✅ -- 완료
+  - ✅ 종목 카드 컴포넌트 (`StockCard`) 구현: ticker, 회사명, 현재가, YoY, 스파크라인
+  - ✅ 4열 반응형 카드 그리드 레이아웃 구현 (모바일 1열, 태블릿 2열, 데스크톱 4열)
+  - ✅ 카드 호버 시 새로고침/삭제 버튼 오버레이 구현
+  - ✅ 삭제 확인 다이얼로그(AlertDialog) 구현
+  - ✅ 빈 상태 UI ("저장된 종목이 없습니다") 개선
+  - ✅ 하단 [+ 추가] 버튼 고정 배치
+  - ✅ 스파크라인 미니 차트 컴포넌트 구현 (Recharts LineChart 간소화 버전)
 
-- **Task 006: 검색 페이지 UI 구현 (F001)**
-  - React Hook Form + Zod 기반 Ticker 입력 폼 구현
-  - 영문 대문자 자동 변환 로직 적용
-  - 빈 값 제출 방지 및 인라인 에러 메시지 표시
-  - Enter 키 및 조회 버튼 제출 지원
-  - 로딩 상태 UI: Skeleton 카드 5개 + 차트 Skeleton 3개 표시
-  - 단계별 진행 메시지 표시 컴포넌트 구현 ("주가 데이터 수집 중..." 등)
-  - 에러 상태 UI: 에러 메시지 + [다시 시도] 버튼
+- **Task 006: 검색 페이지 UI 구현 (F001)** ✅ -- 완료
+  - ✅ React Hook Form + Zod 기반 Ticker 입력 폼 구현
+  - ✅ 영문 대문자 자동 변환 로직 적용
+  - ✅ 빈 값 제출 방지 및 인라인 에러 메시지 표시
+  - ✅ Enter 키 및 조회 버튼 제출 지원
+  - ✅ 로딩 상태 UI: Skeleton 카드 5개 + 차트 Skeleton 3개 표시
+  - ✅ 단계별 진행 메시지 표시 컴포넌트 구현 ("주가 데이터 수집 중..." 등)
+  - ✅ 에러 상태 UI: 에러 메시지 + [다시 시도] 버튼
 
-- **Task 007: 종목 상세 페이지 UI 구현 (F010, F007, F008, F009)**
-  - 지표 요약 카드 5개 구현: 현재 종가, MA13, YoY(색상 구분), 52주 최고가, 52주 최저가
-  - 주가 + MA13 라인 차트 구현 (Recharts LineChart, 파란색/주황색)
-  - Google Trends 영역 차트 구현 (Recharts AreaChart)
-  - 주가 vs 트렌드 비교 차트 구현 (Recharts ComposedChart, 이중 Y축)
-  - 차트 공통 설정: X축 날짜 레이블, Y축 단위, 범례, 반응형 크기
-  - 각 차트별 [PNG 다운로드] 버튼 배치 (기능은 Phase 4에서 구현)
-  - 다운로드 섹션: [엑셀 다운로드] + [전체 차트 PNG 일괄 다운로드] 버튼 배치
+- **Task 007: 종목 상세 페이지 UI 구현 (F010, F007, F008, F009)** ✅ -- 완료
+  - ✅ 지표 요약 카드 5개 구현: 현재 종가, MA13, YoY(색상 구분), 52주 최고가, 52주 최저가
+  - ✅ 주가 + MA13 라인 차트 구현 (Recharts LineChart, 파란색/주황색)
+  - ✅ Google Trends 영역 차트 구현 (Recharts AreaChart)
+  - ✅ 주가 vs 트렌드 비교 차트 구현 (Recharts ComposedChart, 이중 Y축)
+  - ✅ 차트 공통 설정: X축 날짜 레이블, Y축 단위, 범례, 반응형 크기
+  - ✅ 각 차트별 [PNG 다운로드] 버튼 배치 (기능은 Phase 4에서 구현)
+  - ✅ 다운로드 섹션: [엑셀 다운로드] + [전체 차트 PNG 일괄 다운로드] 버튼 배치
 
 ---
 
-### Phase 3: 핵심 기능 구현
+### Phase 3: 핵심 기능 구현 ✅ -- 완료
 
 > 실제 API 연동, DB CRUD, 비즈니스 로직을 구현하여 더미 데이터를 실제 데이터로 교체한다.
 > 각 Task 완료 후 Playwright MCP를 활용한 E2E 테스트를 수행한다.
 
-- **Task 008: 데이터베이스 CRUD 레이어 구현 (F013, F014, F015)** - 우선순위
+- **Task 008: 데이터베이스 CRUD 레이어 구현 (F013, F014, F015)** ✅ -- 완료
   - `src/lib/db/queries.ts`에 DB 접근 함수 구현
   - `insertSearch()` / `upsertSearch()`: searches 테이블 UPSERT 로직
   - `insertPriceData()` / `insertTrendsData()`: 시계열 데이터 배치 INSERT
@@ -128,7 +128,7 @@ StockInsight은 개인 투자자를 위한 로컬 주식 분석 도구로 다음
   - `replaceStockData()`: 재조회 시 price_data/trends_data 전체 교체 (DELETE + INSERT 트랜잭션)
   - Playwright MCP를 활용한 DB CRUD API 엔드포인트 통합 테스트
 
-- **Task 009: 주가 데이터 수집 API 구현 (F002, F003)**
+- **Task 009: 주가 데이터 수집 API 구현 (F002, F003)** ✅ -- 완료
   - `src/app/api/stock/route.ts` Route Handler 구현
   - yahoo-finance2로 5년 주간 종가 수집 (`historical`, `interval: 1wk`)
   - yahoo-finance2 `quoteSummary()`로 회사명(companyName) 조회
@@ -137,7 +137,7 @@ StockInsight은 개인 투자자를 위한 로컬 주식 분석 도구로 다음
   - 에러 처리: 잘못된 ticker, API 응답 실패, 네트워크 오류
   - Playwright MCP를 활용한 API 엔드포인트 테스트
 
-- **Task 010: Google Trends 데이터 수집 API 구현 (F004)**
+- **Task 010: Google Trends 데이터 수집 API 구현 (F004)** ✅ -- 완료
   - `src/app/api/trends/route.ts` Route Handler 구현
   - SerpAPI Google Trends API 호출 (`engine: google_trends`, 5년 주간 데이터)
   - 검색 키워드: companyName 우선, 실패 시 `"{ticker} stock"` 폴백
@@ -146,7 +146,7 @@ StockInsight은 개인 투자자를 위한 로컬 주식 분석 도구로 다음
   - 에러 처리: API 키 누락, 요청 실패, 데이터 없음
   - Playwright MCP를 활용한 API 엔드포인트 테스트
 
-- **Task 011: 지표 계산 로직 구현 (F005, F006)**
+- **Task 011: 지표 계산 로직 구현 (F005, F006)** ✅ -- 완료
   - `src/lib/calculations.ts` 비즈니스 로직 모듈 구현
   - MA13 계산: 13주 이동평균선 (주간 종가 기반 sliding window)
   - YoY 계산: 52주 전 대비 현재 주가 변화율 (%)
@@ -154,7 +154,7 @@ StockInsight은 개인 투자자를 위한 로컬 주식 분석 도구로 다음
   - ISO week number 기반 주가-트렌드 데이터 매칭 (F009 비교 차트용)
   - 단위 테스트 수준의 검증 (엣지 케이스: 데이터 부족, 0 나눗셈 등)
 
-- **Task 012: 종목 조회 통합 플로우 구현 (F001 + F003 + F004 + F005 + F006 + F013)**
+- **Task 012: 종목 조회 통합 플로우 구현 (F001 + F003 + F004 + F005 + F006 + F013)** ✅ -- 완료
   - `src/app/api/searches/route.ts` 통합 API Route Handler 구현
   - 조회 플로우: ticker 입력 -> 주가 수집 -> 트렌드 수집 -> 지표 계산 -> DB 저장 -> search_id 반환
   - 검색 페이지에서 통합 API 호출 및 로딩 상태 관리
@@ -164,7 +164,7 @@ StockInsight은 개인 투자자를 위한 로컬 주식 분석 도구로 다음
   - 동일 ticker 재조회 시 UPSERT 처리 검증
   - Playwright MCP를 활용한 전체 조회 플로우 E2E 테스트
 
-- **Task 013: 대시보드 실제 데이터 연동 (F014, F015, F016)**
+- **Task 013: 대시보드 실제 데이터 연동 (F014, F015, F016)** ✅ -- 완료
   - 대시보드 페이지를 Server Component로 전환하여 DB 직접 조회
   - `getAllSearches()` + 최근 52주 price_data 조회로 카드 데이터 구성
   - 스파크라인 차트에 실제 52주 가격 데이터 바인딩
@@ -173,7 +173,7 @@ StockInsight은 개인 투자자를 위한 로컬 주식 분석 도구로 다음
   - `searched_at` 최신순 정렬 적용
   - Playwright MCP를 활용한 대시보드 CRUD E2E 테스트
 
-- **Task 014: 종목 상세 페이지 실제 데이터 연동 (F002, F007, F008, F009, F010)**
+- **Task 014: 종목 상세 페이지 실제 데이터 연동 (F002, F007, F008, F009, F010)** ✅ -- 완료
   - Server Component에서 `getSearchById()` + 시계열 데이터 조회
   - 지표 요약 카드 5개에 실제 DB 데이터 바인딩
   - 주가 + MA13 차트에 실제 price_data + 계산된 MA13 데이터 바인딩
@@ -182,7 +182,7 @@ StockInsight은 개인 투자자를 위한 로컬 주식 분석 도구로 다음
   - 존재하지 않는 id 접근 시 404 또는 리다이렉트 처리
   - Playwright MCP를 활용한 상세 페이지 데이터 표시 E2E 테스트
 
-- **Task 014-1: 핵심 기능 통합 테스트**
+- **Task 014-1: 핵심 기능 통합 테스트** ✅ -- 완료
   - Playwright MCP를 사용한 전체 사용자 플로우 테스트
     - 시나리오 1: 최초 방문 -> 빈 대시보드 -> [+ 추가] -> ticker 입력 -> 조회 -> 상세 페이지 확인 -> 대시보드 복귀
     - 시나리오 2: 저장된 종목 카드 클릭 -> 상세 페이지 차트/지표 확인

@@ -21,37 +21,55 @@ const envSchema = z
       .default('false')
       .transform(val => val === 'true')
       .describe(
-        'Supabase 사용 여부 (true: Supabase, false: SQLite) - Phase 1에서는 false 권장'
+        'Supabase 사용 여부 (true: Supabase, false: SQLite) - Phase 1에서는 false 권장. Phase 6에서 폐기 예정.'
+      ),
+    DB_READ_MODE: z
+      .enum(['sqlite', 'supabase'])
+      .default('sqlite')
+      .describe(
+        '데이터베이스 읽기 모드 (sqlite: SQLite만 사용, supabase: Supabase 우선, 실패시 SQLite 폴백)'
+      ),
+    DB_WRITE_MODE: z
+      .enum(['sqlite', 'supabase'])
+      .default('sqlite')
+      .describe(
+        '데이터베이스 쓰기 모드 (sqlite: SQLite만 사용, supabase: Supabase만 사용)'
       ),
     SUPABASE_URL: z
       .string()
       .url()
       .optional()
       .describe(
-        'Supabase 프로젝트 URL (https://YOUR_PROJECT_ID.supabase.co) - USE_SUPABASE=true일 때 필수'
+        'Supabase 프로젝트 URL (https://YOUR_PROJECT_ID.supabase.co) - USE_SUPABASE=true 또는 DB_READ_MODE/DB_WRITE_MODE=supabase일 때 필수'
       ),
     SUPABASE_KEY: z
       .string()
       .optional()
       .describe(
-        'Supabase 공개 API 키 (anon key) - Supabase Dashboard Settings → API에서 확인 - USE_SUPABASE=true일 때 필수'
+        'Supabase 공개 API 키 (anon key) - Supabase Dashboard Settings → API에서 확인 - USE_SUPABASE=true 또는 DB_READ_MODE/DB_WRITE_MODE=supabase일 때 필수'
       ),
   })
   .superRefine((data, ctx) => {
-    // USE_SUPABASE=true일 때 SUPABASE_URL과 SUPABASE_KEY는 필수
-    if (data.USE_SUPABASE) {
+    // USE_SUPABASE=true 또는 DB_READ_MODE/DB_WRITE_MODE=supabase일 때 SUPABASE_URL과 SUPABASE_KEY는 필수
+    const needsSupabase =
+      data.USE_SUPABASE ||
+      data.DB_READ_MODE === 'supabase' ||
+      data.DB_WRITE_MODE === 'supabase'
+
+    if (needsSupabase) {
       if (!data.SUPABASE_URL || data.SUPABASE_URL.trim() === '') {
         ctx.addIssue({
           code: 'custom',
           path: ['SUPABASE_URL'],
-          message: 'USE_SUPABASE=true일 때 SUPABASE_URL은 필수입니다',
+          message:
+            'Supabase 모드일 때 SUPABASE_URL은 필수입니다 (https://YOUR_PROJECT_ID.supabase.co 형식)',
         })
       }
       if (!data.SUPABASE_KEY || data.SUPABASE_KEY.trim() === '') {
         ctx.addIssue({
           code: 'custom',
           path: ['SUPABASE_KEY'],
-          message: 'USE_SUPABASE=true일 때 SUPABASE_KEY는 필수입니다',
+          message: 'Supabase 모드일 때 SUPABASE_KEY는 필수입니다 (anon key)',
         })
       }
     }
@@ -66,6 +84,8 @@ function validateEnv() {
       NODE_ENV: process.env.NODE_ENV,
       FINNHUB_API_KEY: process.env.FINNHUB_API_KEY,
       USE_SUPABASE: process.env.USE_SUPABASE,
+      DB_READ_MODE: process.env.DB_READ_MODE,
+      DB_WRITE_MODE: process.env.DB_WRITE_MODE,
       SUPABASE_URL: process.env.SUPABASE_URL,
       SUPABASE_KEY: process.env.SUPABASE_KEY,
     })
@@ -95,16 +115,24 @@ export type Env = z.infer<typeof envSchema>
  * 앱 초기화
  * 데이터베이스 및 환경 설정을 초기화합니다
  *
- * - USE_SUPABASE=true: Supabase 사용 (SQLite 초기화 스킵)
- * - USE_SUPABASE=false: SQLite 사용 (로컬 데이터베이스 초기화)
+ * SQLite 초기화는 다음 경우 스킵:
+ * - USE_SUPABASE=true (레거시)
+ * - DB_READ_MODE=supabase AND DB_WRITE_MODE=supabase (Phase 5 Primary 모드)
+ *
+ * 그 외의 경우 SQLite 초기화 수행
  */
 export async function initializeApp(): Promise<void> {
-  if (env.USE_SUPABASE) {
+  // Phase 5 Primary 모드 확인 (Supabase만 사용)
+  const isSupabasePrimary =
+    env.DB_READ_MODE === 'supabase' && env.DB_WRITE_MODE === 'supabase'
+
+  // 레거시 USE_SUPABASE 또는 Phase 5 Primary 모드
+  if (env.USE_SUPABASE || isSupabasePrimary) {
     console.log('✓ Supabase 모드: SQLite 초기화 스킵')
     return
   }
 
-  // SQLite 데이터베이스 초기화 (USE_SUPABASE=false일 때만)
+  // SQLite 데이터베이스 초기화 (SQLite 사용 시)
   const { getDatabase } = await import('./database')
 
   try {
