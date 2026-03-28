@@ -1,22 +1,65 @@
 /**
- * Task 010: Google Trends 데이터 수집 API Route
+ * Google Trends 데이터 수집 API Route
  *
- * GET /api/trends?ticker=AAPL&companyName=Apple+Inc.
+ * F004 (ticker 기반): GET /api/trends?ticker=AAPL&companyName=Apple+Inc.
+ * F017 (keyword 기반): GET /api/trends?keyword=artificial+intelligence
  * Response: ApiResponse<{ trendsData, keyword }>
  */
 
 import { NextRequest } from 'next/server'
-import { fetchTrendsData } from '@/lib/services/trends-service'
+import { fetchTrendsData, callPyTrendsAPI } from '@/lib/services/trends-service'
 import { TickerInputSchema } from '@/lib/validation'
 import { createSuccessResponse, createErrorResponse } from '@/lib/api-helpers'
 
 export async function GET(request: NextRequest) {
   try {
     // 쿼리 파라미터 추출
+    const keyword = request.nextUrl.searchParams.get('keyword')
     const ticker = request.nextUrl.searchParams.get('ticker')
     const companyName =
       request.nextUrl.searchParams.get('companyName') || ticker
 
+    // ============================================================================
+    // F017: 키워드 기반 트렌드 조회 (keyword 파라미터 우선)
+    // ============================================================================
+    if (keyword) {
+      // 키워드 검증 (1-100자, 빈 값 방지)
+      const trimmedKeyword = keyword.trim()
+      if (!trimmedKeyword || trimmedKeyword.length > 100) {
+        return createErrorResponse(
+          'INVALID_KEYWORD',
+          '1~100자의 유효한 키워드를 입력하세요.',
+          400
+        )
+      }
+
+      try {
+        const trendsData = callPyTrendsAPI(trimmedKeyword)
+        return createSuccessResponse(
+          {
+            trendsData,
+            keyword: trimmedKeyword,
+          },
+          200
+        )
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error'
+        console.error(
+          `Keyword trends fetch failed for "${trimmedKeyword}":`,
+          error
+        )
+        return createErrorResponse(
+          'TRENDS_FETCH_FAILED',
+          '트렌드 데이터를 가져오지 못했습니다. 다른 키워드로 시도해주세요.',
+          502,
+          { message, keyword: trimmedKeyword }
+        )
+      }
+    }
+
+    // ============================================================================
+    // F004: ticker 기반 트렌드 조회 (기존 로직)
+    // ============================================================================
     // ticker 검증
     const result = TickerInputSchema.safeParse(ticker)
     if (!result.success) {

@@ -24,6 +24,13 @@ const envSchema = z.object({
     .describe(
       'Supabase 공개 API 키 (anon key) - Supabase Dashboard Settings → API에서 확인'
     ),
+  NEXT_PUBLIC_SUPABASE_URL: z
+    .string()
+    .url()
+    .describe('Supabase 프로젝트 URL - 클라이언트에서 접근'),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z
+    .string()
+    .describe('Supabase anon 키 - 클라이언트에서 접근 (OAuth용)'),
 })
 
 /**
@@ -36,6 +43,8 @@ function validateEnv() {
       FINNHUB_API_KEY: process.env.FINNHUB_API_KEY,
       SUPABASE_URL: process.env.SUPABASE_URL,
       SUPABASE_KEY: process.env.SUPABASE_KEY,
+      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     })
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {

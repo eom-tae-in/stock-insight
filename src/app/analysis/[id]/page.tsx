@@ -6,6 +6,7 @@ import { MetricsSummary } from '@/components/metrics-summary'
 import { UnifiedChart } from '@/components/unified-chart'
 import { CustomChartBuilder } from '@/components/custom-chart-builder'
 import { CustomChartView } from '@/components/custom-chart-view'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getSearchById } from '@/lib/db/queries'
 import { calculateMetrics, calculateMA13 } from '@/lib/calculations'
 import { Table as TableIcon } from 'lucide-react'
@@ -19,8 +20,9 @@ export const dynamic = 'force-dynamic'
 export default async function AnalysisPage({ params }: AnalysisPageProps) {
   const { id } = await params
 
-  // DB에서 종목 데이터 직접 조회
-  const record = await getSearchById(id)
+  // 인증된 서버 클라이언트로 종목 데이터 조회 (RLS 적용됨)
+  const supabase = await createSupabaseServerClient()
+  const record = await getSearchById(id, supabase)
 
   if (!record) {
     notFound()
