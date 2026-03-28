@@ -389,20 +389,41 @@ StockInsight은 개인 투자자를 위한 로컬 주식 분석 도구로 다음
   - ✅ Playwright MCP E2E 테스트 환경 준비 (SQLite Primary 모드 테스트 완료)
   - ✅ 향후 유효한 Supabase API 키로 실제 Supabase Primary 모드 테스트 가능
 
-- **Task M-011-2: 코드 리뷰 피드백 적용 (Critical 버그 3가지 수정)** ✅ -- 완료
-  - ✅ Supabase Primary 모드: `supabaseAdapter` → `fallbackAdapter`로 변경
+- **Task M-011-2: 코드 리뷰 피드백 적용 (7가지 버그 수정)** ✅ -- 완료
+
+  **Critical 버그 3가지:**
+  - ✅ Supabase Primary 모드: `supabaseAdapter` → `fallbackAdapter`
     - 목적: Supabase 전용 쓰기 구현 (SQLite 이중 쓰기 제거)
-    - 변경: `getAdapter()` Line 735 → `return fallbackAdapter`
-  - ✅ Dual-Write 모드: `shadowReadAdapter` → `supabaseAdapter`로 변경
+    - 변경: `db.ts` Line 735 → `return fallbackAdapter`
+  - ✅ Dual-Write 모드: `shadowReadAdapter` → `supabaseAdapter`
     - 목적: SQLite (필수) + Supabase (선택) 이중 쓰기 구현
-    - 변경: `getAdapter()` Line 746 → `return supabaseAdapter`
-  - ✅ 환경 변수 검증 강화: `process.env.USE_SUPABASE` → `env.USE_SUPABASE`
-    - 파일: `src/app/api/searches/route.ts` (Line 121)
+    - 변경: `db.ts` Line 746 → `return supabaseAdapter`
+  - ✅ 환경 변수 검증: `process.env.USE_SUPABASE` → `env.USE_SUPABASE`
+    - 파일: `src/app/api/searches/route.ts`
     - 목적: Zod 검증된 환경 변수 사용
-  - ✅ Next.js 15 동적 라우트 설정:
+
+  **Medium 버그 2가지:**
+  - ✅ Supabase INSERT 원자성: DELETE → INSERT 대신 **UPSERT 패턴** 적용
+    - `insertPriceData()`, `insertTrendsData()` 메서드 수정
+    - `onConflict: 'search_id,date'` 설정으로 중복 시 업데이트
+    - DELETE 성공 후 INSERT 실패 시 데이터 손실 방지
+  - ✅ Shadow Read 병렬 실행: 순차 실행 → **fire-and-forget** 비블로킹
+    - `getSearch`, `getSearchByTicker`, `getAllSearches` 적용
+    - `getPriceDataBySearchId`, `getTrendsDataBySearchId` 적용
+    - 응답 지연 제거 (void async IIFE 사용)
+
+  **Low 버그 2가지:**
+  - ✅ 데이터 정합성 비교 개선: JSON.stringify → **필드 단위 비교**
+    - `compareSearchRecords()` 함수 추가 (SearchRecord 필드별 비교)
+    - `comparePriceDataArrays()` 함수 추가 (PriceDataPoint 배열 비교)
+    - `compareTrendsDataArrays()` 함수 추가 (TrendsDataPoint 배열 비교)
+  - ✅ Next.js 15 앱 초기화 패턴: layout.tsx → **instrumentation.ts**
+    - `instrumentation.ts` 생성 (register() 함수로 앱 초기화)
+    - `layout.tsx`에서 initializeApp() 제거
+    - 빌드 성공 (First Load JS 158KB)
+  - ✅ Next.js 15 동적 라우트:
     - `/api/searches/route.ts`: `export const dynamic = 'force-dynamic'` 추가
     - `/api/searches/[id]/route.ts`: `export const dynamic = 'force-dynamic'` 추가
-    - 목적: 동적 DB 쿼리 캐싱 비활성화
 
 ---
 
