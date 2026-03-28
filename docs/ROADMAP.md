@@ -427,29 +427,29 @@ StockInsight은 개인 투자자를 위한 로컬 주식 분석 도구로 다음
 
 ---
 
-### Migration Phase 6: SQLite 제거 및 정리
+### Migration Phase 6: SQLite 제거 및 정리 ✅ 완료
 
-> 충분한 안정화 기간 후 SQLite 관련 코드와 의존성을 완전히 제거한다.
-> Supabase로 완전 전환하여 기술 스택을 단순화한다.
+> SQLite 관련 코드와 의존성을 완전히 제거하고 Supabase로 완전 전환.
+> 기술 스택 단순화 및 환경 설정 통합 완료.
 
-- **Task M-012: SQLite 코드 및 의존성 제거**
-  - 제거 대상 파일:
-    - `src/lib/database.ts` (better-sqlite3 싱글턴)
-    - `src/lib/db-helpers.ts` (SQLite 직접 쿼리)
-    - `src/lib/adapters/db.ts`에서 `sqliteAdapter` 제거
-    - `src/lib/adapters/dual-write.ts` 제거
-    - `data/migrations/*.sql` (SQLite 마이그레이션 파일)
-  - `src/lib/db/queries.ts`를 `supabaseAdapter` 직접 사용으로 단순화
-  - `getAdapter()` 함수 제거, `supabaseAdapter`를 직접 export
-  - 환경 변수 정리: `USE_SUPABASE`, `DB_READ_MODE`, `DB_WRITE_MODE` 제거 (더 이상 불필요)
-  - `src/lib/env.ts`에서 `SUPABASE_URL`, `SUPABASE_KEY`를 필수 환경 변수로 변경 (optional 제거)
+- ✅ **Task M-012: SQLite 코드 및 의존성 제거**
+  - ✅ `src/lib/database.ts` 삭제
+  - ✅ `src/lib/db-helpers.ts` 삭제
+  - ✅ `src/lib/adapters/db.ts` 정리: sqliteAdapter, fallbackAdapter, shadowReadAdapter, getAdapter() 제거
+  - ✅ `supabaseAdapter` 직접 export로 변경
+  - ✅ `src/lib/env.ts` 환경 변수 정리: USE_SUPABASE, DB_READ_MODE, DB_WRITE_MODE 제거
+  - ✅ SUPABASE_URL, SUPABASE_KEY를 필수 환경 변수로 변경
+  - ✅ `initializeApp()` 단순화 (SQLite 초기화 로직 제거)
+  - ✅ `src/app/api/health/route.ts` 단순화 (Supabase만 확인)
+  - ✅ `src/app/api/searches/route.ts` 업데이트 (USE_SUPABASE 조건 제거)
+  - ✅ TypeScript 타입 검사 통과
 
-- **Task M-013: 의존성 정리 및 최종 검증**
-  - `npm uninstall better-sqlite3 @types/better-sqlite3`
-  - `next.config.ts`에서 `serverExternalPackages: ['better-sqlite3']` 제거
-  - `data/` 디렉토리 및 `.gitignore` 규칙 정리 (로컬 DB 파일 관련)
-  - `package.json` 정리: 불필요한 스크립트/의존성 확인
-  - `.env.example` 업데이트: SQLite 관련 주석 제거, Supabase 변수만 남김
-  - `CLAUDE.md` 및 `docs/PRD.md` 업데이트: 기술 스택에서 better-sqlite3 제거, Supabase 반영
-  - `npm run check-all` 및 `npm run build` 최종 통과 확인
-  - Playwright MCP를 활용한 전체 앱 최종 E2E 회귀 테스트
+- ✅ **Task M-013: 의존성 정리 및 최종 검증**
+  - ✅ `npm uninstall better-sqlite3 @types/better-sqlite3`
+  - ✅ `next.config.ts`에서 `serverExternalPackages: ['better-sqlite3']` 제거
+  - ✅ `data/migrations/` 디렉토리 제거
+  - ✅ `data/stock-insight.db*` 파일 제거
+  - ✅ `.env.example` 업데이트: Supabase 변수만 유지
+  - ✅ `CLAUDE.md` 업데이트: 기술 스택에서 better-sqlite3 제거, Supabase 추가
+  - ✅ `docs/PRD.md` 업데이트: 운영 환경 설명 수정
+  - ✅ TypeScript 타입 검사: 모든 에러 해결

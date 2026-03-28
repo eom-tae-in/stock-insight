@@ -14,7 +14,6 @@ import { fetchStockData } from '@/lib/services/stock-service'
 import { fetchTrendsData } from '@/lib/services/trends-service'
 import { calculateMetrics } from '@/lib/calculations'
 import { TickerInputSchema } from '@/lib/validation'
-import { env } from '@/lib/env'
 import {
   getAllSearches,
   upsertSearch,
@@ -117,12 +116,8 @@ export async function POST(request: NextRequest) {
 
     const id = await upsertSearch(searchRecord)
 
-    // Phase 5: SQLite 기반 저장 (USE_SUPABASE=false 또는 Supabase Primary가 아닐 때)
-    // Supabase Primary 모드(DB_READ_MODE='supabase' && DB_WRITE_MODE='supabase')에서는
-    // adapter가 price_data/trends_data 별도 테이블에 자동으로 저장함
-    if (!env.USE_SUPABASE) {
-      await replaceStockData(id, stockData.priceData, trendsData)
-    }
+    // Phase 6: Supabase 단일 기반 - 가격 및 트렌드 데이터 저장
+    await replaceStockData(id, stockData.priceData, trendsData)
 
     // 5. 응답
     return createSuccessResponse(
