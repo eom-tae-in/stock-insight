@@ -436,6 +436,147 @@ if (!SERPAPI_KEY) {
 
 ---
 
+## Supabase 마이그레이션 전략 (신규)
+
+### 📋 마이그레이션 현재 상태
+
+- ✅ SQLite 기반 기능 완성
+- 🔄 Supabase(PostgreSQL) 점진적 마이그레이션 계획 중
+
+### 🎯 8가지 핵심 원칙 (엄격)
+
+1. **UI 변경 금지**
+   - 컴포넌트, 페이지 레이아웃 수정 금지
+   - 데이터 연동 계층만 변경
+
+2. **비즈니스 로직 유지**
+   - 날짜 정규화, 지표 계산, 검증 규칙 동일
+   - API 응답 형식 변경 금지
+
+3. **SQLite 한 번에 제거 금지**
+   - 마이그레이션 완료 전까지 SQLite 코드 보존
+   - 병렬 지원 단계 필수
+
+4. **DB 접근 계층 먼저 분리**
+   - 추상화 계층(Adapter) 생성 후 Supabase 로직 추가
+   - `src/lib/db-helpers.ts` → `src/lib/adapters/db.ts` 전환
+
+5. **단계별 점진적 진행**
+   - 각 단계: 1~2개 파일 수정
+   - 각 단계: 독립적이며 되돌릴 수 있게
+   - 단계 완료 후 다음 단계로 진행
+
+6. **각 단계마다 변경 내용 기록**
+   - 커밋 메시지: `[파일 목록] - [변경 이유] - [테스트 포인트]`
+   - PR 설명: 롤백 방법 포함
+
+7. **구조 대규모 개편 금지**
+   - 폴더 재구성, 파일 이름 변경 금지
+   - 임의의 리팩토링 금지
+   - 마이그레이션 완료 후 정리
+
+8. **각 단계마다 변경 재현 가능하게**
+   - 테스트 통과 확인 필수
+   - 롤백 절차 문서화
+   - 비상 대응 계획 수립
+
+### 📊 권장 마이그레이션 단계
+
+```
+Phase 1: Supabase 환경 설정 및 Adapter 구조화
+  └─ 파일: src/lib/adapters/db.ts (새 생성)
+  └─ 목표: SQLite/Supabase 두 Provider 추상화
+  └─ 변경: 0개 기능 코드 수정 없음 (환경 설정만)
+  └─ 테스트: 빌드 성공, 기존 API 동작 동일
+
+Phase 2: 첫 번째 테이블 마이그레이션 (searches)
+  └─ 단계 2A: Supabase에 searches 테이블 생성
+  └─ 단계 2B: Adapter에 Supabase 쿼리 구현
+  └─ 단계 2C: 읽기 전환 (Supabase 읽기, SQLite 유지)
+  └─ 테스트: GET /api/searches 응답 동일, 데이터 일치
+
+Phase 3: 이중 쓰기 단계 (Dual-Write)
+  └─ 목표: 두 DB에 동시 쓰기, 데이터 동기화 검증
+  └─ 쓰기 순서: SQLite 먼저 → Supabase 추가
+  └─ 실패 처리: Supabase 실패 시 로깅만, SQLite는 성공
+  └─ 테스트: POST /api/searches 후 두 DB 데이터 비교
+
+Phase 4: Supabase Primary 전환
+  └─ 읽기: Supabase에서만 읽기
+  └─ 쓰기: Supabase에만 쓰기
+  └─ SQLite: 폴백으로만 유지 (비상용)
+  └─ 테스트: 1주일 안정성 모니터링
+
+Phase 5: 남은 테이블 마이그레이션 (price_data, trends_data)
+  └─ Phase 2-4 반복
+  └─ 각 테이블별 독립적 진행
+
+Phase 6: SQLite 완전 제거
+  └─ 목표: 모든 코드에서 SQLite 제거
+  └─ 순서: DB 계층 → 마이그레이션 파일 → 의존성 제거
+  └─ 테스트: 전체 E2E 테스트 통과
+```
+
+### ⚠️ 마이그레이션 시 금지사항
+
+- ❌ 한 커밋에 여러 테이블 마이그레이션
+- ❌ Supabase 연결 실패 시 무시하고 진행
+- ❌ SQLite와 Supabase 쿼리 문법 다르면 "동일하게" 강제 (Adapter로 정규화)
+- ❌ 마이그레이션 중 새 기능 추가
+- ❌ API 응답 형식 변경
+- ❌ 컴포넌트 리팩토링
+
+### ✅ 각 단계 완료 체크리스트
+
+**Phase N 완료 전 필수 확인:**
+
+```bash
+# 1. 코드 검사
+npm run check-all      # lint, type check 통과
+
+# 2. 빌드
+npm run build          # 프로덕션 빌드 성공
+
+# 3. API 테스트
+curl http://localhost:3000/api/searches  # 기존 응답 동일?
+
+# 4. 데이터 검증
+# DB에서 직접 조회하여 양쪽 데이터 비교
+# SQLite: `sqlite3 data/stock-insight.db "SELECT * FROM searches;"`
+# Supabase: supabase CLI 또는 Dashboard
+
+# 5. 문서화
+# - 커밋 메시지에 변경 파일, 이유, 테스트 포인트 기록
+# - README.md에 마이그레이션 진행 상황 업데이트
+```
+
+### 📝 커밋 메시지 템플릿
+
+```
+feat: Supabase 마이그레이션 - Phase N: [간단한 설명]
+
+## 변경 파일
+- src/lib/adapters/db.ts (새 생성)
+- src/lib/db/queries.ts (수정)
+- .env.example (수정)
+
+## 변경 이유
+[이 단계가 필요한 이유, 다음 단계와의 관계]
+
+## 테스트 포인트
+- [ ] npm run check-all 통과
+- [ ] npm run build 성공
+- [ ] GET /api/searches 응답 기존과 동일
+- [ ] SQLite 데이터 == Supabase 데이터 (수동 검증)
+
+## 롤백 방법
+[이 커밋을 되돌리는 방법]
+- git revert [commit-hash]
+- 또는 git reset --hard [previous-commit]
+```
+
+---
+
 ## AI 의사결정 가이드
 
 ### 애매한 상황에서의 우선순위
