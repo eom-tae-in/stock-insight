@@ -389,6 +389,21 @@ StockInsight은 개인 투자자를 위한 로컬 주식 분석 도구로 다음
   - ✅ Playwright MCP E2E 테스트 환경 준비 (SQLite Primary 모드 테스트 완료)
   - ✅ 향후 유효한 Supabase API 키로 실제 Supabase Primary 모드 테스트 가능
 
+- **Task M-011-2: 코드 리뷰 피드백 적용 (Critical 버그 3가지 수정)** ✅ -- 완료
+  - ✅ Supabase Primary 모드: `supabaseAdapter` → `fallbackAdapter`로 변경
+    - 목적: Supabase 전용 쓰기 구현 (SQLite 이중 쓰기 제거)
+    - 변경: `getAdapter()` Line 735 → `return fallbackAdapter`
+  - ✅ Dual-Write 모드: `shadowReadAdapter` → `supabaseAdapter`로 변경
+    - 목적: SQLite (필수) + Supabase (선택) 이중 쓰기 구현
+    - 변경: `getAdapter()` Line 746 → `return supabaseAdapter`
+  - ✅ 환경 변수 검증 강화: `process.env.USE_SUPABASE` → `env.USE_SUPABASE`
+    - 파일: `src/app/api/searches/route.ts` (Line 121)
+    - 목적: Zod 검증된 환경 변수 사용
+  - ✅ Next.js 15 동적 라우트 설정:
+    - `/api/searches/route.ts`: `export const dynamic = 'force-dynamic'` 추가
+    - `/api/searches/[id]/route.ts`: `export const dynamic = 'force-dynamic'` 추가
+    - 목적: 동적 DB 쿼리 캐싱 비활성화
+
 ---
 
 ### Migration Phase 6: SQLite 제거 및 정리
