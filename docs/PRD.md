@@ -76,10 +76,10 @@
 | **F010** | 지표 요약 카드              | 현재 종가, MA13, YoY, 52주 최고가, 52주 최저가를 카드 형태로 요약 표시                                                                                                                                                                                                                                                                                                                                                                                                   | 수치 기반 빠른 판단 지원                             | 종목 상세 페이지              |
 | **F011** | 엑셀 다운로드               | 원본 주가 데이터, Google Trends 데이터, 계산 지표를 .xlsx 파일로 저장                                                                                                                                                                                                                                                                                                                                                                                                    | 추가 분석을 위한 데이터 내보내기                     | 종목 상세 페이지              |
 | **F012** | 차트 PNG 다운로드           | 표시된 차트 3종을 개별 또는 일괄 PNG 이미지로 저장                                                                                                                                                                                                                                                                                                                                                                                                                       | 보고서/공유용 차트 추출                              | 종목 상세 페이지              |
-| **F013** | 조회 결과 로컬 DB 저장      | 수집/계산된 데이터 전체를 로컬 SQLite DB(`data/stock-insight.db`)에 저장. `searches` 테이블에 종목 메타데이터 및 핵심 지표 저장, `price_data` 테이블에 5년 주간 주가 배열 저장, `trends_data` 테이블에 5년 주간 트렌드 배열 저장. 동일 ticker 재조회 시 `searches` 레코드를 UPSERT하고 `price_data`/`trends_data`는 전체 교체(DELETE + INSERT). 저장 완료 시 생성된 search_id를 반환                                                                                     | 데이터 재사용 및 대시보드 관리를 위한 핵심 저장 기능 | 새 종목 조회 페이지           |
-| **F014** | 저장된 종목 목록 조회       | DB `searches` 테이블에서 전체 저장 종목 목록을 조회하여 대시보드 카드 그리드로 표시. 각 카드에는 ticker, company_name, current_price, yoy_change와 스파크라인용 최근 52주(1년) `price_data` 배열을 포함. 정렬 기준: `searched_at` 최신순. 종목 없을 때는 안내 메시지 표시                                                                                                                                                                                                | 로컬 저장 데이터의 진입점이자 서비스의 홈 화면       | 대시보드                      |
-| **F015** | 종목 삭제                   | 대시보드 카드 호버 시 삭제 버튼 표시. 클릭 시 확인 다이얼로그 표시 후 사용자 확인 시 DB에서 해당 search_id의 `searches`, `price_data`, `trends_data` 레코드 전부 삭제(CASCADE). 삭제 완료 후 카드 그리드에서 즉시 제거                                                                                                                                                                                                                                                   | 불필요한 종목 제거 및 DB 용량 관리                   | 대시보드                      |
-| **F016** | 저장 데이터 새로고침        | 대시보드 카드 호버 시 새로고침 버튼 표시. 클릭 시 해당 ticker에 대해 F003(주가 재수집) → F004(트렌드 재수집) → F005~F006(지표 재계산) → F013(DB 갱신) 순서로 처리. 처리 중 카드 위치 유지, 카드 내 로딩 스피너 표시. 완료 시 카드 데이터(current_price, yoy_change, 스파크라인 등)를 최신값으로 갱신하고 `last_updated_at` 업데이트                                                                                                                                      | 5년 데이터 로컬 캐시를 최신 상태로 유지              | 대시보드                      |
+| **F013** | 조회 결과 Supabase 저장     | 수집/계산된 데이터 전체를 Supabase PostgreSQL DB에 저장. `searches` 테이블에 종목 메타데이터 및 핵심 지표 저장, `price_data` 테이블에 5년 주간 주가 저장, `trends_data` 테이블에 5년 주간 트렌드 저장. 동일 ticker 재조회 시 `searches` 레코드를 UPSERT하고 `price_data`/`trends_data`는 전체 교체. 저장 완료 시 생성된 search_id를 반환                                                                                                                                 | 데이터 재사용 및 대시보드 관리를 위한 핵심 저장 기능 | 새 종목 조회 페이지           |
+| **F014** | 저장된 종목 목록 조회       | Supabase `searches` 테이블에서 전체 저장 종목 목록을 조회하여 대시보드 카드 그리드로 표시. 각 카드에는 ticker, company_name, current_price, yoy_change와 스파크라인용 최근 52주(1년) 주가 데이터를 포함. 정렬 기준: `searched_at` 최신순. 종목 없을 때는 안내 메시지 표시                                                                                                                                                                                                | Supabase 저장 데이터의 진입점이자 서비스의 홈 화면   | 대시보드                      |
+| **F015** | 종목 삭제                   | 대시보드 카드 호버 시 삭제 버튼 표시. 클릭 시 확인 다이얼로그 표시 후 사용자 확인 시 Supabase DB에서 해당 search_id의 `searches`, `price_data`, `trends_data` 레코드 전부 삭제(CASCADE). 삭제 완료 후 카드 그리드에서 즉시 제거                                                                                                                                                                                                                                          | 불필요한 종목 제거 및 DB 용량 관리                   | 대시보드                      |
+| **F016** | 저장 데이터 새로고침        | 대시보드 카드 호버 시 새로고침 버튼 표시. 클릭 시 해당 ticker에 대해 F003(주가 재수집) → F004(트렌드 재수집) → F005~F006(지표 재계산) → F013(Supabase 갱신) 순서로 처리. 처리 중 카드 위치 유지, 카드 내 로딩 스피너 표시. 완료 시 카드 데이터(current_price, yoy_change, 스파크라인 등)를 최신값으로 갱신하고 `last_updated_at` 업데이트                                                                                                                                | 저장된 데이터를 최신 상태로 유지                     | 대시보드                      |
 
 ### 2. MVP 이후 기능 (제외)
 
@@ -185,44 +185,44 @@ StockInsight 내비게이션
 
 ## 데이터 모델
 
-> better-sqlite3 기반 로컬 SQLite 파일 저장. 파일 위치: 프로젝트 루트 `data/stock-insight.db`
-> 앱 시작 시 테이블이 없으면 자동 생성 (`CREATE TABLE IF NOT EXISTS`)
+> Supabase PostgreSQL 클라우드 기반 저장소 (Phase 6: Supabase 단일화)
+> 테이블은 Supabase 대시보드에서 사전에 생성됨
 
 ### searches 테이블 (종목 메타데이터 + 핵심 지표)
 
-| 필드            | 설명                                                                                | 타입                              |
-| --------------- | ----------------------------------------------------------------------------------- | --------------------------------- |
-| id              | 레코드 고유 식별자. `/analysis/[id]` URL 파라미터로 사용                            | INTEGER PRIMARY KEY AUTOINCREMENT |
-| ticker          | 종목 심볼 (예: "AAPL"). UNIQUE 제약으로 중복 저장 방지, 재조회 시 UPSERT 처리       | TEXT NOT NULL UNIQUE              |
-| company_name    | 회사명 (예: "Apple Inc."). yahoo-finance2 `quoteSummary()` 조회 결과                | TEXT                              |
-| searched_at     | 최초 조회 시각. ISO 8601 형식 ("YYYY-MM-DDTHH:mm:ssZ")                              | TEXT NOT NULL                     |
-| last_updated_at | 마지막 데이터 갱신 시각. F016 새로고침 시 업데이트                                  | TEXT NOT NULL                     |
-| current_price   | 오늘 종가 (USD). 대시보드 카드 + 상세 페이지 지표 표시용                            | REAL                              |
-| high_52week     | 52주 최고가 (USD). 상세 페이지 지표 카드용                                          | REAL                              |
-| low_52week      | 52주 최저가 (USD). 상세 페이지 지표 카드용                                          | REAL                              |
-| ma13_current    | 현재 MA13 값. 상세 페이지 지표 카드용                                               | REAL                              |
-| yoy_change      | YoY 변화율 (%). 양수=상승, 음수=하락. 대시보드 카드 + 상세 페이지용                 | REAL                              |
-| trends_keyword  | Google Trends 검색에 사용된 실제 키워드. 회사명 우선, 실패 시 "{ticker} stock" 폴백 | TEXT                              |
+| 필드            | 설명                                                                                | 타입                   |
+| --------------- | ----------------------------------------------------------------------------------- | ---------------------- |
+| id              | 레코드 고유 식별자 (UUID). `/analysis/[id]` URL 파라미터로 사용                     | TEXT (UUID, 자동 생성) |
+| ticker          | 종목 심볼 (예: "AAPL"). UNIQUE 제약으로 중복 저장 방지, 재조회 시 UPSERT 처리       | TEXT NOT NULL UNIQUE   |
+| company_name    | 회사명 (예: "Apple Inc."). yahoo-finance2 `quoteSummary()` 조회 결과                | TEXT                   |
+| searched_at     | 최초 조회 시각. ISO 8601 형식 ("YYYY-MM-DDTHH:mm:ssZ")                              | TEXT NOT NULL          |
+| last_updated_at | 마지막 데이터 갱신 시각. F016 새로고침 시 업데이트                                  | TEXT NOT NULL          |
+| current_price   | 오늘 종가 (USD). 대시보드 카드 + 상세 페이지 지표 표시용                            | REAL                   |
+| high_52week     | 52주 최고가 (USD). 상세 페이지 지표 카드용                                          | REAL                   |
+| low_52week      | 52주 최저가 (USD). 상세 페이지 지표 카드용                                          | REAL                   |
+| ma13_current    | 현재 MA13 값. 상세 페이지 지표 카드용                                               | REAL                   |
+| yoy_change      | YoY 변화율 (%). 양수=상승, 음수=하락. 대시보드 카드 + 상세 페이지용                 | REAL                   |
+| trends_keyword  | Google Trends 검색에 사용된 실제 키워드. 회사명 우선, 실패 시 "{ticker} stock" 폴백 | TEXT                   |
 
 ### price_data 테이블 (5년 주간 주가 시계열)
 
-| 필드      | 설명                                                                                                            | 타입                              |
-| --------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| id        | 레코드 고유 식별자                                                                                              | INTEGER PRIMARY KEY AUTOINCREMENT |
-| search_id | searches.id 외래 키. CASCADE DELETE 적용                                                                        | INTEGER NOT NULL                  |
-| date      | ISO 주 시작일(월요일) 기준 "YYYY-MM-DD" 형식. Yahoo Finance 원본(금요일)을 date-fns `startOfISOWeek()`로 정규화 | TEXT NOT NULL                     |
-| close     | 해당 주 종가 (USD)                                                                                              | REAL NOT NULL                     |
+| 필드      | 설명                                                                                                            | 타입               |
+| --------- | --------------------------------------------------------------------------------------------------------------- | ------------------ |
+| id        | 레코드 고유 식별자 (자동 생성)                                                                                  | BIGINT (자동 증가) |
+| search_id | searches.id 외래 키 (UUID). CASCADE DELETE 적용                                                                 | TEXT NOT NULL      |
+| date      | ISO 주 시작일(월요일) 기준 "YYYY-MM-DD" 형식. Yahoo Finance 원본(금요일)을 date-fns `startOfISOWeek()`로 정규화 | TEXT NOT NULL      |
+| close     | 해당 주 종가 (USD)                                                                                              | REAL NOT NULL      |
 
 **인덱스**: `(search_id, date)` 복합 인덱스 (상세 페이지 차트 데이터 조회 성능)
 
 ### trends_data 테이블 (5년 주간 Google Trends 시계열)
 
-| 필드      | 설명                                                                                                      | 타입                              |
-| --------- | --------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| id        | 레코드 고유 식별자                                                                                        | INTEGER PRIMARY KEY AUTOINCREMENT |
-| search_id | searches.id 외래 키. CASCADE DELETE 적용                                                                  | INTEGER NOT NULL                  |
-| date      | ISO 주 시작일(월요일) 기준 "YYYY-MM-DD" 형식. SerpAPI 원본(일요일)을 date-fns `startOfISOWeek()`로 정규화 | TEXT NOT NULL                     |
-| value     | 해당 주 검색 관심도 (0~100)                                                                               | INTEGER NOT NULL                  |
+| 필드      | 설명                                                                                                      | 타입               |
+| --------- | --------------------------------------------------------------------------------------------------------- | ------------------ |
+| id        | 레코드 고유 식별자 (자동 생성)                                                                            | BIGINT (자동 증가) |
+| search_id | searches.id 외래 키 (UUID). CASCADE DELETE 적용                                                           | TEXT NOT NULL      |
+| date      | ISO 주 시작일(월요일) 기준 "YYYY-MM-DD" 형식. SerpAPI 원본(일요일)을 date-fns `startOfISOWeek()`로 정규화 | TEXT NOT NULL      |
+| value     | 해당 주 검색 관심도 (0~100)                                                                               | INTEGER NOT NULL   |
 
 **인덱스**: `(search_id, date)` 복합 인덱스
 
@@ -277,7 +277,7 @@ searches 레코드 삭제 시 연결된 price_data, trends_data 자동 CASCADE D
 
 ### 데이터 저장 (서버사이드)
 
-- **better-sqlite3** - 로컬 SQLite DB 클라이언트. npm 패키지로 설치, 별도 DB 서버/앱 설치 불필요. 동기 API로 Next.js Route Handlers에서 직접 사용. 저장 위치: 프로젝트 루트 `data/stock-insight.db`. 5년치 260개 주간 데이터 \* 다수 종목 저장에 충분한 용량 제공. `next.config.ts`에 `serverExternalPackages: ['better-sqlite3']` 설정 필요. **DB 초기화 시 반드시 `PRAGMA foreign_keys = ON` 실행 (외래 키 CASCADE DELETE 정상 작동 필수)**
+- **Supabase** - PostgreSQL 클라우드 DB. 별도 설치 불필요. REST API를 통한 비동기 접근. 자동 백업, 행 수준 보안(RLS), 벡터 검색 지원. 환경 변수에서 `SUPABASE_URL`과 `SUPABASE_KEY` 설정 필요.
 
 ### 다운로드
 
@@ -289,7 +289,7 @@ searches 레코드 삭제 시 연결된 price_data, trends_data 자동 CASCADE D
 - **Node.js 20+**
 - **npm 10+**
 - **localhost:3000** (`npm run dev` 실행)
-- **data/** 디렉터리 - SQLite DB 파일 저장 위치 (`.gitignore`에 `data/*.db` 추가)
+- **Supabase** - https://supabase.com 에서 프로젝트 생성 필수
 
 ### 환경 변수 설정
 
