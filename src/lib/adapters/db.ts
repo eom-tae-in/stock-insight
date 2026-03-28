@@ -313,37 +313,49 @@ export const supabaseAdapter: DbAdapter = {
     searchId: string,
     priceData: PriceDataPoint[]
   ): Promise<void> {
-    const supabase = getSupabaseClient()
+    // Phase 5: Step 1 - Write to SQLite first (synchronous, mandatory)
+    await sqliteAdapter.insertPriceData(searchId, priceData)
 
-    // 기존 price_data 삭제
-    const { error: deleteError } = await supabase
-      .from('price_data')
-      .delete()
-      .eq('search_id', searchId)
+    // Phase 5: Step 2 - Write to Supabase (asynchronous, optional)
+    try {
+      const supabase = getSupabaseClient()
 
-    if (deleteError) throw deleteError
+      // 기존 price_data 삭제
+      const { error: deleteError } = await supabase
+        .from('price_data')
+        .delete()
+        .eq('search_id', searchId)
 
-    // 빈 배열이면 여기서 종료
-    if (priceData.length === 0) {
-      return
-    }
+      if (deleteError) throw deleteError
 
-    // 배치 INSERT (100개씩)
-    for (let i = 0; i < priceData.length; i += 100) {
-      const batch = priceData.slice(i, i + 100)
-      const { error } = await supabase.from('price_data').insert(
-        batch.map(p => ({
-          search_id: searchId,
-          date: p.date,
-          close: p.close,
-          open: p.open,
-          high: p.high,
-          low: p.low,
-          volume: p.volume,
-        }))
+      // 빈 배열이면 여기서 종료
+      if (priceData.length === 0) {
+        return
+      }
+
+      // 배치 INSERT (100개씩)
+      for (let i = 0; i < priceData.length; i += 100) {
+        const batch = priceData.slice(i, i + 100)
+        const { error } = await supabase.from('price_data').insert(
+          batch.map(p => ({
+            search_id: searchId,
+            date: p.date,
+            close: p.close,
+            open: p.open,
+            high: p.high,
+            low: p.low,
+            volume: p.volume,
+          }))
+        )
+
+        if (error) throw error
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      console.warn(
+        `[Dual-Write] Supabase insertPriceData failed for searchId=${searchId}:`,
+        errorMsg
       )
-
-      if (error) throw error
     }
   },
 
@@ -372,33 +384,45 @@ export const supabaseAdapter: DbAdapter = {
     searchId: string,
     trendsData: TrendsDataPoint[]
   ): Promise<void> {
-    const supabase = getSupabaseClient()
+    // Phase 5: Step 1 - Write to SQLite first (synchronous, mandatory)
+    await sqliteAdapter.insertTrendsData(searchId, trendsData)
 
-    // 기존 trends_data 삭제
-    const { error: deleteError } = await supabase
-      .from('trends_data')
-      .delete()
-      .eq('search_id', searchId)
+    // Phase 5: Step 2 - Write to Supabase (asynchronous, optional)
+    try {
+      const supabase = getSupabaseClient()
 
-    if (deleteError) throw deleteError
+      // 기존 trends_data 삭제
+      const { error: deleteError } = await supabase
+        .from('trends_data')
+        .delete()
+        .eq('search_id', searchId)
 
-    // 빈 배열이면 여기서 종료
-    if (trendsData.length === 0) {
-      return
-    }
+      if (deleteError) throw deleteError
 
-    // 배치 INSERT (100개씩)
-    for (let i = 0; i < trendsData.length; i += 100) {
-      const batch = trendsData.slice(i, i + 100)
-      const { error } = await supabase.from('trends_data').insert(
-        batch.map(t => ({
-          search_id: searchId,
-          date: t.date,
-          value: t.value,
-        }))
+      // 빈 배열이면 여기서 종료
+      if (trendsData.length === 0) {
+        return
+      }
+
+      // 배치 INSERT (100개씩)
+      for (let i = 0; i < trendsData.length; i += 100) {
+        const batch = trendsData.slice(i, i + 100)
+        const { error } = await supabase.from('trends_data').insert(
+          batch.map(t => ({
+            search_id: searchId,
+            date: t.date,
+            value: t.value,
+          }))
+        )
+
+        if (error) throw error
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      console.warn(
+        `[Dual-Write] Supabase insertTrendsData failed for searchId=${searchId}:`,
+        errorMsg
       )
-
-      if (error) throw error
     }
   },
 
@@ -417,6 +441,155 @@ export const supabaseAdapter: DbAdapter = {
       date: row.date,
       value: row.value,
     }))
+  },
+}
+
+/**
+ * Shadow Read Adapter Implementation
+ * Phase 5: 데이터 정합성 검증을 위한 Shadow Read 모드
+ *
+ * 읽기 메서드: SQLite 읽기 + Supabase 병렬 읽기 + 비교 + 로깅
+ * - SQLite 결과를 반환하되, Supabase 결과와 비교하여 불일치 로깅
+ * - Supabase 오류는 로깅만 하고 무시
+ *
+ * 쓰기 메서드: SQLite만 사용
+ * - Shadow Read는 읽기만 검증하는 단계
+ *
+ * 용도:
+ * - DB_READ_MODE='supabase' && DB_WRITE_MODE='sqlite': Shadow Read + 새 데이터는 SQLite만 쓰기
+ * - DB_READ_MODE='supabase' && DB_WRITE_MODE='supabase': 아직 구현 안 함 (fallbackAdapter 사용)
+ */
+const shadowReadAdapter: DbAdapter = {
+  async upsertSearch(record: SearchRecord): Promise<string> {
+    return await sqliteAdapter.upsertSearch(record)
+  },
+
+  async getSearch(searchId: string): Promise<SearchRecord | null> {
+    const sqliteResult = await sqliteAdapter.getSearch(searchId)
+
+    // Supabase 병렬 읽기 (비교용)
+    try {
+      const supabaseResult = await supabaseAdapter.getSearch(searchId)
+
+      if (JSON.stringify(sqliteResult) !== JSON.stringify(supabaseResult)) {
+        console.warn(
+          `[Shadow Read] table=searches, searchId=${searchId}, mismatch detected`
+        )
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      console.warn(
+        `[Shadow Read] Supabase getSearch failed for searchId=${searchId}: ${errorMsg}`
+      )
+    }
+
+    return sqliteResult
+  },
+
+  async getSearchByTicker(ticker: string): Promise<SearchRecord | null> {
+    const sqliteResult = await sqliteAdapter.getSearchByTicker(ticker)
+
+    // Supabase 병렬 읽기 (비교용)
+    try {
+      const supabaseResult = await supabaseAdapter.getSearchByTicker(ticker)
+
+      if (JSON.stringify(sqliteResult) !== JSON.stringify(supabaseResult)) {
+        console.warn(
+          `[Shadow Read] table=searches, ticker=${ticker}, mismatch detected`
+        )
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      console.warn(
+        `[Shadow Read] Supabase getSearchByTicker failed for ticker=${ticker}: ${errorMsg}`
+      )
+    }
+
+    return sqliteResult
+  },
+
+  async getAllSearches(): Promise<SearchRecord[]> {
+    const sqliteResult = await sqliteAdapter.getAllSearches()
+
+    // Supabase 병렬 읽기 (비교용)
+    try {
+      const supabaseResult = await supabaseAdapter.getAllSearches()
+
+      if (JSON.stringify(sqliteResult) !== JSON.stringify(supabaseResult)) {
+        console.warn(
+          `[Shadow Read] table=searches, getAllSearches mismatch: sqlite=${sqliteResult.length}, supabase=${supabaseResult.length}`
+        )
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      console.warn(`[Shadow Read] Supabase getAllSearches failed: ${errorMsg}`)
+    }
+
+    return sqliteResult
+  },
+
+  async deleteSearch(searchId: string): Promise<boolean> {
+    return await sqliteAdapter.deleteSearch(searchId)
+  },
+
+  async insertPriceData(
+    searchId: string,
+    priceData: PriceDataPoint[]
+  ): Promise<void> {
+    return await sqliteAdapter.insertPriceData(searchId, priceData)
+  },
+
+  async getPriceDataBySearchId(searchId: string): Promise<PriceDataPoint[]> {
+    const sqliteResult = await sqliteAdapter.getPriceDataBySearchId(searchId)
+
+    // Supabase 병렬 읽기 (비교용)
+    try {
+      const supabaseResult =
+        await supabaseAdapter.getPriceDataBySearchId(searchId)
+
+      if (JSON.stringify(sqliteResult) !== JSON.stringify(supabaseResult)) {
+        console.warn(
+          `[Shadow Read] table=price_data, searchId=${searchId}, mismatch: sqlite=${sqliteResult.length}, supabase=${supabaseResult.length}`
+        )
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      console.warn(
+        `[Shadow Read] Supabase getPriceDataBySearchId failed for searchId=${searchId}: ${errorMsg}`
+      )
+    }
+
+    return sqliteResult
+  },
+
+  async insertTrendsData(
+    searchId: string,
+    trendsData: TrendsDataPoint[]
+  ): Promise<void> {
+    return await sqliteAdapter.insertTrendsData(searchId, trendsData)
+  },
+
+  async getTrendsDataBySearchId(searchId: string): Promise<TrendsDataPoint[]> {
+    const sqliteResult = await sqliteAdapter.getTrendsDataBySearchId(searchId)
+
+    // Supabase 병렬 읽기 (비교용)
+    try {
+      const supabaseResult =
+        await supabaseAdapter.getTrendsDataBySearchId(searchId)
+
+      if (JSON.stringify(sqliteResult) !== JSON.stringify(supabaseResult)) {
+        console.warn(
+          `[Shadow Read] table=trends_data, searchId=${searchId}, mismatch: sqlite=${sqliteResult.length}, supabase=${supabaseResult.length}`
+        )
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      console.warn(
+        `[Shadow Read] Supabase getTrendsDataBySearchId failed for searchId=${searchId}: ${errorMsg}`
+      )
+    }
+
+    return sqliteResult
   },
 }
 
@@ -555,19 +728,33 @@ const fallbackAdapter: DbAdapter = {
  * - Fallback: USE_SUPABASE=true (legacy, for backward compatibility)
  */
 function getAdapter(): DbAdapter {
-  // Phase 4: DB_READ_MODE and DB_WRITE_MODE based selection (highest priority)
-  if (env.DB_WRITE_MODE === 'supabase' && env.DB_READ_MODE === 'supabase') {
-    return fallbackAdapter
-  } else if (env.DB_WRITE_MODE === 'supabase') {
-    // Phase 3: Dual-write mode (supabaseAdapter already implements dual-write in upsertSearch)
+  // Phase 5: DB_READ_MODE and DB_WRITE_MODE based selection (highest priority)
+
+  // Supabase Primary mode: read from Supabase (with SQLite fallback), write to both
+  // Using supabaseAdapter for dual-write which ensures SQLite first, then Supabase
+  if (env.DB_READ_MODE === 'supabase' && env.DB_WRITE_MODE === 'supabase') {
     return supabaseAdapter
-  } else if (env.USE_SUPABASE) {
-    // Legacy: USE_SUPABASE=true (backward compatibility)
-    return supabaseAdapter
-  } else {
-    // SQLite Primary (default)
-    return sqliteAdapter
   }
+
+  // Shadow Read mode: read from Supabase (with comparison), write to SQLite only
+  if (env.DB_READ_MODE === 'supabase' && env.DB_WRITE_MODE === 'sqlite') {
+    // Phase 5: Shadow Read with SQLite write only
+    return shadowReadAdapter
+  }
+
+  // Dual-Write mode: read from SQLite, write to both SQLite and Supabase
+  if (env.DB_WRITE_MODE === 'supabase' && env.DB_READ_MODE === 'sqlite') {
+    // Phase 5: Dual-Write with Shadow Read validation
+    return shadowReadAdapter
+  }
+
+  // Legacy mode: USE_SUPABASE=true (backward compatibility)
+  if (env.USE_SUPABASE) {
+    return supabaseAdapter
+  }
+
+  // SQLite Primary mode (default)
+  return sqliteAdapter
 }
 
 /**
