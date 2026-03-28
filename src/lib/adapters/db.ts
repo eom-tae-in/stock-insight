@@ -149,72 +149,100 @@ export const sqliteAdapter: DbAdapter = {
 }
 
 /**
+ * Helper function for Supabase upsert operation
+ * Extracted to support Phase 3 dual-write strategy
+ */
+async function performSupabaseUpsert(record: SearchRecord): Promise<string> {
+  const supabase = getSupabaseClient()
+  const { stringifySearchRecord } = await import('../type-guards')
+  const raw = stringifySearchRecord(record)
+
+  const { data: existing } = await supabase
+    .from('searches')
+    .select('id')
+    .eq('ticker', record.ticker)
+    .single()
+
+  if (existing) {
+    // UPDATE
+    const { error } = await supabase
+      .from('searches')
+      .update({
+        company_name: raw.company_name,
+        current_price: raw.current_price,
+        previous_close: raw.previous_close,
+        ma13: raw.ma13,
+        yoy_change: raw.yoy_change,
+        week52_high: raw.week52_high,
+        week52_low: raw.week52_low,
+        price_data: raw.price_data,
+        trends_data: raw.trends_data,
+        last_updated_at: raw.last_updated_at,
+        searched_at: raw.searched_at,
+      })
+      .eq('id', existing.id)
+
+    if (error) throw error
+    return existing.id
+  } else {
+    // INSERT
+    const { data, error } = await supabase
+      .from('searches')
+      .insert({
+        id: raw.id,
+        ticker: raw.ticker,
+        company_name: raw.company_name,
+        current_price: raw.current_price,
+        previous_close: raw.previous_close,
+        ma13: raw.ma13,
+        yoy_change: raw.yoy_change,
+        week52_high: raw.week52_high,
+        week52_low: raw.week52_low,
+        price_data: raw.price_data,
+        trends_data: raw.trends_data,
+        last_updated_at: raw.last_updated_at,
+        searched_at: raw.searched_at,
+        created_at: raw.created_at,
+      })
+      .select('id')
+      .single()
+
+    if (error) throw error
+    return data.id
+  }
+}
+
+/**
  * Supabase Adapter Implementation
  * Provides database operations using Supabase (PostgreSQL) as the provider.
  * Implements the DbAdapter interface with Supabase client methods.
  *
  * All operations are async and use Supabase's Postgres API.
  * Includes proper error handling and data transformation.
+ *
+ * Phase 3: Dual-Write Strategy
+ * When performing upsertSearch, this adapter now writes to both SQLite and Supabase.
+ * SQLite is written first (synchronous, mandatory).
+ * Supabase is written second (asynchronous, optional - failures are logged but don't fail the request).
  */
 export const supabaseAdapter: DbAdapter = {
   async upsertSearch(record: SearchRecord): Promise<string> {
-    const supabase = getSupabaseClient()
-    const { stringifySearchRecord } = await import('../type-guards')
-    const raw = stringifySearchRecord(record)
+    // Phase 3: Step 1 - Write to SQLite first (synchronous, mandatory)
+    const sqliteId = await sqliteAdapter.upsertSearch(record)
 
-    const { data: existing } = await supabase
-      .from('searches')
-      .select('id')
-      .eq('ticker', record.ticker)
-      .single()
-
-    if (existing) {
-      // UPDATE
-      const { error } = await supabase
-        .from('searches')
-        .update({
-          company_name: raw.company_name,
-          current_price: raw.current_price,
-          previous_close: raw.previous_close,
-          ma13: raw.ma13,
-          yoy_change: raw.yoy_change,
-          week52_high: raw.week52_high,
-          week52_low: raw.week52_low,
-          price_data: raw.price_data,
-          trends_data: raw.trends_data,
-          last_updated_at: raw.last_updated_at,
-          searched_at: raw.searched_at,
-        })
-        .eq('id', existing.id)
-
-      if (error) throw error
-      return existing.id
-    } else {
-      // INSERT
-      const { data, error } = await supabase
-        .from('searches')
-        .insert({
-          id: raw.id,
-          ticker: raw.ticker,
-          company_name: raw.company_name,
-          current_price: raw.current_price,
-          previous_close: raw.previous_close,
-          ma13: raw.ma13,
-          yoy_change: raw.yoy_change,
-          week52_high: raw.week52_high,
-          week52_low: raw.week52_low,
-          price_data: raw.price_data,
-          trends_data: raw.trends_data,
-          last_updated_at: raw.last_updated_at,
-          searched_at: raw.searched_at,
-          created_at: raw.created_at,
-        })
-        .select('id')
-        .single()
-
-      if (error) throw error
-      return data.id
+    // Phase 3: Step 2 - Write to Supabase (asynchronous, optional)
+    try {
+      await performSupabaseUpsert(record)
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      console.warn(
+        `[Phase 3] Supabase upsert failed for ticker=${record.ticker}:`,
+        errorMsg
+      )
     }
+
+    // Phase 3: Step 3 - Return SQLite ID (ensures synchronous write always succeeds)
+    return sqliteId
   },
 
   async getSearch(searchId: string): Promise<SearchRecord | null> {
