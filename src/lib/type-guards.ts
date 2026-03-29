@@ -215,6 +215,7 @@ export function parseSearchRecordRaw(
       id: raw.id as string,
       ticker: raw.ticker as string,
       company_name: raw.company_name as string,
+      currency: raw.currency as string | undefined,
       current_price: raw.current_price as number,
       previous_close: raw.previous_close as number | undefined,
       ma13: raw.ma13 as number | undefined,

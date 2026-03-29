@@ -74,6 +74,7 @@ export default async function TablePage({ params }: TablePageProps) {
           <section>
             <DataTable
               ticker={record.ticker}
+              currency={record.currency}
               priceData={record.price_data}
               trendsData={record.trends_data}
               ma13Values={ma13Values}

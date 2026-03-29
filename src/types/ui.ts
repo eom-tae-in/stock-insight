@@ -114,6 +114,7 @@ export interface Downloadable {
  */
 export interface UnifiedChartProps {
   ticker?: string
+  currency?: string
   priceData: PriceDataPoint[]
   trendsData: TrendsDataPoint[]
   ma13?: (number | null)[]

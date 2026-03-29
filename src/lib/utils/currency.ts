@@ -1,103 +1,156 @@
 /**
  * 국제 통화 지원 유틸리티
  *
- * ticker 마켓 코드에서 통화 정보 파싱 및 가격 포맷팅
- * 예: '005930.KS' → ₩, '7203.T' → ¥, 'TOYOTA80.BK' → ฿
+ * 우선순위:
+ * 1. ISO 통화 코드 직접 사용 (Yahoo Finance에서 수집한 'EUR', 'KRW' 등)
+ * 2. ticker 마켓 코드 파싱 fallback (기존 데이터 호환)
  */
 
 interface CurrencyInfo {
-  symbol: string // '₩', '$', 'HK$' 등
-  decimals: number // 소수점 자리수 (0 or 2)
+  symbol: string
+  decimals: number
 }
 
-// 마켓 코드 → 통화 정보 매핑
-const MARKET_CURRENCY_MAP: Record<string, CurrencyInfo> = {
-  // 한국
-  KS: { symbol: '₩', decimals: 0 },
-  KQ: { symbol: '₩', decimals: 0 }, // 코스닥
-
-  // 일본
-  T: { symbol: '¥', decimals: 0 },
-  OS: { symbol: '¥', decimals: 0 }, // 오사카
-
-  // 중국/홍콩
-  HK: { symbol: 'HK$', decimals: 2 },
-  SS: { symbol: '¥', decimals: 2 }, // 상하이
-  SZ: { symbol: '¥', decimals: 2 }, // 심천
-
-  // 동남아
-  BK: { symbol: '฿', decimals: 2 }, // 태국 바트
-  JK: { symbol: 'Rp', decimals: 0 }, // 인도네시아 루피아
-  KL: { symbol: 'RM', decimals: 2 }, // 말레이시아 링깃
-  SI: { symbol: 'S$', decimals: 2 }, // 싱가포르 달러
-  PS: { symbol: '₱', decimals: 2 }, // 필리핀 페소
-  VN: { symbol: '₫', decimals: 0 }, // 베트남 동
-
-  // 인도
-  NS: { symbol: '₹', decimals: 2 }, // NSE
-  BO: { symbol: '₹', decimals: 2 }, // BSE
+// ISO 통화 코드 → 기호/소수점 매핑 (핵심)
+const CURRENCY_MAP: Record<string, CurrencyInfo> = {
+  // 달러류
+  USD: { symbol: '$', decimals: 2 },
+  CAD: { symbol: 'CA$', decimals: 2 },
+  AUD: { symbol: 'A$', decimals: 2 },
+  NZD: { symbol: 'NZ$', decimals: 2 },
+  HKD: { symbol: 'HK$', decimals: 2 },
+  SGD: { symbol: 'S$', decimals: 2 },
+  MXN: { symbol: 'MX$', decimals: 2 },
+  BRL: { symbol: 'R$', decimals: 2 },
 
   // 유럽
-  L: { symbol: '£', decimals: 2 }, // 영국
-  IL: { symbol: 'p', decimals: 2 }, // 영국 (페니)
-  PA: { symbol: '€', decimals: 2 }, // 프랑스
-  AS: { symbol: '€', decimals: 2 }, // 네덜란드
-  DE: { symbol: '€', decimals: 2 }, // 독일
-  MI: { symbol: '€', decimals: 2 }, // 이탈리아
-  MC: { symbol: '€', decimals: 2 }, // 스페인
-  BR: { symbol: '€', decimals: 2 }, // 벨기에
-  HE: { symbol: '€', decimals: 2 }, // 핀란드
-  OL: { symbol: 'kr', decimals: 2 }, // 노르웨이
-  ST: { symbol: 'kr', decimals: 2 }, // 스웨덴
-  CO: { symbol: 'kr', decimals: 2 }, // 덴마크
-  SW: { symbol: 'CHF', decimals: 2 }, // 스위스
-  VX: { symbol: 'CHF', decimals: 2 }, // 스위스(SIX)
-  IS: { symbol: '₺', decimals: 2 }, // 터키
+  EUR: { symbol: '€', decimals: 2 },
+  GBP: { symbol: '£', decimals: 2 },
+  CHF: { symbol: 'CHF', decimals: 2 },
+  NOK: { symbol: 'kr', decimals: 2 },
+  SEK: { symbol: 'kr', decimals: 2 },
+  DKK: { symbol: 'kr', decimals: 2 },
+  TRY: { symbol: '₺', decimals: 2 },
+  PLN: { symbol: 'zł', decimals: 2 },
+  CZK: { symbol: 'Kč', decimals: 2 },
+  HUF: { symbol: 'Ft', decimals: 0 },
 
-  // 북미
-  TO: { symbol: 'CA$', decimals: 2 }, // 캐나다
-  V: { symbol: 'CA$', decimals: 2 }, // 캐나다 벤쿠버
-  MX: { symbol: 'MX$', decimals: 2 }, // 멕시코
+  // 아시아 (정수 표시)
+  KRW: { symbol: '₩', decimals: 0 },
+  JPY: { symbol: '¥', decimals: 0 },
+  IDR: { symbol: 'Rp', decimals: 0 },
+  VND: { symbol: '₫', decimals: 0 },
 
-  // 남미
-  SA: { symbol: 'R$', decimals: 2 }, // 브라질
-  BA: { symbol: 'ARS$', decimals: 2 }, // 아르헨티나
-  SN: { symbol: 'CLP$', decimals: 0 }, // 칠레
-  LM: { symbol: 'S/', decimals: 2 }, // 페루
-
-  // 오세아니아
-  AX: { symbol: 'A$', decimals: 2 }, // 호주
-  NZ: { symbol: 'NZ$', decimals: 2 }, // 뉴질랜드
+  // 아시아 (소수점)
+  CNY: { symbol: '¥', decimals: 2 },
+  TWD: { symbol: 'NT$', decimals: 2 },
+  THB: { symbol: '฿', decimals: 2 },
+  MYR: { symbol: 'RM', decimals: 2 },
+  PHP: { symbol: '₱', decimals: 2 },
+  INR: { symbol: '₹', decimals: 2 },
 
   // 중동/아프리카
-  TA: { symbol: '₪', decimals: 2 }, // 이스라엘
-  CA: { symbol: 'SAR', decimals: 2 }, // 사우디 (일부)
+  ILS: { symbol: '₪', decimals: 2 },
+  SAR: { symbol: 'SR', decimals: 2 },
+  AED: { symbol: 'AED', decimals: 2 },
+  ZAR: { symbol: 'R', decimals: 2 },
 }
 
-const USD: CurrencyInfo = { symbol: '$', decimals: 2 }
-
-/**
- * ticker에서 통화 정보 파싱
- * @param ticker 종목 코드 (예: '005930.KS', 'AAPL', 'TOYOTA80.BK')
- * @returns 통화 정보 (기호, 소수점 자리수)
- */
-export function getCurrencyFromTicker(ticker: string): CurrencyInfo {
-  const parts = ticker.split('.')
-  // 마켓 코드가 없으면 USD (미국)
-  if (parts.length < 2) return USD
-
-  const marketCode = parts[parts.length - 1].toUpperCase()
-  return MARKET_CURRENCY_MAP[marketCode] ?? USD
+// 마켓 코드 → ISO 통화 코드 (ticker fallback용)
+const MARKET_TO_CURRENCY: Record<string, string> = {
+  // 한국
+  KS: 'KRW',
+  KQ: 'KRW',
+  // 일본
+  T: 'JPY',
+  OS: 'JPY',
+  // 중국/홍콩
+  HK: 'HKD',
+  SS: 'CNY',
+  SZ: 'CNY',
+  // 동남아
+  BK: 'THB',
+  JK: 'IDR',
+  KL: 'MYR',
+  SI: 'SGD',
+  PS: 'PHP',
+  VN: 'VND',
+  // 인도
+  NS: 'INR',
+  BO: 'INR',
+  // 유럽
+  L: 'GBP',
+  IL: 'GBP',
+  PA: 'EUR',
+  AS: 'EUR',
+  DE: 'EUR',
+  F: 'EUR',
+  BE: 'EUR',
+  MI: 'EUR',
+  MC: 'EUR',
+  BR: 'EUR',
+  HE: 'EUR',
+  OL: 'NOK',
+  ST: 'SEK',
+  CO: 'DKK',
+  SW: 'CHF',
+  VX: 'CHF',
+  IS: 'TRY',
+  WA: 'PLN',
+  PR: 'CZK',
+  BD: 'HUF',
+  // 북미
+  TO: 'CAD',
+  V: 'CAD',
+  MX: 'MXN',
+  // 남미
+  SA: 'BRL',
+  BA: 'ARS',
+  // 오세아니아
+  AX: 'AUD',
+  NZ: 'NZD',
+  // 대만
+  TW: 'TWD',
+  TWO: 'TWD',
+  // 중동/아프리카
+  TA: 'ILS',
+  SR: 'SAR',
+  DU: 'AED',
+  JNB: 'ZAR',
 }
 
 /**
- * 가격을 통화 기호와 함께 포맷팅
- * @param value 가격 (숫자)
- * @param ticker 종목 코드 (통화 결정용)
- * @returns 포맷된 가격 문자열 (예: '₩179,700', '$179.70', '฿6.95')
+ * ISO 통화 코드 또는 ticker에서 통화 정보 파싱
+ *
+ * - 'EUR', 'KRW' 같은 3자리 ISO 코드 직접 지원
+ * - '005930.KS', 'TOYOTA80.BK' 같은 ticker에서 마켓 코드 파싱 (fallback)
  */
-export function formatPrice(value: number, ticker: string): string {
-  const { symbol, decimals } = getCurrencyFromTicker(ticker)
+function resolveCurrencyInfo(currencyOrTicker: string): CurrencyInfo {
+  const upper = currencyOrTicker.toUpperCase().trim()
+
+  // ISO 통화 코드로 직접 매핑 확인
+  if (CURRENCY_MAP[upper]) return CURRENCY_MAP[upper]
+
+  // ticker에서 마켓 코드 파싱 (fallback)
+  const parts = upper.split('.')
+  if (parts.length >= 2) {
+    const marketCode = parts[parts.length - 1]
+    const isoCode = MARKET_TO_CURRENCY[marketCode]
+    if (isoCode && CURRENCY_MAP[isoCode]) return CURRENCY_MAP[isoCode]
+  }
+
+  // 기본값: USD
+  return CURRENCY_MAP['USD']
+}
+
+/**
+ * 가격 포맷팅
+ * @param value 가격
+ * @param currencyOrTicker ISO 코드('EUR') 또는 ticker('4BY1.F') 둘 다 가능
+ * @returns '€1.05', '₩179,700', '$179.70'
+ */
+export function formatPrice(value: number, currencyOrTicker: string): string {
+  const { symbol, decimals } = resolveCurrencyInfo(currencyOrTicker)
   const formatted = value.toLocaleString('en-US', {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
@@ -107,18 +160,30 @@ export function formatPrice(value: number, ticker: string): string {
 
 /**
  * 통화 기호만 반환 (그래프 Y축 레이블용)
- * @param ticker 종목 코드
- * @returns 통화 기호 (예: '₩', '$', 'HK$')
+ * @param currencyOrTicker ISO 코드 또는 ticker
+ * @returns '₩', '$', '€'
  */
-export function getCurrencySymbol(ticker: string): string {
-  return getCurrencyFromTicker(ticker).symbol
+export function getCurrencySymbol(currencyOrTicker: string): string {
+  return resolveCurrencyInfo(currencyOrTicker).symbol
 }
 
 /**
- * 소수점 자리수만 반환 (포맷팅 시 사용)
- * @param ticker 종목 코드
- * @returns 소수점 자리수 (0 또는 2)
+ * ticker에서 ISO 통화 코드 파싱 (DB 저장용)
+ * @param ticker '005930.KS', '4BY1.F' 등
+ * @returns 'KRW', 'EUR', 'USD' 등
  */
-export function getDecimalPlaces(ticker: string): number {
-  return getCurrencyFromTicker(ticker).decimals
+export function getCurrencyCodeFromTicker(ticker: string): string {
+  const upper = ticker.toUpperCase().trim()
+  const parts = upper.split('.')
+  if (parts.length >= 2) {
+    const marketCode = parts[parts.length - 1]
+    const isoCode = MARKET_TO_CURRENCY[marketCode]
+    if (isoCode) return isoCode
+  }
+  return 'USD'
+}
+
+/** @deprecated ticker 기반 파싱 — getCurrencySymbol(currency ?? ticker) 사용 권장 */
+export function getCurrencyFromTicker(ticker: string): CurrencyInfo {
+  return resolveCurrencyInfo(ticker)
 }

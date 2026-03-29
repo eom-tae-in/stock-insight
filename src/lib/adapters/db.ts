@@ -221,6 +221,7 @@ async function performSupabaseUpsert(
       .from('searches')
       .update({
         company_name: record.company_name,
+        currency: record.currency,
         current_price: record.current_price,
         previous_close: record.previous_close,
         ma13: record.ma13,
@@ -244,6 +245,7 @@ async function performSupabaseUpsert(
         id: record.id,
         ticker: record.ticker,
         company_name: record.company_name,
+        currency: record.currency,
         current_price: record.current_price,
         previous_close: record.previous_close,
         ma13: record.ma13,
