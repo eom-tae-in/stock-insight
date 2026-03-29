@@ -9,12 +9,6 @@ const envSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'production', 'test'])
     .default('development'),
-  FINNHUB_API_KEY: z
-    .string()
-    .optional()
-    .describe(
-      'Finnhub API 키 (https://finnhub.io 발급) - 없으면 Yahoo Finance 폴백'
-    ),
   SUPABASE_URL: z
     .string()
     .url()
@@ -40,7 +34,6 @@ function validateEnv() {
   try {
     return envSchema.parse({
       NODE_ENV: process.env.NODE_ENV,
-      FINNHUB_API_KEY: process.env.FINNHUB_API_KEY,
       SUPABASE_URL: process.env.SUPABASE_URL,
       SUPABASE_KEY: process.env.SUPABASE_KEY,
       NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
