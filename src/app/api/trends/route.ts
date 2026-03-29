@@ -3,6 +3,7 @@
  *
  * F004 (ticker 기반): GET /api/trends?ticker=AAPL&companyName=Apple+Inc.
  * F017 (keyword 기반): GET /api/trends?keyword=artificial+intelligence
+ * F023 확장: GET /api/trends?keyword=...&geo=US&timeframe=1y&gprop=youtube
  * Response: ApiResponse<{ trendsData, keyword }>
  */
 
@@ -19,8 +20,38 @@ export async function GET(request: NextRequest) {
     const companyName =
       request.nextUrl.searchParams.get('companyName') || ticker
 
+    // F023: 국가/기간/범위 파라미터 (allowlist 검증)
+    const ALLOWED_GEO_CODES = [
+      '',
+      'US',
+      'KR',
+      'JP',
+      'CN',
+      'GB',
+      'DE',
+      'FR',
+      'IN',
+      'BR',
+      'AU',
+    ]
+    const ALLOWED_TIMEFRAMES = ['1y', '3y', '5y']
+    const ALLOWED_GPROPS = ['', 'youtube', 'news', 'froogle', 'images']
+
+    const rawGeo = request.nextUrl.searchParams.get('geo') ?? ''
+    const geo = ALLOWED_GEO_CODES.includes(rawGeo) ? rawGeo : ''
+
+    const rawTimeframe = request.nextUrl.searchParams.get('timeframe')
+    const timeframe =
+      rawTimeframe && ALLOWED_TIMEFRAMES.includes(rawTimeframe)
+        ? rawTimeframe
+        : '5y'
+
+    const rawGprop = request.nextUrl.searchParams.get('gprop') ?? ''
+    const gprop = ALLOWED_GPROPS.includes(rawGprop) ? rawGprop : ''
+
     // ============================================================================
     // F017: 키워드 기반 트렌드 조회 (keyword 파라미터 우선)
+    // F023: 국가/기간/범위 파라미터 지원
     // ============================================================================
     if (keyword) {
       // 키워드 검증 (1-100자, 빈 값 방지)
@@ -34,7 +65,12 @@ export async function GET(request: NextRequest) {
       }
 
       try {
-        const trendsData = callPyTrendsAPI(trimmedKeyword)
+        const trendsData = callPyTrendsAPI(
+          trimmedKeyword,
+          geo,
+          timeframe,
+          gprop
+        )
         return createSuccessResponse(
           {
             trendsData,
