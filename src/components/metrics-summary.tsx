@@ -8,15 +8,17 @@ export function MetricsSummary({
   metrics,
   lastUpdatedAt,
   ticker,
-}: MetricsSummaryProps & { ticker: string }) {
+  currency,
+}: MetricsSummaryProps & { ticker: string; currency?: string }) {
   const isYoYPositive = metrics.yoyChange >= 0
-  const currency = getCurrencyFromTicker(ticker)
+  // currency가 있으면 사용, 없으면 ticker에서 파싱 (fallback)
+  const currencyInfo = getCurrencyFromTicker(currency || ticker)
 
   // 통화별 가격 포맷팅 (한국₩: 정수, 미국$: 소수점2자리)
   const formatPrice = (value: number): string => {
     return value.toLocaleString('en-US', {
-      minimumFractionDigits: currency.decimals,
-      maximumFractionDigits: currency.decimals,
+      minimumFractionDigits: currencyInfo.decimals,
+      maximumFractionDigits: currencyInfo.decimals,
     })
   }
 
@@ -35,12 +37,12 @@ export function MetricsSummary({
         <MetricsCard
           label="현재 종가"
           value={formatPrice(metrics.currentPrice)}
-          unit={currency.symbol}
+          unit={currencyInfo.symbol}
         />
         <MetricsCard
           label="13주 이동평균"
           value={formatPrice(metrics.ma13)}
-          unit={currency.symbol}
+          unit={currencyInfo.symbol}
         />
         <MetricsCard
           label="52주 YoY"
@@ -51,12 +53,12 @@ export function MetricsSummary({
         <MetricsCard
           label="52주 최고가"
           value={formatPrice(metrics.week52High)}
-          unit={currency.symbol}
+          unit={currencyInfo.symbol}
         />
         <MetricsCard
           label="52주 최저가"
           value={formatPrice(metrics.week52Low)}
-          unit={currency.symbol}
+          unit={currencyInfo.symbol}
         />
       </div>
 

@@ -10,6 +10,7 @@ import type { PriceDataPoint, TrendsDataPoint } from '@/types'
 
 interface DataTableProps {
   ticker: string
+  currency?: string
   priceData: PriceDataPoint[]
   trendsData: TrendsDataPoint[]
   ma13Values: (number | null)[]
@@ -19,6 +20,7 @@ const ITEMS_PER_PAGE = 20
 
 export function DataTable({
   ticker,
+  currency,
   priceData,
   trendsData,
   ma13Values,
@@ -173,7 +175,7 @@ export function DataTable({
               <th className="border-muted/60 border-r px-4 py-3">
                 <div className="flex items-center justify-center">
                   <SortHeader
-                    label={`주가 (${getCurrencySymbol(ticker)})`}
+                    label={`주가 (${getCurrencySymbol(currency || ticker)})`}
                     sortKey="close"
                   />
                 </div>
@@ -186,7 +188,7 @@ export function DataTable({
               <th className="border-muted/60 border-r px-4 py-3">
                 <div className="flex items-center justify-center">
                   <SortHeader
-                    label={`13주 MA (${getCurrencySymbol(ticker)})`}
+                    label={`13주 MA (${getCurrencySymbol(currency || ticker)})`}
                     sortKey="ma13"
                   />
                 </div>
@@ -210,7 +212,7 @@ export function DataTable({
                 </td>
                 <td className="border-muted/60 border-r px-4 py-3">
                   <div className="text-center">
-                    {formatPrice(row.close, ticker)}
+                    {formatPrice(row.close, currency || ticker)}
                   </div>
                 </td>
                 <td className="border-muted/60 border-r px-4 py-3">
@@ -226,7 +228,7 @@ export function DataTable({
                 </td>
                 <td className="border-muted/60 border-r px-4 py-3">
                   <div className="text-center">
-                    {formatPrice(row.ma13, ticker)}
+                    {formatPrice(row.ma13, currency || ticker)}
                   </div>
                 </td>
                 <td className="px-4 py-3">

@@ -123,6 +123,7 @@ export async function POST(request: NextRequest) {
       id: crypto.randomUUID(),
       ticker: validatedTicker,
       company_name: stockData.companyName,
+      currency: stockData.currency,
       current_price: metrics.currentPrice,
       previous_close: metrics.previousClose,
       ma13: metrics.ma13,

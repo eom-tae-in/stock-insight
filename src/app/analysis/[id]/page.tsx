@@ -53,6 +53,7 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
               metrics={metrics}
               lastUpdatedAt={record.last_updated_at}
               ticker={record.ticker}
+              currency={record.currency}
             />
           </section>
 
@@ -60,6 +61,7 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
           <section className="mb-8">
             <UnifiedChart
               ticker={record.ticker}
+              currency={record.currency}
               priceData={record.price_data}
               trendsData={record.trends_data}
               ma13={ma13Values}
@@ -77,6 +79,7 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
             <CustomChartView
               searchId={record.id}
               ticker={record.ticker}
+              currency={record.currency}
               priceData={record.price_data}
               trendsData={record.trends_data}
               ma13={ma13Values}

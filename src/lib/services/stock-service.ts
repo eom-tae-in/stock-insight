@@ -17,6 +17,7 @@ export interface StockDataResult {
   companyName: string
   currentPrice: number
   previousClose: number
+  currency?: string // ISO 통화 코드 (예: 'USD', 'KRW', 'EUR')
   priceData: PriceDataPoint[]
 }
 
@@ -24,10 +25,11 @@ export interface StockDataResult {
  * Yahoo Finance에서 주가 데이터 수집
  */
 export async function fetchStockData(ticker: string): Promise<StockDataResult> {
-  // 1. 회사명 및 현재가 조회 (Yahoo Finance)
+  // 1. 회사명, 현재가, 통화 조회 (Yahoo Finance)
   let companyName = ticker
   let currentPrice = 0
   let previousClose = 0
+  let currency: string | undefined
 
   try {
     const quoteData = await yf.quote(ticker)
@@ -51,6 +53,11 @@ export async function fetchStockData(ticker: string): Promise<StockDataResult> {
         companyName = quoteData.longName
       } else if (quoteData.shortName) {
         companyName = quoteData.shortName
+      }
+
+      // 통화 (ISO 코드: 'USD', 'KRW', 'EUR' 등)
+      if (quoteData.currency) {
+        currency = quoteData.currency
       }
     }
   } catch (error) {
@@ -129,6 +136,7 @@ export async function fetchStockData(ticker: string): Promise<StockDataResult> {
     companyName,
     currentPrice,
     previousClose: previousClose || currentPrice,
+    currency,
     priceData,
   }
 }

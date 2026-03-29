@@ -90,6 +90,7 @@ const TIME_RANGE_PRESETS = [
 
 export function UnifiedChart({
   ticker,
+  currency,
   priceData,
   trendsData,
   ma13,
@@ -373,7 +374,7 @@ export function UnifiedChart({
               <YAxis
                 yAxisId="left"
                 label={{
-                  value: `가격 (${getCurrencySymbol(ticker ?? '')})`,
+                  value: `가격 (${getCurrencySymbol(currency || ticker || '')})`,
                   angle: -90,
                   position: 'insideLeft',
                 }}
@@ -432,7 +433,7 @@ export function UnifiedChart({
                   '52주 최저가',
                 ]
                 if (priceSeriesNames.includes(name as string)) {
-                  return formatPrice(value, ticker ?? '')
+                  return formatPrice(value, currency || ticker || '')
                 }
 
                 // 나머지 시리즈: 소수점 2자리
@@ -534,7 +535,8 @@ export function UnifiedChart({
       <div className="bg-muted/50 text-muted-foreground rounded-lg p-4 text-sm">
         <p>
           💡 위의 토글 버튼을 클릭하여 원하는 데이터를 표시/숨길 수 있습니다.
-          좌측은 주가($), 우측은 검색 관심도와 YoY(%)를 표시합니다.
+          좌측은 주가({getCurrencySymbol(currency || ticker || '')}), 우측은
+          검색 관심도와 YoY(%)를 표시합니다.
         </p>
       </div>
     </div>
