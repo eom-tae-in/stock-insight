@@ -9,22 +9,9 @@
 
 import YahooFinance from 'yahoo-finance2'
 import { subYears, startOfISOWeek, format } from 'date-fns'
-import { env } from '@/lib/env'
 import type { PriceDataPoint } from '@/types'
 
 const yf = new YahooFinance()
-
-/**
- * Finnhub API 응답 형식
- */
-interface FinnhubQuote {
-  c: number // currentPrice
-  pc: number // previousClose
-}
-
-interface FinnhubProfile {
-  name: string
-}
 
 export interface StockDataResult {
   companyName: string
@@ -34,69 +21,41 @@ export interface StockDataResult {
 }
 
 /**
- * Finnhub에서 현재가 조회
- */
-async function fetchFinnhubQuote(ticker: string): Promise<FinnhubQuote> {
-  if (!env.FINNHUB_API_KEY) {
-    throw new Error('FINNHUB_API_KEY is not configured')
-  }
-
-  const url = `https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${env.FINNHUB_API_KEY}`
-  const response = await fetch(url)
-
-  if (!response.ok) {
-    throw new Error(`Finnhub quote request failed: ${response.statusText}`)
-  }
-
-  const data = (await response.json()) as FinnhubQuote
-  return data
-}
-
-/**
- * Finnhub에서 회사명 조회
- */
-async function fetchFinnhubProfile(ticker: string): Promise<FinnhubProfile> {
-  if (!env.FINNHUB_API_KEY) {
-    throw new Error('FINNHUB_API_KEY is not configured')
-  }
-
-  const url = `https://finnhub.io/api/v1/stock/profile2?symbol=${ticker}&token=${env.FINNHUB_API_KEY}`
-  const response = await fetch(url)
-
-  if (!response.ok) {
-    throw new Error(`Finnhub profile request failed: ${response.statusText}`)
-  }
-
-  const data = (await response.json()) as FinnhubProfile
-  return data
-}
-
-/**
  * Yahoo Finance에서 주가 데이터 수집
  */
 export async function fetchStockData(ticker: string): Promise<StockDataResult> {
-  // 1. 회사명 및 현재가 조회 (Finnhub)
+  // 1. 회사명 및 현재가 조회 (Yahoo Finance)
   let companyName = ticker
   let currentPrice = 0
   let previousClose = 0
 
   try {
-    const [quoteResult, profileResult] = await Promise.allSettled([
-      fetchFinnhubQuote(ticker),
-      fetchFinnhubProfile(ticker),
-    ])
+    const quoteData = await yf.quote(ticker)
 
-    if (quoteResult.status === 'fulfilled' && quoteResult.value.c > 0) {
-      currentPrice = quoteResult.value.c
-      previousClose = quoteResult.value.pc
-    }
+    if (quoteData) {
+      // 현재가
+      if (quoteData.regularMarketPrice && quoteData.regularMarketPrice > 0) {
+        currentPrice = quoteData.regularMarketPrice
+      }
 
-    if (profileResult.status === 'fulfilled' && profileResult.value.name) {
-      companyName = profileResult.value.name
+      // 전일 종가
+      if (
+        quoteData.regularMarketPreviousClose &&
+        quoteData.regularMarketPreviousClose > 0
+      ) {
+        previousClose = quoteData.regularMarketPreviousClose
+      }
+
+      // 회사명
+      if (quoteData.longName) {
+        companyName = quoteData.longName
+      } else if (quoteData.shortName) {
+        companyName = quoteData.shortName
+      }
     }
   } catch (error) {
-    // Finnhub 실패 시에도 historical로 진행
-    console.warn(`Failed to fetch Finnhub data for ${ticker}:`, error)
+    // Yahoo Finance quote 실패 시에도 historical로 진행
+    console.warn(`Failed to fetch quote data for ${ticker}:`, error)
   }
 
   // 2. 5년 주간 종가 데이터 수집
