@@ -785,20 +785,20 @@ export default function KeywordTrendsClient() {
                       max="260"
                       value={state.customWeeks}
                       onChange={e => {
-                        const weeks = Math.max(
-                          1,
-                          Math.min(260, parseInt(e.target.value) || 1)
-                        )
-                        setState(prev => ({
-                          ...prev,
-                          customWeeks: weeks,
-                        }))
+                        const weeks = parseInt(e.target.value, 10)
+                        if (!isNaN(weeks)) {
+                          setState(prev => ({
+                            ...prev,
+                            customWeeks: Math.max(1, Math.min(260, weeks)),
+                          }))
+                        }
                       }}
                       onKeyDown={e => {
                         if (e.key === 'Enter') {
                           handleTimeframeChange('custom')
                         }
                       }}
+                      onFocus={e => e.target.select()}
                       className="border-input bg-background h-10 w-20 rounded border px-3 py-2 text-sm"
                       placeholder="주 수"
                     />
