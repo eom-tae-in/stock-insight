@@ -68,6 +68,7 @@ export default function KeywordTrendsClient() {
     DEFAULT_TIMEFRAME
   )
   const [customWeeks, setCustomWeeks] = useState(26)
+  const [customWeeksInput, setCustomWeeksInput] = useState('26')
 
   // URL 파라미터에서 초기 상태 파싱 (F033: URL 파라미터 기반 상태 관리)
   useEffect(() => {
@@ -90,6 +91,11 @@ export default function KeywordTrendsClient() {
       setTimeframe(tf)
     }
   }, [searchParams])
+
+  // customWeeks 변경 시 입력 필드 동기화
+  useEffect(() => {
+    setCustomWeeksInput(String(customWeeks))
+  }, [customWeeks])
 
   const [availableSearches, setAvailableSearches] = useState<SearchRecord[]>([])
   const [isSaving, setIsSaving] = useState(false)
@@ -521,6 +527,18 @@ export default function KeywordTrendsClient() {
     setTimeframe(tf)
   }
 
+  // 커스텀 주 수 적용 — 입력값 검증 후 확정
+  const handleApplyCustomWeeks = () => {
+    const weeks = parseInt(customWeeksInput, 10)
+    if (isNaN(weeks) || weeks < 1 || weeks > 260) {
+      toast.error('1~260 사이의 숫자를 입력하세요')
+      setCustomWeeksInput(String(customWeeks))
+      return
+    }
+    setCustomWeeks(weeks)
+    handleTimeframeChange('custom')
+  }
+
   // 저장된 키워드 삭제 (확인 다이얼로그)
   const handleConfirmDelete = async (keywordSearchId: string) => {
     try {
@@ -647,16 +665,13 @@ export default function KeywordTrendsClient() {
                       type="number"
                       min="1"
                       max="260"
-                      value={customWeeks}
+                      value={customWeeksInput}
                       onChange={e => {
-                        const weeks = parseInt(e.target.value, 10)
-                        if (!isNaN(weeks)) {
-                          setCustomWeeks(Math.max(1, Math.min(260, weeks)))
-                        }
+                        setCustomWeeksInput(e.target.value)
                       }}
                       onKeyDown={e => {
                         if (e.key === 'Enter') {
-                          handleTimeframeChange('custom')
+                          handleApplyCustomWeeks()
                         }
                       }}
                       onFocus={e => e.target.select()}
@@ -664,7 +679,7 @@ export default function KeywordTrendsClient() {
                       placeholder="주 수"
                     />
                     <Button
-                      onClick={() => handleTimeframeChange('custom')}
+                      onClick={handleApplyCustomWeeks}
                       variant="outline"
                       size="sm"
                       className="h-10"
