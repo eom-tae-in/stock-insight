@@ -11,6 +11,7 @@ import { NextRequest } from 'next/server'
 import { fetchTrendsData, callPyTrendsAPI } from '@/lib/services/trends-service'
 import { TickerInputSchema } from '@/lib/validation'
 import { createSuccessResponse, createErrorResponse } from '@/lib/api-helpers'
+import { TIMEFRAMES, GEO_CODES, GPROPS } from '@/lib/constants/trends'
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,34 +21,20 @@ export async function GET(request: NextRequest) {
     const companyName =
       request.nextUrl.searchParams.get('companyName') || ticker
 
-    // F023: 국가/기간/범위 파라미터 (allowlist 검증)
-    const ALLOWED_GEO_CODES = [
-      '',
-      'US',
-      'KR',
-      'JP',
-      'CN',
-      'GB',
-      'DE',
-      'FR',
-      'IN',
-      'BR',
-      'AU',
-    ]
-    const ALLOWED_TIMEFRAMES = ['1y', '3y', '5y']
-    const ALLOWED_GPROPS = ['', 'youtube', 'news', 'froogle', 'images']
-
+    // F023: 국가/기간/범위 파라미터 (allowlist 검증 - 공유 상수 사용)
     const rawGeo = request.nextUrl.searchParams.get('geo') ?? ''
-    const geo = ALLOWED_GEO_CODES.includes(rawGeo) ? rawGeo : ''
+    const geo = (GEO_CODES as readonly string[]).includes(rawGeo) ? rawGeo : ''
 
     const rawTimeframe = request.nextUrl.searchParams.get('timeframe')
     const timeframe =
-      rawTimeframe && ALLOWED_TIMEFRAMES.includes(rawTimeframe)
+      rawTimeframe && (TIMEFRAMES as readonly string[]).includes(rawTimeframe)
         ? rawTimeframe
         : '5y'
 
     const rawGprop = request.nextUrl.searchParams.get('gprop') ?? ''
-    const gprop = ALLOWED_GPROPS.includes(rawGprop) ? rawGprop : ''
+    const gprop = (GPROPS as readonly string[]).includes(rawGprop)
+      ? rawGprop
+      : ''
 
     // ============================================================================
     // F017: 키워드 기반 트렌드 조회 (keyword 파라미터 우선)
@@ -65,7 +52,7 @@ export async function GET(request: NextRequest) {
       }
 
       try {
-        const trendsData = callPyTrendsAPI(
+        const trendsData = await callPyTrendsAPI(
           trimmedKeyword,
           geo,
           timeframe,

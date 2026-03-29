@@ -10,7 +10,7 @@
 - **Runtime**: React 19.1.0 + TypeScript 5
 - **Styling**: TailwindCSS v4 + shadcn/ui (new-york style)
 - **Database**: Supabase (PostgreSQL 기반 클라우드 DB)
-- **Data Sources**: yahoo-finance2 (주가), SerpAPI (Google Trends)
+- **Data Sources**: yahoo-finance2 (주가), pytrends (Google Trends)
 - **Forms**: React Hook Form + Zod
 - **UI Components**: Radix UI + Lucide Icons
 - **Development**: ESLint + Prettier + Husky + lint-staged

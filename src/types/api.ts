@@ -40,32 +40,11 @@ export interface YahooFinanceHistoricalData {
 }
 
 /**
- * SerpAPI Google Trends 응답 타입
+ * Google Trends 응답 타입
  */
 export interface GoogleTrendsData {
   date: number // Unix timestamp
   value: number // 0-100
-}
-
-export interface SerpAPIGoogleTrendsResponse {
-  search_metadata?: {
-    status: string
-    json_endpoint?: string
-    created_at?: string
-    processed_at?: string
-    google_url?: string
-  }
-  interest_over_time?: {
-    timeline_data: Array<{
-      date: number
-      values: Array<{
-        query: string
-        value: number
-      }>
-      hasData: boolean[]
-    }>
-  }
-  error?: string
 }
 
 /**

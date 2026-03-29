@@ -123,5 +123,15 @@ export interface KeywordStockOverlay {
   keyword_search_id: string // keyword_searches.id
   search_id: string // searches.id
   display_order: number // 그래프에서 표시할 순서
-  created_at: string // ISO 8601 타임스탬프
+  created_at: string // ISO 8601 타임스탐프
+}
+
+/**
+ * F021: 키워드 트렌드 분석 지표
+ * Google Trends 데이터의 현재 값, MA13, YoY 변화율을 담음
+ */
+export interface KeywordTrendsMetrics {
+  currentKeywordValue: number // 현재 트렌드 지수 (0-100)
+  ma13Value: number | null // 13주 이동평균 (0-100)
+  yoyChange: number | null // 52주 대비 변화율 (%)
 }

@@ -12,6 +12,7 @@ import type {
 } from '@/types/database'
 import { calculateTrendsMA13, calculateTrendsYoY } from '@/lib/indicators'
 import { apiFetch, apiFetchJson } from '@/lib/fetch-client'
+import { filterTrendsForTimeframe } from '@/lib/trends-filter'
 import KeywordTrendsChart from './keyword-trends-chart'
 import KeywordSearchList from './keyword-search-list'
 import KeywordSearchForm from './keyword-search-form'
@@ -33,11 +34,11 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 
-// ma13 / yoyChange 는 파생 값이므로 state에서 제거
+// 상태 구조 변경: trendsDataByTimeframe 제거, fullTrendsData로 교체
+// trendsData는 useMemo 파생값으로 처리
 interface KeywordTrendsState {
   keyword: string
-  trendsData: TrendsDataPoint[] // 선택된 timeframe의 데이터
-  trendsDataByTimeframe: Record<string, TrendsDataPoint[]> // 타임프레임별 데이터 (string 키: "w", "1y", "26w" 등)
+  fullTrendsData: TrendsDataPoint[] // 5년 전체 원본 데이터
   isLoading: boolean
   selectedSearches: SearchRecord[]
   savedKeywords: KeywordSearchRecord[]
@@ -55,8 +56,7 @@ export default function KeywordTrendsClient() {
 
   const [state, setState] = useState<KeywordTrendsState>({
     keyword: '',
-    trendsData: [],
-    trendsDataByTimeframe: {},
+    fullTrendsData: [],
     isLoading: false,
     selectedSearches: [],
     savedKeywords: [],
@@ -88,20 +88,30 @@ export default function KeywordTrendsClient() {
     }
   }, [searchParams])
 
-  // F027: timeframe 변경 시 해당 데이터로 업데이트 (클로저 스테일 값 방지)
-  useEffect(() => {
-    setState(prev => {
-      const newData = prev.trendsDataByTimeframe[prev.timeframe]
-      if (!newData) return prev
-      return { ...prev, trendsData: newData }
-    })
-  }, [state.timeframe, state.trendsDataByTimeframe])
+  const [availableSearches, setAvailableSearches] = useState<SearchRecord[]>([])
+  const [isSaving, setIsSaving] = useState(false)
+  const [deleteDialogId, setDeleteDialogId] = useState<string | null>(null)
+  const [downloadingTimeframes, setDownloadingTimeframes] = useState<
+    Set<string>
+  >(new Set())
+  const [searchFilter, setSearchFilter] = useState('')
+
+  // 아키텍처 변경: trendsData는 fullTrendsData에서 필터링한 파생값
+  const trendsData = useMemo(
+    () =>
+      filterTrendsForTimeframe(
+        state.fullTrendsData,
+        state.timeframe,
+        state.customWeeks
+      ),
+    [state.fullTrendsData, state.timeframe, state.customWeeks]
+  )
 
   // Medium: URL 동기화 통일 - router.replace() 사용
   // 파라미터 변경 시 URL 업데이트 (F033: geo/gprop 변경 감지)
   // scroll: false로 스크롤 위치 유지
   useEffect(() => {
-    if (state.keyword && state.trendsData.length > 0) {
+    if (state.keyword && trendsData.length > 0) {
       const params = new URLSearchParams({
         keyword: state.keyword,
         geo: state.geo,
@@ -115,22 +125,14 @@ export default function KeywordTrendsClient() {
     state.gprop,
     state.keyword,
     state.timeframe,
-    state.trendsData.length,
+    trendsData.length,
     router,
   ])
 
-  const [availableSearches, setAvailableSearches] = useState<SearchRecord[]>([])
-  const [isSaving, setIsSaving] = useState(false)
-  const [deleteDialogId, setDeleteDialogId] = useState<string | null>(null)
-  const [downloadingTimeframes, setDownloadingTimeframes] = useState<
-    Set<string>
-  >(new Set())
-  const [searchFilter, setSearchFilter] = useState('')
-
   // P1-9: ma13 / yoyChange 를 useMemo로 파생 (단일 calculateTrendsMA13 호출)
   const ma13Values = useMemo(
-    () => calculateTrendsMA13(state.trendsData),
-    [state.trendsData]
+    () => calculateTrendsMA13(trendsData),
+    [trendsData]
   )
 
   const currentMA13 = useMemo(() => {
@@ -140,73 +142,27 @@ export default function KeywordTrendsClient() {
 
   // Medium: ma13Values를 전달하여 중복 계산 제거
   const yoyChange = useMemo(
-    () => calculateTrendsYoY(state.trendsData, ma13Values),
-    [state.trendsData, ma13Values]
+    () => calculateTrendsYoY(trendsData, ma13Values),
+    [trendsData, ma13Values]
   )
 
   // F027: 차트용 52주 YoY 라인 값 배열 (각 포인트별 전년동기 대비 변화율)
   const yoyValuesArray = useMemo(() => {
     const weeksInYear = 52
-    return state.trendsData.map((point, idx) => {
+    return trendsData.map((point, idx) => {
       if (idx < weeksInYear) return null
       const currentValue = point.value
-      const previousYearValue = state.trendsData[idx - weeksInYear].value
+      const previousYearValue = trendsData[idx - weeksInYear].value
       if (previousYearValue === 0) return null
       return ((currentValue - previousYearValue) / previousYearValue) * 100
     })
-  }, [state.trendsData])
+  }, [trendsData])
 
   // 페이지 진입 시: 저장된 종목 목록 + 저장된 키워드 목록 로드
   useEffect(() => {
     fetchAvailableSearches()
     fetchSavedKeywords()
   }, [])
-
-  // timeframe이 'custom'으로 변경되면 해당 주 수 데이터 조회
-  // (customWeeks는 적용 버튼/Enter 입력으로만 timeframe이 변경되므로 의존성 제외)
-  useEffect(() => {
-    if (state.timeframe === 'custom' && state.keyword) {
-      const customKey = `${state.customWeeks}w`
-      const existingData = state.trendsDataByTimeframe[customKey]
-
-      if (existingData && existingData.length > 0) {
-        // 이미 조회된 데이터가 있으면 사용
-        setState(prev => ({ ...prev, trendsData: existingData }))
-      } else {
-        // 새로운 주 수는 API에서 조회
-        ;(async () => {
-          try {
-            const params = new URLSearchParams({
-              keyword: state.keyword,
-              geo: state.geo,
-              timeframe: customKey,
-              gprop: state.gprop,
-            })
-
-            const res = await apiFetch(`/api/trends?${params.toString()}`)
-            if (res.ok) {
-              const data = await res.json()
-              const raw = data?.data?.trendsData
-              if (Array.isArray(raw)) {
-                const customData = raw as TrendsDataPoint[]
-                setState(prev => ({
-                  ...prev,
-                  trendsData: customData,
-                  trendsDataByTimeframe: {
-                    ...prev.trendsDataByTimeframe,
-                    [customKey]: customData,
-                  },
-                }))
-              }
-            }
-          } catch (err) {
-            console.error(`Failed to fetch custom timeframe data:`, err)
-          }
-        })()
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.timeframe, state.keyword])
 
   // P0-2: 401 처리를 apiFetchJson으로 위임
   const fetchAvailableSearches = async () => {
@@ -245,7 +201,7 @@ export default function KeywordTrendsClient() {
     return tf as string
   }
 
-  // 키워드로 트렌드 조회 (F023: geo, timeframe, gprop 파라미터 지원, F027: 다중 timeframe)
+  // 키워드로 트렌드 조회 — 아키텍처 변경: 5y 단일 fetch
   const handleSearchKeyword = async () => {
     const trimmedKeyword = state.keyword.trim()
     if (!trimmedKeyword) {
@@ -256,76 +212,37 @@ export default function KeywordTrendsClient() {
     setState(prev => ({ ...prev, isLoading: true }))
 
     try {
-      // F027: 모든 timeframe의 데이터를 병렬로 fetch
-      const trendsDataByTimeframe: Record<string, TrendsDataPoint[]> = {}
-
-      // 기본 timeframes + 커스텀 timeframe 포함
-      const timeframesToFetch =
-        state.timeframe === 'custom'
-          ? [...TIMEFRAMES, getTimeframeString('custom', state.customWeeks)]
-          : TIMEFRAMES
-
-      const fetchPromises = timeframesToFetch.map(async tf => {
-        try {
-          const params = new URLSearchParams({
-            keyword: trimmedKeyword,
-            geo: state.geo,
-            timeframe: tf,
-            gprop: state.gprop,
-          })
-
-          const res = await apiFetch(`/api/trends?${params.toString()}`)
-          if (res.ok) {
-            const data = await res.json()
-            // API 응답 타입 검증 (단언 제거)
-            const raw = data?.data?.trendsData
-            if (Array.isArray(raw)) {
-              trendsDataByTimeframe[tf] = raw as TrendsDataPoint[]
-            }
-          }
-        } catch (err) {
-          console.warn(`Failed to fetch trends for timeframe ${tf}:`, err)
-        }
+      const params = new URLSearchParams({
+        keyword: trimmedKeyword,
+        geo: state.geo,
+        timeframe: '5y', // 최대 기간만 한 번에 조회
+        gprop: state.gprop,
       })
 
-      await Promise.all(fetchPromises)
+      const res = await apiFetch(`/api/trends?${params.toString()}`)
+      if (!res.ok) throw new Error('Failed to fetch trends')
 
-      // 모든 fetch 실패 시 에러 처리
-      if (Object.keys(trendsDataByTimeframe).length === 0) {
-        toast.error('모든 타임프레임 데이터 조회에 실패했습니다')
-        setState(prev => ({ ...prev, isLoading: false }))
-        return
-      }
-
-      // 기본값: 선택된 timeframe 데이터 표시
-      const selectedTfKey =
-        state.timeframe === 'custom'
-          ? getTimeframeString('custom', state.customWeeks)
-          : state.timeframe
-      const defaultTrendsData =
-        trendsDataByTimeframe[selectedTfKey] ||
-        trendsDataByTimeframe[DEFAULT_TIMEFRAME] ||
-        []
+      const data = await res.json()
+      const raw = data?.data?.trendsData
+      if (!Array.isArray(raw)) throw new Error('Invalid response format')
 
       setState(prev => ({
         ...prev,
         keyword: trimmedKeyword,
-        trendsData: defaultTrendsData,
-        trendsDataByTimeframe,
+        fullTrendsData: raw as TrendsDataPoint[],
         selectedSearches: [],
         isLoading: false,
-        timeframe: state.timeframe,
-        customWeeks: state.customWeeks,
       }))
 
-      // F033: URL 파라미터 업데이트
-      const params = new URLSearchParams({
+      // URL 파라미터 업데이트
+      const urlParams = new URLSearchParams({
         keyword: trimmedKeyword,
         geo: state.geo,
-        timeframe: DEFAULT_TIMEFRAME,
+        timeframe:
+          state.timeframe === 'custom' ? DEFAULT_TIMEFRAME : state.timeframe,
         gprop: state.gprop,
       })
-      router.push(`/trends?${params.toString()}`)
+      router.push(`/trends?${urlParams.toString()}`)
 
       toast.success('트렌드 데이터를 가져왔습니다')
     } catch (error) {
@@ -372,7 +289,7 @@ export default function KeywordTrendsClient() {
 
   // 현재 키워드 + 오버레이 조합 저장
   const handleSaveCombo = async () => {
-    if (!state.keyword || state.trendsData.length === 0) {
+    if (!state.keyword || trendsData.length === 0) {
       toast.error('먼저 트렌드를 조회해주세요')
       return
     }
@@ -385,7 +302,7 @@ export default function KeywordTrendsClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           keyword: state.keyword,
-          trendsData: state.trendsData,
+          trendsData: trendsData,
           ma13: currentMA13,
           yoy_change: yoyChange,
         }),
@@ -427,8 +344,7 @@ export default function KeywordTrendsClient() {
     }
   }
 
-  // P0-6: 경쟁 조건 수정 - 모든 데이터를 준비한 후 한 번에 setState
-  // Critical: 전체 타임프레임 데이터를 재조회하는 방식으로 변경
+  // 저장된 키워드 복원 — 아키텍처 변경: 5y 단일 fetch
   const handleRestoreKeyword = async (keywordSearch: KeywordSearchRecord) => {
     setState(prev => ({ ...prev, isLoading: true }))
 
@@ -446,58 +362,38 @@ export default function KeywordTrendsClient() {
         .map(o => availableSearches.find(s => s.id === o.search_id))
         .filter(Boolean) as SearchRecord[]
 
-      // 2단계: 모든 타임프레임 데이터 재조회
-      const trendsDataByTimeframe: Record<string, TrendsDataPoint[]> = {}
-
-      const fetchPromises = TIMEFRAMES.map(async tf => {
-        try {
-          const params = new URLSearchParams({
-            keyword: keywordSearch.keyword,
-            geo: '',
-            timeframe: tf,
-            gprop: '',
-          })
-
-          const res = await apiFetch(`/api/trends?${params.toString()}`)
-          if (res.ok) {
-            const data = await res.json()
-            const raw = data?.data?.trendsData
-            if (Array.isArray(raw)) {
-              trendsDataByTimeframe[tf] = raw as TrendsDataPoint[]
-            }
-          }
-        } catch (err) {
-          console.warn(`Failed to fetch trends for timeframe ${tf}:`, err)
-        }
+      // 2단계: 5y 데이터 재조회
+      const params = new URLSearchParams({
+        keyword: keywordSearch.keyword,
+        geo: '',
+        timeframe: '5y',
+        gprop: '',
       })
 
-      await Promise.all(fetchPromises)
+      const res = await apiFetch(`/api/trends?${params.toString()}`)
+      if (!res.ok) throw new Error('Failed to fetch trends')
 
-      if (Object.keys(trendsDataByTimeframe).length === 0) {
-        toast.error('타임프레임 데이터를 가져오지 못했습니다')
-        setState(prev => ({ ...prev, isLoading: false }))
-        return
-      }
+      const data = await res.json()
+      const raw = data?.data?.trendsData
+      if (!Array.isArray(raw)) throw new Error('Invalid response format')
 
-      // 모든 데이터가 준비된 후 한 번에 업데이트
       setState(prev => ({
         ...prev,
         keyword: keywordSearch.keyword,
-        trendsData: trendsDataByTimeframe[DEFAULT_TIMEFRAME] || [],
-        trendsDataByTimeframe,
+        fullTrendsData: raw as TrendsDataPoint[],
         selectedSearches: overlaySearches,
         timeframe: DEFAULT_TIMEFRAME,
         isLoading: false,
       }))
 
       // URL 업데이트
-      const params = new URLSearchParams({
+      const urlParams = new URLSearchParams({
         keyword: keywordSearch.keyword,
         geo: '',
         timeframe: DEFAULT_TIMEFRAME,
         gprop: '',
       })
-      router.push(`/trends?${params.toString()}`)
+      router.push(`/trends?${urlParams.toString()}`)
 
       toast.success(`"${keywordSearch.keyword}" 데이터를 복원했습니다`)
     } catch (error) {
@@ -552,7 +448,7 @@ export default function KeywordTrendsClient() {
   // P0-4: Excel 오버레이 시트 Map 최적화 (이미 chart에서 동일 패턴 적용됨)
   // P2-12: xlsx 동적 임포트
   const handleDownloadExcel = async () => {
-    if (!state.keyword || state.trendsData.length === 0) {
+    if (!state.keyword || trendsData.length === 0) {
       toast.error('먼저 트렌드를 조회해주세요')
       return
     }
@@ -562,7 +458,7 @@ export default function KeywordTrendsClient() {
       const wb = utils.book_new()
 
       // Sheet 1: 트렌드 데이터 (P1-9: ma13Values는 이미 useMemo로 계산됨)
-      const trendsSheet = state.trendsData.map((point, idx) => ({
+      const trendsSheet = trendsData.map((point, idx) => ({
         날짜: point.date,
         트렌드지수: point.value,
         MA13: ma13Values[idx] ?? null,
@@ -584,7 +480,7 @@ export default function KeywordTrendsClient() {
         const priceMap = new Map<string, number>()
         search.price_data?.forEach(p => priceMap.set(p.date, p.close))
 
-        const overlaySheet = state.trendsData.map(trendPoint => {
+        const overlaySheet = trendsData.map(trendPoint => {
           const close = priceMap.get(trendPoint.date)
           const normalized =
             close !== undefined
@@ -632,29 +528,9 @@ export default function KeywordTrendsClient() {
   }
 
   // 기간 변경 시 스크롤 위치 유지 (강화된 복원 로직)
+  // 기간 변경 — 아키텍처 변경으로 API 호출 없음 (스크롤 점프 제거)
   const handleTimeframeChange = (tf: Timeframe | 'custom') => {
-    const scrollPos = { x: window.scrollX, y: window.scrollY }
-
     setState(prev => ({ ...prev, timeframe: tf }))
-
-    // DOM 완전 업데이트 후 스크롤 복원
-    const restoreScroll = () => {
-      window.scrollTo(scrollPos.x, scrollPos.y)
-    }
-
-    // 차트 렌더링이 완료될 때까지 대기 후 복원
-    // requestAnimationFrame 여러 회 + 더 긴 setTimeout으로 안정적 복원
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setTimeout(restoreScroll, 100)
-        })
-      })
-    })
-
-    // 추가 보장: 200ms, 400ms 후에도 복원 시도 (중복 리렌더링 대응)
-    setTimeout(restoreScroll, 200)
-    setTimeout(restoreScroll, 400)
   }
 
   // 저장된 키워드 삭제 (확인 다이얼로그)
@@ -718,7 +594,7 @@ export default function KeywordTrendsClient() {
             />
 
             {/* 지표 요약 */}
-            {state.trendsData.length > 0 && (
+            {trendsData.length > 0 && (
               <div className="grid grid-cols-2 gap-4">
                 <Card>
                   <CardHeader className="pb-2">
@@ -760,7 +636,7 @@ export default function KeywordTrendsClient() {
             )}
 
             {/* F027: 통합 차트 (기간 선택으로 데이터 변경) */}
-            {Object.keys(state.trendsDataByTimeframe).length > 0 && (
+            {state.fullTrendsData.length > 0 && (
               <>
                 {/* 기간 선택 버튼 + 커스텀 입력 */}
                 <div className="space-y-3">
@@ -844,7 +720,7 @@ export default function KeywordTrendsClient() {
                   }}
                 >
                   <KeywordTrendsChart
-                    trendsData={state.trendsData}
+                    trendsData={trendsData}
                     overlays={state.selectedSearches}
                     ma13Values={ma13Values}
                     yoyValuesArray={yoyValuesArray}
@@ -882,14 +758,13 @@ export default function KeywordTrendsClient() {
             )}
 
             {/* 빈 상태 */}
-            {Object.keys(state.trendsDataByTimeframe).length === 0 &&
-              !state.isLoading && (
-                <Card>
-                  <CardContent className="text-muted-foreground py-12 text-center">
-                    <p>키워드를 입력하여 트렌드를 분석하세요</p>
-                  </CardContent>
-                </Card>
-              )}
+            {state.fullTrendsData.length === 0 && !state.isLoading && (
+              <Card>
+                <CardContent className="text-muted-foreground py-12 text-center">
+                  <p>키워드를 입력하여 트렌드를 분석하세요</p>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
 

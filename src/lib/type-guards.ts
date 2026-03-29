@@ -8,7 +8,6 @@ import {
 import {
   YahooFinancePriceData,
   YahooFinanceHistoricalData,
-  SerpAPIGoogleTrendsResponse,
   APIError,
 } from '@/types/api'
 import { ProgressState } from '@/types/ui'
@@ -147,23 +146,6 @@ export function isYahooFinanceHistoricalData(
     Array.isArray(obj.quotes) &&
     obj.quotes.every(isYahooFinancePriceData) &&
     (obj.currency === undefined || typeof obj.currency === 'string')
-  )
-}
-
-/**
- * SerpAPIGoogleTrendsResponse 타입 가드
- */
-export function isSerpAPIGoogleTrendsResponse(
-  value: unknown
-): value is SerpAPIGoogleTrendsResponse {
-  if (typeof value !== 'object' || value === null) return false
-  const obj = value as Record<string, unknown>
-  return (
-    (obj.search_metadata === undefined ||
-      typeof obj.search_metadata === 'object') &&
-    (obj.interest_over_time === undefined ||
-      typeof obj.interest_over_time === 'object') &&
-    (obj.error === undefined || typeof obj.error === 'string')
   )
 }
 

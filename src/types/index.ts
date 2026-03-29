@@ -9,7 +9,6 @@ export type {
   YahooFinanceQuoteSummary,
   YahooFinanceHistoricalData,
   GoogleTrendsData,
-  SerpAPIGoogleTrendsResponse,
   APIError,
 } from './api'
 
@@ -21,6 +20,7 @@ export type {
   SearchRecordRaw,
   Metrics,
   CalculatedMetrics,
+  KeywordTrendsMetrics,
 } from './database'
 
 // UI 타입

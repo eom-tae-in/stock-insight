@@ -9,9 +9,13 @@
  */
 
 import { startOfISOWeek, format } from 'date-fns'
-import { execFileSync } from 'child_process'
+import { execFile } from 'child_process'
+import { promisify } from 'util'
 import path from 'path'
 import type { TrendsDataPoint } from '@/types'
+
+// Critical: execFileSync 대신 promisify(execFile) 사용 - 이벤트 루프 블로킹 방지
+const execFileAsync = promisify(execFile)
 
 export interface TrendsDataResult {
   trendsData: TrendsDataPoint[]
@@ -25,18 +29,19 @@ interface PyTrendsDataPoint {
 
 /**
  * pytrends Python 스크립트 호출 (F023: geo, timeframe, gprop 파라미터 지원)
+ * Critical: execFileSync → execFile (비동기) 변환 - 이벤트 루프 블로킹 방지
  */
-export function callPyTrendsAPI(
+export async function callPyTrendsAPI(
   keyword: string,
   geo: string = '',
   timeframe: string = '5y',
   gprop: string = ''
-): TrendsDataPoint[] {
+): Promise<TrendsDataPoint[]> {
   try {
     const pythonPath = path.join(process.cwd(), 'venv', 'bin', 'python3')
     const scriptPath = path.join(process.cwd(), 'src', 'lib', 'get_trends.py')
 
-    const result = execFileSync(
+    const { stdout } = await execFileAsync(
       pythonPath,
       [scriptPath, keyword, geo, timeframe, gprop],
       {
@@ -46,7 +51,7 @@ export function callPyTrendsAPI(
       }
     )
 
-    const pyData: PyTrendsDataPoint[] = JSON.parse(result)
+    const pyData: PyTrendsDataPoint[] = JSON.parse(stdout)
 
     if (!pyData || pyData.length === 0) {
       throw new Error('No trends data available')
@@ -110,7 +115,7 @@ export async function fetchTrendsData(
   // 1차: companyName으로 시도
   // F023 geo/timeframe/gprop은 ticker 기반(F004) 경로에서 미지원 - 기본값 사용
   try {
-    const trendsData = callPyTrendsAPI(companyName)
+    const trendsData = await callPyTrendsAPI(companyName)
     return {
       trendsData,
       keyword: companyName,
@@ -123,7 +128,7 @@ export async function fetchTrendsData(
   // 2차: `${ticker} stock`으로 폴백
   const fallbackKeyword = `${ticker} stock`
   try {
-    const trendsData = callPyTrendsAPI(fallbackKeyword)
+    const trendsData = await callPyTrendsAPI(fallbackKeyword)
     return {
       trendsData,
       keyword: fallbackKeyword,
