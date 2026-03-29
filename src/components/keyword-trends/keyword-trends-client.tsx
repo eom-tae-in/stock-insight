@@ -111,7 +111,7 @@ export default function KeywordTrendsClient() {
   // timeframe/customWeeks 변경 시 router 호출 안 함 → 스크롤 점프 방지
   // (UnifiedChart와 동일한 방식)
   useEffect(() => {
-    if (state.keyword && trendsData.length > 0) {
+    if (state.keyword && state.fullTrendsData.length > 0) {
       const params = new URLSearchParams({
         keyword: state.keyword,
         geo: state.geo,
@@ -124,7 +124,7 @@ export default function KeywordTrendsClient() {
     state.geo,
     state.gprop,
     state.keyword,
-    trendsData.length,
+    state.fullTrendsData.length, // 원본 데이터만 감시 (필터된 데이터 아님)
     router,
     // timeframe, customWeeks 제거 ← state 기반 필터링만
   ])
