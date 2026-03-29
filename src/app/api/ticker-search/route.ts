@@ -3,9 +3,12 @@
  *
  * GET /api/ticker-search?q=Apple
  * Response: ApiResponse<{ symbol: string; longname: string }[]>
+ *
+ * 실제로 5년 데이터를 가져올 수 있는 종목만 반환
  */
 
 import { NextRequest } from 'next/server'
+import { subYears } from 'date-fns'
 import YahooFinance from 'yahoo-finance2'
 import { createSuccessResponse, createErrorResponse } from '@/lib/api-helpers'
 
@@ -23,19 +26,60 @@ export async function GET(request: NextRequest) {
     const results = await yf.search(query)
 
     // quotes 배열에서 필요한 정보만 추출 (주식만)
-    const stocks = (results.quotes || [])
+    const candidates = (
+      (results.quotes || []) as Array<{
+        symbol: string
+        quoteType: string
+        longname?: string
+        shortname?: string
+      }>
+    )
       .filter(q => q.quoteType === 'EQUITY')
-      .slice(0, 5)
+      .slice(0, 20) // 더 많이 먼저 가져오기 (일부는 데이터 조회 불가)
       .map(q => ({
         symbol: q.symbol,
         longname: q.longname || q.shortname || q.symbol,
       }))
 
-    if (stocks.length === 0) {
+    if (candidates.length === 0) {
       return createErrorResponse('NO_RESULTS', '검색 결과가 없습니다.', 404)
     }
 
-    return createSuccessResponse(stocks, 200)
+    // 각 ticker에 대해 실제로 5년 데이터를 가져올 수 있는지 검증
+    const validStocks: { symbol: string; longname: string }[] = []
+    const endDate = new Date()
+    const startDate = subYears(endDate, 5)
+
+    for (const stock of candidates) {
+      try {
+        // 5년 데이터 조회 시도
+        const historicalData = await yf.historical(stock.symbol, {
+          period1: startDate,
+          period2: endDate,
+          interval: '1wk',
+          events: 'history',
+        })
+
+        // 데이터가 존재하면 유효한 종목
+        if (historicalData && historicalData.length > 0) {
+          validStocks.push(stock)
+        }
+      } catch {
+        // 데이터 조회 실패 → 스킵
+        console.debug(`Cannot fetch 5y data for ${stock.symbol}`)
+      }
+
+      // 최대 5개 유효한 종목 찾으면 중단 (성능상 이유)
+      if (validStocks.length >= 5) {
+        break
+      }
+    }
+
+    if (validStocks.length === 0) {
+      return createErrorResponse('NO_RESULTS', '검색 결과가 없습니다.', 404)
+    }
+
+    return createSuccessResponse(validStocks, 200)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     console.error('Ticker search error:', error)
