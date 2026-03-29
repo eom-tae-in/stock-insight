@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     if (!result.success) {
       return createErrorResponse(
         'INVALID_TICKER',
-        '올바른 종목 심볼을 입력하세요 (1-6자, 영문/숫자/점 포함)',
+        '올바른 종목 심볼을 입력하세요 (1-12자, 영문/숫자/점 포함)',
         400
       )
     }
