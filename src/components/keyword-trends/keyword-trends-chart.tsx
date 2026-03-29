@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import {
   ComposedChart,
   Line,
@@ -12,61 +13,86 @@ import {
 } from 'recharts'
 import { format, parseISO } from 'date-fns'
 import type { TrendsDataPoint, SearchRecord } from '@/types/database'
-import { calculateTrendsMA13 } from '@/lib/indicators'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+
+interface ChartDataPoint {
+  date: string
+  fullDate: string
+  trendsValue: number
+  ma13: number | null
+  [key: string]: number | string | null
+}
 
 interface KeywordTrendsChartProps {
   trendsData: TrendsDataPoint[]
   overlays: SearchRecord[]
+  // P1-9: 부모에서 이미 계산된 ma13Values를 받아 중복 계산 방지
+  ma13Values: (number | null)[]
 }
 
 export default function KeywordTrendsChart({
   trendsData,
   overlays,
+  ma13Values,
 }: KeywordTrendsChartProps) {
-  // MA13 계산
-  const ma13Values = calculateTrendsMA13(trendsData)
+  // P0-4 / P1-10: 오버레이별 Map 미리 계산 (O(n²) → O(n+m))
+  const overlayMaps = useMemo(
+    () =>
+      overlays.map(search => {
+        const prices = search.price_data?.map(p => p.close) ?? []
+        if (prices.length === 0) return new Map<string, number>()
 
-  // 차트 데이터 구성
-  interface ChartDataPoint {
-    date: string
-    fullDate: string
-    trendsValue: number
-    ma13: number | null
-    [key: string]: number | string | null
-  }
-
-  const chartData: ChartDataPoint[] = trendsData.map((point, idx) => {
-    const row: ChartDataPoint = {
-      date: format(parseISO(point.date), 'MMM dd'),
-      fullDate: point.date,
-      trendsValue: point.value,
-      ma13: ma13Values[idx] ?? null,
-    }
-
-    // 오버레이 주식 데이터 추가
-    overlays.forEach((search, overlayIdx) => {
-      // search의 price_data에서 date와 매칭되는 close 값을 찾기
-      const pricePoint = search.price_data?.find(p => p.date === point.date)
-      if (pricePoint) {
-        // 정규화: min-max normalization to 0-100
-        const priceDataValues = search.price_data?.map(p => p.close) ?? []
-        const minPrice = Math.min(...priceDataValues)
-        const maxPrice = Math.max(...priceDataValues)
+        const minPrice = Math.min(...prices)
+        const maxPrice = Math.max(...prices)
         const range = maxPrice - minPrice
 
-        const normalized =
-          range === 0 ? 50 : ((pricePoint.close - minPrice) / range) * 100
+        const map = new Map<string, number>()
+        search.price_data?.forEach(p => {
+          const normalized =
+            range === 0 ? 50 : ((p.close - minPrice) / range) * 100
+          map.set(p.date, Math.round(normalized * 100) / 100)
+        })
+        return map
+      }),
+    [overlays]
+  )
 
-        row[`overlay${overlayIdx}`] = Math.round(normalized * 100) / 100
-      }
+  // P1-10: Tooltip label 조회용 Map (formatted date → fullDate)
+  const formattedToFullDateMap = useMemo(() => {
+    const map = new Map<string, string>()
+    trendsData.forEach(point => {
+      const formatted = format(parseISO(point.date), 'MMM dd')
+      map.set(formatted, point.date)
     })
+    return map
+  }, [trendsData])
 
-    return row
-  })
+  // 차트 데이터 구성
+  const chartData: ChartDataPoint[] = useMemo(
+    () =>
+      trendsData.map((point, idx) => {
+        const row: ChartDataPoint = {
+          date: format(parseISO(point.date), 'MMM dd'),
+          fullDate: point.date,
+          trendsValue: point.value,
+          ma13: ma13Values[idx] ?? null,
+        }
 
-  // 오버레이 색상 팔레트
-  const overlayColors = ['#22c55e', '#a855f7', '#ef4444']
+        // 오버레이 주식 데이터 추가 (Map 기반 O(1) 조회)
+        overlays.forEach((_, overlayIdx) => {
+          const normalized = overlayMaps[overlayIdx].get(point.date)
+          if (normalized !== undefined) {
+            row[`overlay${overlayIdx}`] = normalized
+          }
+        })
+
+        return row
+      }),
+    [trendsData, ma13Values, overlays, overlayMaps]
+  )
+
+  // 오버레이 색상 팔레트 (F026: 5개)
+  const overlayColors = ['#22c55e', '#a855f7', '#ef4444', '#f59e0b', '#06b6d4']
 
   return (
     <Card>
@@ -83,7 +109,7 @@ export default function KeywordTrendsChart({
             <XAxis
               dataKey="date"
               tick={{ fontSize: 12 }}
-              interval={Math.floor(chartData.length / 12)}
+              interval={Math.max(1, Math.floor(chartData.length / 12))}
             />
 
             {/* 왼쪽 Y축: 트렌드 지수 (0-100) */}
@@ -111,17 +137,19 @@ export default function KeywordTrendsChart({
               />
             )}
 
+            {/* P1-10: Tooltip - O(n) find 제거, Map O(1) 조회 */}
             <Tooltip
               contentStyle={{
-                backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
+                backgroundColor: 'hsl(var(--background))',
+                border: '1px solid hsl(var(--border))',
                 borderRadius: '4px',
+                color: 'hsl(var(--foreground))',
               }}
               labelFormatter={label => {
                 const labelStr = String(label)
-                const row = chartData.find(r => r.date === labelStr)
-                return row?.fullDate
-                  ? format(parseISO(row.fullDate), 'yyyy-MM-dd')
+                const fullDate = formattedToFullDateMap.get(labelStr)
+                return fullDate
+                  ? format(parseISO(fullDate), 'yyyy-MM-dd')
                   : labelStr
               }}
             />
