@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState, useEffect, useMemo } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import type {
@@ -13,16 +14,16 @@ import { calculateTrendsMA13, calculateTrendsYoY } from '@/lib/indicators'
 import { apiFetch, apiFetchJson } from '@/lib/fetch-client'
 import KeywordTrendsChart from './keyword-trends-chart'
 import KeywordSearchList from './keyword-search-list'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import KeywordSearchForm from './keyword-search-form'
+import OverlayManager from './overlay-manager'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+  TIMEFRAMES,
+  TIMEFRAME_LABELS,
+  DEFAULT_TIMEFRAME,
+  type Timeframe,
+} from '@/lib/constants/trends'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,33 +36,95 @@ import {
 // ma13 / yoyChange 는 파생 값이므로 state에서 제거
 interface KeywordTrendsState {
   keyword: string
-  trendsData: TrendsDataPoint[]
+  trendsData: TrendsDataPoint[] // 선택된 timeframe의 데이터
+  trendsDataByTimeframe: Record<string, TrendsDataPoint[]> // 타임프레임별 데이터 (string 키: "w", "1y", "26w" 등)
   isLoading: boolean
   selectedSearches: SearchRecord[]
   savedKeywords: KeywordSearchRecord[]
   geo: string
-  timeframe: string
+  timeframe: Timeframe | 'custom'
+  customWeeks: number // 커스텀 기간 (주 단위)
   gprop: string
 }
 
 export default function KeywordTrendsClient() {
-  const chartRef = useRef<HTMLDivElement>(null)
+  // F027: 각 timeframe별 ref 저장
+  const chartRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [state, setState] = useState<KeywordTrendsState>({
     keyword: '',
     trendsData: [],
+    trendsDataByTimeframe: {},
     isLoading: false,
     selectedSearches: [],
     savedKeywords: [],
     geo: '',
-    timeframe: '5y',
+    timeframe: DEFAULT_TIMEFRAME,
+    customWeeks: 26,
     gprop: '',
   })
+
+  // URL 파라미터에서 초기 상태 파싱 (F033: URL 파라미터 기반 상태 관리)
+  useEffect(() => {
+    const keyword = searchParams.get('keyword') || ''
+    const geo = searchParams.get('geo') || ''
+    const rawTimeframe = searchParams.get('timeframe')
+    const timeframe =
+      rawTimeframe && TIMEFRAMES.includes(rawTimeframe as Timeframe)
+        ? (rawTimeframe as Timeframe)
+        : DEFAULT_TIMEFRAME
+    const gprop = searchParams.get('gprop') || ''
+
+    if (keyword) {
+      setState(prev => ({
+        ...prev,
+        keyword,
+        geo,
+        timeframe,
+        gprop,
+      }))
+    }
+  }, [searchParams])
+
+  // F027: timeframe 변경 시 해당 데이터로 업데이트 (클로저 스테일 값 방지)
+  useEffect(() => {
+    setState(prev => {
+      const newData = prev.trendsDataByTimeframe[prev.timeframe]
+      if (!newData) return prev
+      return { ...prev, trendsData: newData }
+    })
+  }, [state.timeframe, state.trendsDataByTimeframe])
+
+  // Medium: URL 동기화 통일 - router.replace() 사용
+  // 파라미터 변경 시 URL 업데이트 (F033: geo/gprop 변경 감지)
+  // scroll: false로 스크롤 위치 유지
+  useEffect(() => {
+    if (state.keyword && state.trendsData.length > 0) {
+      const params = new URLSearchParams({
+        keyword: state.keyword,
+        geo: state.geo,
+        timeframe: state.timeframe,
+        gprop: state.gprop,
+      })
+      router.replace(`/trends?${params.toString()}`, { scroll: false })
+    }
+  }, [
+    state.geo,
+    state.gprop,
+    state.keyword,
+    state.timeframe,
+    state.trendsData.length,
+    router,
+  ])
 
   const [availableSearches, setAvailableSearches] = useState<SearchRecord[]>([])
   const [isSaving, setIsSaving] = useState(false)
   const [deleteDialogId, setDeleteDialogId] = useState<string | null>(null)
-  const [isDownloading, setIsDownloading] = useState(false)
+  const [downloadingTimeframes, setDownloadingTimeframes] = useState<
+    Set<string>
+  >(new Set())
   const [searchFilter, setSearchFilter] = useState('')
 
   // P1-9: ma13 / yoyChange 를 useMemo로 파생 (단일 calculateTrendsMA13 호출)
@@ -75,16 +138,75 @@ export default function KeywordTrendsClient() {
     return ma13Values[ma13Values.length - 1]
   }, [ma13Values])
 
+  // Medium: ma13Values를 전달하여 중복 계산 제거
   const yoyChange = useMemo(
-    () => calculateTrendsYoY(state.trendsData),
-    [state.trendsData]
+    () => calculateTrendsYoY(state.trendsData, ma13Values),
+    [state.trendsData, ma13Values]
   )
+
+  // F027: 차트용 52주 YoY 라인 값 배열 (각 포인트별 전년동기 대비 변화율)
+  const yoyValuesArray = useMemo(() => {
+    const weeksInYear = 52
+    return state.trendsData.map((point, idx) => {
+      if (idx < weeksInYear) return null
+      const currentValue = point.value
+      const previousYearValue = state.trendsData[idx - weeksInYear].value
+      if (previousYearValue === 0) return null
+      return ((currentValue - previousYearValue) / previousYearValue) * 100
+    })
+  }, [state.trendsData])
 
   // 페이지 진입 시: 저장된 종목 목록 + 저장된 키워드 목록 로드
   useEffect(() => {
     fetchAvailableSearches()
     fetchSavedKeywords()
   }, [])
+
+  // timeframe이 'custom'으로 변경되면 해당 주 수 데이터 조회
+  // (customWeeks는 적용 버튼/Enter 입력으로만 timeframe이 변경되므로 의존성 제외)
+  useEffect(() => {
+    if (state.timeframe === 'custom' && state.keyword) {
+      const customKey = `${state.customWeeks}w`
+      const existingData = state.trendsDataByTimeframe[customKey]
+
+      if (existingData && existingData.length > 0) {
+        // 이미 조회된 데이터가 있으면 사용
+        setState(prev => ({ ...prev, trendsData: existingData }))
+      } else {
+        // 새로운 주 수는 API에서 조회
+        ;(async () => {
+          try {
+            const params = new URLSearchParams({
+              keyword: state.keyword,
+              geo: state.geo,
+              timeframe: customKey,
+              gprop: state.gprop,
+            })
+
+            const res = await apiFetch(`/api/trends?${params.toString()}`)
+            if (res.ok) {
+              const data = await res.json()
+              const raw = data?.data?.trendsData
+              if (Array.isArray(raw)) {
+                const customData = raw as TrendsDataPoint[]
+                setState(prev => ({
+                  ...prev,
+                  trendsData: customData,
+                  trendsDataByTimeframe: {
+                    ...prev.trendsDataByTimeframe,
+                    [customKey]: customData,
+                  },
+                }))
+              }
+            }
+          } catch (err) {
+            console.error(`Failed to fetch custom timeframe data:`, err)
+          }
+        })()
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.timeframe, state.keyword])
 
   // P0-2: 401 처리를 apiFetchJson으로 위임
   const fetchAvailableSearches = async () => {
@@ -112,7 +234,18 @@ export default function KeywordTrendsClient() {
     }
   }
 
-  // 키워드로 트렌드 조회 (F023: geo, timeframe, gprop 파라미터 지원)
+  // 커스텀 주 수를 timeframe 문자열로 변환
+  const getTimeframeString = (
+    tf: Timeframe | 'custom',
+    weeks?: number
+  ): string => {
+    if (tf === 'custom' && weeks) {
+      return `${weeks}w`
+    }
+    return tf as string
+  }
+
+  // 키워드로 트렌드 조회 (F023: geo, timeframe, gprop 파라미터 지원, F027: 다중 timeframe)
   const handleSearchKeyword = async () => {
     const trimmedKeyword = state.keyword.trim()
     if (!trimmedKeyword) {
@@ -123,29 +256,76 @@ export default function KeywordTrendsClient() {
     setState(prev => ({ ...prev, isLoading: true }))
 
     try {
-      const params = new URLSearchParams({
-        keyword: trimmedKeyword,
-        geo: state.geo,
-        timeframe: state.timeframe,
-        gprop: state.gprop,
+      // F027: 모든 timeframe의 데이터를 병렬로 fetch
+      const trendsDataByTimeframe: Record<string, TrendsDataPoint[]> = {}
+
+      // 기본 timeframes + 커스텀 timeframe 포함
+      const timeframesToFetch =
+        state.timeframe === 'custom'
+          ? [...TIMEFRAMES, getTimeframeString('custom', state.customWeeks)]
+          : TIMEFRAMES
+
+      const fetchPromises = timeframesToFetch.map(async tf => {
+        try {
+          const params = new URLSearchParams({
+            keyword: trimmedKeyword,
+            geo: state.geo,
+            timeframe: tf,
+            gprop: state.gprop,
+          })
+
+          const res = await apiFetch(`/api/trends?${params.toString()}`)
+          if (res.ok) {
+            const data = await res.json()
+            // API 응답 타입 검증 (단언 제거)
+            const raw = data?.data?.trendsData
+            if (Array.isArray(raw)) {
+              trendsDataByTimeframe[tf] = raw as TrendsDataPoint[]
+            }
+          }
+        } catch (err) {
+          console.warn(`Failed to fetch trends for timeframe ${tf}:`, err)
+        }
       })
 
-      const res = await apiFetch(`/api/trends?${params.toString()}`)
-      if (!res.ok) {
-        const error = await res.json()
-        throw new Error(error.message || 'Failed to fetch trends')
+      await Promise.all(fetchPromises)
+
+      // 모든 fetch 실패 시 에러 처리
+      if (Object.keys(trendsDataByTimeframe).length === 0) {
+        toast.error('모든 타임프레임 데이터 조회에 실패했습니다')
+        setState(prev => ({ ...prev, isLoading: false }))
+        return
       }
 
-      const data = await res.json()
-      const trendsData = data.data.trendsData as TrendsDataPoint[]
+      // 기본값: 선택된 timeframe 데이터 표시
+      const selectedTfKey =
+        state.timeframe === 'custom'
+          ? getTimeframeString('custom', state.customWeeks)
+          : state.timeframe
+      const defaultTrendsData =
+        trendsDataByTimeframe[selectedTfKey] ||
+        trendsDataByTimeframe[DEFAULT_TIMEFRAME] ||
+        []
 
       setState(prev => ({
         ...prev,
         keyword: trimmedKeyword,
-        trendsData,
+        trendsData: defaultTrendsData,
+        trendsDataByTimeframe,
         selectedSearches: [],
         isLoading: false,
+        timeframe: state.timeframe,
+        customWeeks: state.customWeeks,
       }))
+
+      // F033: URL 파라미터 업데이트
+      const params = new URLSearchParams({
+        keyword: trimmedKeyword,
+        geo: state.geo,
+        timeframe: DEFAULT_TIMEFRAME,
+        gprop: state.gprop,
+      })
+      router.push(`/trends?${params.toString()}`)
 
       toast.success('트렌드 데이터를 가져왔습니다')
     } catch (error) {
@@ -248,30 +428,76 @@ export default function KeywordTrendsClient() {
   }
 
   // P0-6: 경쟁 조건 수정 - 모든 데이터를 준비한 후 한 번에 setState
+  // Critical: 전체 타임프레임 데이터를 재조회하는 방식으로 변경
   const handleRestoreKeyword = async (keywordSearch: KeywordSearchRecord) => {
     setState(prev => ({ ...prev, isLoading: true }))
 
     try {
-      const res = await apiFetch(
+      // 1단계: 오버레이 데이터 로드
+      const overlayRes = await apiFetch(
         `/api/keyword-searches/${keywordSearch.id}/overlays`
       )
-      if (!res.ok) throw new Error('Failed to fetch overlays')
+      if (!overlayRes.ok) throw new Error('Failed to fetch overlays')
 
-      const data = await res.json()
-      const overlays = data.data as KeywordStockOverlay[]
+      const overlayData = await overlayRes.json()
+      const overlays = overlayData.data as KeywordStockOverlay[]
 
       const overlaySearches = overlays
         .map(o => availableSearches.find(s => s.id === o.search_id))
         .filter(Boolean) as SearchRecord[]
 
+      // 2단계: 모든 타임프레임 데이터 재조회
+      const trendsDataByTimeframe: Record<string, TrendsDataPoint[]> = {}
+
+      const fetchPromises = TIMEFRAMES.map(async tf => {
+        try {
+          const params = new URLSearchParams({
+            keyword: keywordSearch.keyword,
+            geo: '',
+            timeframe: tf,
+            gprop: '',
+          })
+
+          const res = await apiFetch(`/api/trends?${params.toString()}`)
+          if (res.ok) {
+            const data = await res.json()
+            const raw = data?.data?.trendsData
+            if (Array.isArray(raw)) {
+              trendsDataByTimeframe[tf] = raw as TrendsDataPoint[]
+            }
+          }
+        } catch (err) {
+          console.warn(`Failed to fetch trends for timeframe ${tf}:`, err)
+        }
+      })
+
+      await Promise.all(fetchPromises)
+
+      if (Object.keys(trendsDataByTimeframe).length === 0) {
+        toast.error('타임프레임 데이터를 가져오지 못했습니다')
+        setState(prev => ({ ...prev, isLoading: false }))
+        return
+      }
+
       // 모든 데이터가 준비된 후 한 번에 업데이트
       setState(prev => ({
         ...prev,
         keyword: keywordSearch.keyword,
-        trendsData: keywordSearch.trends_data,
+        trendsData: trendsDataByTimeframe[DEFAULT_TIMEFRAME] || [],
+        trendsDataByTimeframe,
         selectedSearches: overlaySearches,
+        timeframe: DEFAULT_TIMEFRAME,
         isLoading: false,
       }))
+
+      // URL 업데이트
+      const params = new URLSearchParams({
+        keyword: keywordSearch.keyword,
+        geo: '',
+        timeframe: DEFAULT_TIMEFRAME,
+        gprop: '',
+      })
+      router.push(`/trends?${params.toString()}`)
 
       toast.success(`"${keywordSearch.keyword}" 데이터를 복원했습니다`)
     } catch (error) {
@@ -283,33 +509,43 @@ export default function KeywordTrendsClient() {
 
   // P0-3: PNG 메모리 누수 수정 - toBlob + URL.revokeObjectURL
   // P2-12: html-to-image 동적 임포트
-  const handleDownloadPNG = async () => {
-    if (!chartRef.current || !state.keyword) {
+  // F027: timeframe 파라미터로 개별 차트 다운로드 지원 (타임프레임별 상태 분리)
+  const handleDownloadPNG = async (timeframe: Timeframe | 'custom') => {
+    const chartRef = chartRefs.current[timeframe]
+    if (!chartRef || !state.keyword) {
       toast.error('차트가 준비되지 않았습니다')
       return
     }
 
-    setIsDownloading(true)
+    setDownloadingTimeframes(prev => new Set(prev).add(timeframe))
     try {
       const { toBlob } = await import('html-to-image')
-      const blob = await toBlob(chartRef.current)
+      const blob = await toBlob(chartRef)
       if (!blob) throw new Error('이미지 생성에 실패했습니다')
 
       const objectUrl = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = objectUrl
-      link.download = `${state.keyword}-trends-${format(new Date(), 'yyyyMMdd')}.png`
+      const timeframeLabel =
+        timeframe === 'custom'
+          ? `${state.customWeeks}w`
+          : TIMEFRAME_LABELS[timeframe] || timeframe
+      link.download = `${state.keyword}-trends-${timeframeLabel}-${format(new Date(), 'yyyyMMdd')}.png`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
       URL.revokeObjectURL(objectUrl)
 
-      toast.success('차트를 PNG로 다운로드했습니다')
+      toast.success(`${timeframeLabel} 차트를 PNG로 다운로드했습니다`)
     } catch (error) {
       console.error('Error downloading chart:', error)
       toast.error('차트 다운로드에 실패했습니다')
     } finally {
-      setIsDownloading(false)
+      setDownloadingTimeframes(prev => {
+        const next = new Set(prev)
+        next.delete(timeframe)
+        return next
+      })
     }
   }
 
@@ -395,6 +631,32 @@ export default function KeywordTrendsClient() {
     }
   }
 
+  // 기간 변경 시 스크롤 위치 유지 (강화된 복원 로직)
+  const handleTimeframeChange = (tf: Timeframe | 'custom') => {
+    const scrollPos = { x: window.scrollX, y: window.scrollY }
+
+    setState(prev => ({ ...prev, timeframe: tf }))
+
+    // DOM 완전 업데이트 후 스크롤 복원
+    const restoreScroll = () => {
+      window.scrollTo(scrollPos.x, scrollPos.y)
+    }
+
+    // 차트 렌더링이 완료될 때까지 대기 후 복원
+    // requestAnimationFrame 여러 회 + 더 긴 setTimeout으로 안정적 복원
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setTimeout(restoreScroll, 100)
+        })
+      })
+    })
+
+    // 추가 보장: 200ms, 400ms 후에도 복원 시도 (중복 리렌더링 대응)
+    setTimeout(restoreScroll, 200)
+    setTimeout(restoreScroll, 400)
+  }
+
   // 저장된 키워드 삭제 (확인 다이얼로그)
   const handleConfirmDelete = async (keywordSearchId: string) => {
     try {
@@ -435,83 +697,25 @@ export default function KeywordTrendsClient() {
           {/* 우측: 입력 및 차트 */}
           <div className="space-y-6 lg:col-span-3">
             {/* 입력 섹션 */}
-            <Card>
-              <CardHeader>
-                <CardTitle>키워드 검색</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="예: artificial intelligence, 전기차"
-                    value={state.keyword}
-                    onChange={e =>
-                      setState(prev => ({ ...prev, keyword: e.target.value }))
-                    }
-                    onKeyDown={e => e.key === 'Enter' && handleSearchKeyword()}
-                    disabled={state.isLoading}
-                    maxLength={100}
-                  />
-                  <Button
-                    onClick={handleSearchKeyword}
-                    disabled={state.isLoading}
-                    className="min-w-24"
-                  >
-                    {state.isLoading ? '로딩중...' : '조회'}
-                  </Button>
-                </div>
-
-                {/* F023: 국가/기간/범위 선택 */}
-                <div className="grid grid-cols-3 gap-3">
-                  <Select
-                    value={state.geo}
-                    onValueChange={geo => setState(prev => ({ ...prev, geo }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="국가 선택" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">전체</SelectItem>
-                      <SelectItem value="US">미국</SelectItem>
-                      <SelectItem value="KR">한국</SelectItem>
-                      <SelectItem value="JP">일본</SelectItem>
-                      <SelectItem value="CN">중국</SelectItem>
-                      <SelectItem value="GB">영국</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  <Select
-                    value={state.timeframe}
-                    onValueChange={timeframe =>
-                      setState(prev => ({ ...prev, timeframe }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="기간 선택" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1y">1년</SelectItem>
-                      <SelectItem value="3y">3년</SelectItem>
-                      <SelectItem value="5y">5년</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  <Select
-                    value={state.gprop}
-                    onValueChange={gprop =>
-                      setState(prev => ({ ...prev, gprop }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="검색범위 선택" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">웹 검색</SelectItem>
-                      <SelectItem value="youtube">유튜브</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
+            <KeywordSearchForm
+              keyword={state.keyword}
+              geo={state.geo}
+              timeframe={state.timeframe}
+              gprop={state.gprop}
+              isLoading={state.isLoading}
+              onKeywordChange={keyword =>
+                setState(prev => ({ ...prev, keyword }))
+              }
+              onGeoChange={geo => setState(prev => ({ ...prev, geo }))}
+              onTimeframeChange={tf => {
+                const validTimeframe = TIMEFRAMES.includes(tf as Timeframe)
+                  ? (tf as Timeframe)
+                  : DEFAULT_TIMEFRAME
+                handleTimeframeChange(validTimeframe)
+              }}
+              onGpropChange={gprop => setState(prev => ({ ...prev, gprop }))}
+              onSearch={handleSearchKeyword}
+            />
 
             {/* 지표 요약 */}
             {state.trendsData.length > 0 && (
@@ -555,111 +759,120 @@ export default function KeywordTrendsClient() {
               </div>
             )}
 
-            {/* 차트 (P1-9: ma13Values를 prop으로 전달하여 chart 내부 중복 계산 방지) */}
-            {state.trendsData.length > 0 && (
+            {/* F027: 통합 차트 (기간 선택으로 데이터 변경) */}
+            {Object.keys(state.trendsDataByTimeframe).length > 0 && (
               <>
-                <div ref={chartRef}>
+                {/* 기간 선택 버튼 + 커스텀 입력 */}
+                <div className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    {TIMEFRAMES.map(tf => (
+                      <Button
+                        key={tf}
+                        onClick={() => handleTimeframeChange(tf)}
+                        variant={state.timeframe === tf ? 'default' : 'outline'}
+                        size="sm"
+                      >
+                        {TIMEFRAME_LABELS[tf]}
+                      </Button>
+                    ))}
+                  </div>
+
+                  {/* 커스텀 기간 입력 - 명시적 적용 */}
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="1"
+                      max="260"
+                      value={state.customWeeks}
+                      onChange={e => {
+                        const weeks = Math.max(
+                          1,
+                          Math.min(260, parseInt(e.target.value) || 1)
+                        )
+                        setState(prev => ({
+                          ...prev,
+                          customWeeks: weeks,
+                        }))
+                      }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          handleTimeframeChange('custom')
+                        }
+                      }}
+                      className="border-input bg-background h-10 w-20 rounded border px-3 py-2 text-sm"
+                      placeholder="주 수"
+                    />
+                    <Button
+                      onClick={() => handleTimeframeChange('custom')}
+                      variant="outline"
+                      size="sm"
+                      className="h-10"
+                    >
+                      적용
+                    </Button>
+                    <span className="text-muted-foreground text-sm">주</span>
+                    <span className="text-muted-foreground text-sm">
+                      ({((state.customWeeks * 7) / 365).toFixed(2)}년)
+                    </span>
+                  </div>
+                </div>
+
+                {/* 통합 차트 (기간별 데이터만 변경) */}
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">
+                    {state.timeframe === 'custom'
+                      ? `${state.customWeeks}주 트렌드 분석`
+                      : `${TIMEFRAME_LABELS[state.timeframe]} 트렌드 분석`}
+                  </h3>
+                  <Button
+                    onClick={() => handleDownloadPNG(state.timeframe)}
+                    disabled={downloadingTimeframes.has(
+                      String(state.timeframe)
+                    )}
+                    variant="outline"
+                    size="sm"
+                  >
+                    {downloadingTimeframes.has(state.timeframe)
+                      ? 'PNG 다운로드 중...'
+                      : 'PNG 다운로드'}
+                  </Button>
+                </div>
+
+                <div
+                  ref={el => {
+                    if (el) chartRefs.current[state.timeframe] = el
+                  }}
+                >
                   <KeywordTrendsChart
                     trendsData={state.trendsData}
                     overlays={state.selectedSearches}
                     ma13Values={ma13Values}
+                    yoyValuesArray={yoyValuesArray}
                   />
                 </div>
 
                 {/* 오버레이 추가 */}
+                <OverlayManager
+                  selectedSearches={state.selectedSearches}
+                  availableSearches={availableSearches}
+                  searchFilter={searchFilter}
+                  isSaving={isSaving}
+                  onAddOverlay={handleAddOverlay}
+                  onRemoveOverlay={handleRemoveOverlay}
+                  onSearchFilterChange={setSearchFilter}
+                  onSaveCombo={handleSaveCombo}
+                />
+
+                {/* F024, F025: Excel 다운로드 섹션 */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>종목 오버레이 추가 (최대 5개)</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* F026: 종목 검색 필터 */}
-                    <Input
-                      placeholder="종목 검색 (Ticker 또는 회사명)"
-                      value={searchFilter}
-                      onChange={e => setSearchFilter(e.target.value)}
-                      className="h-9"
-                    />
-
-                    <div className="flex gap-2">
-                      <Select onValueChange={handleAddOverlay}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="저장된 종목 선택" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableSearches
-                            .filter(
-                              search =>
-                                !searchFilter ||
-                                search.ticker
-                                  .toLowerCase()
-                                  .includes(searchFilter.toLowerCase()) ||
-                                search.company_name
-                                  .toLowerCase()
-                                  .includes(searchFilter.toLowerCase())
-                            )
-                            .map(search => (
-                              <SelectItem key={search.id} value={search.id}>
-                                {search.ticker} - {search.company_name}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* 선택된 오버레이 목록 */}
-                    {state.selectedSearches.length > 0 && (
-                      <div className="space-y-2">
-                        {state.selectedSearches.map((search, idx) => (
-                          <div
-                            key={search.id}
-                            className="bg-muted flex items-center justify-between rounded p-2"
-                          >
-                            <span className="text-sm font-medium">
-                              {idx + 1}. {search.ticker} - {search.company_name}
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRemoveOverlay(search.id)}
-                              aria-label={`${search.ticker} 오버레이 제거`}
-                            >
-                              ✕
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* 저장 버튼 */}
-                    <Button
-                      onClick={handleSaveCombo}
-                      disabled={isSaving}
-                      className="w-full"
-                    >
-                      {isSaving ? '저장중...' : '현재 조합 저장'}
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                {/* F024, F025: 다운로드 섹션 */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>다운로드</CardTitle>
+                    <CardTitle>데이터 다운로드</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <Button
-                      onClick={handleDownloadPNG}
-                      disabled={isDownloading || state.trendsData.length === 0}
-                      className="w-full"
-                      variant="outline"
-                    >
-                      {isDownloading ? 'PNG 다운로드 중...' : 'PNG 다운로드'}
-                    </Button>
-                    <Button
                       onClick={handleDownloadExcel}
-                      disabled={state.trendsData.length === 0}
-                      className="w-full"
                       variant="outline"
+                      className="w-full"
                     >
                       Excel 다운로드
                     </Button>
@@ -669,13 +882,14 @@ export default function KeywordTrendsClient() {
             )}
 
             {/* 빈 상태 */}
-            {state.trendsData.length === 0 && !state.isLoading && (
-              <Card>
-                <CardContent className="text-muted-foreground py-12 text-center">
-                  <p>키워드를 입력하여 트렌드를 분석하세요</p>
-                </CardContent>
-              </Card>
-            )}
+            {Object.keys(state.trendsDataByTimeframe).length === 0 &&
+              !state.isLoading && (
+                <Card>
+                  <CardContent className="text-muted-foreground py-12 text-center">
+                    <p>키워드를 입력하여 트렌드를 분석하세요</p>
+                  </CardContent>
+                </Card>
+              )}
           </div>
         </div>
 
