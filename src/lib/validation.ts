@@ -3,14 +3,15 @@ import { z } from 'zod'
 /**
  * Ticker 입력 검증 스키마
  *
- * 미국 주식 심볼 규칙:
- * - 1~5자 (BRK.B, MSFT, etc.)
+ * 글로벌 주식 심볼 규칙:
+ * - 1~12자 (AAPL, BRK.B, 005930.KS, 0700.HK, 600000.SS, etc.)
  * - 영문 대문자, 숫자, 점(.) 허용
+ * - 마켓 코드: .US, .KS(한국), .HK(홍콩), .SS(상하이), .SZ(심천) 등
  */
 export const TickerInputSchema = z
   .string()
   .min(1, '종목 심볼을 입력하세요')
-  .max(6, '종목 심볼은 6자 이내여야 합니다')
+  .max(12, '종목 심볼은 12자 이내여야 합니다')
   .toUpperCase()
   .regex(/^[A-Z0-9.]+$/, '영문 대문자, 숫자, 점(.)만 입력 가능합니다')
 
