@@ -107,15 +107,14 @@ export default function KeywordTrendsClient() {
     [state.fullTrendsData, state.timeframe, state.customWeeks]
   )
 
-  // Medium: URL 동기화 통일 - router.replace() 사용
-  // 파라미터 변경 시 URL 업데이트 (F033: geo/gprop 변경 감지)
-  // scroll: false로 스크롤 위치 유지
+  // Medium: URL 동기화 - geo/gprop 변경만 감지 (timeframe은 state 기반)
+  // timeframe 변경은 URL 동기화 제외 → 스크롤 점프 방지
   useEffect(() => {
     if (state.keyword && trendsData.length > 0) {
       const params = new URLSearchParams({
         keyword: state.keyword,
         geo: state.geo,
-        timeframe: state.timeframe,
+        timeframe: DEFAULT_TIMEFRAME, // 기본값 고정, 현재 timeframe 제외
         gprop: state.gprop,
       })
       router.replace(`/trends?${params.toString()}`, { scroll: false })
@@ -124,7 +123,7 @@ export default function KeywordTrendsClient() {
     state.geo,
     state.gprop,
     state.keyword,
-    state.timeframe,
+    // state.timeframe 의존성 제거 → timeframe 변경은 state 기반만
     trendsData.length,
     router,
   ])
