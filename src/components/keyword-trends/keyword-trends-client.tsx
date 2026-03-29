@@ -34,8 +34,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 
-// 상태 구조 변경: trendsDataByTimeframe 제거, fullTrendsData로 교체
-// trendsData는 useMemo 파생값으로 처리
+// 상태 구조: fullTrendsData와 기본 필터만 state에 보관
+// timeframe/customWeeks는 별도 state로 분리 (UnifiedChart 방식)
 interface KeywordTrendsState {
   keyword: string
   fullTrendsData: TrendsDataPoint[] // 5년 전체 원본 데이터
@@ -43,8 +43,6 @@ interface KeywordTrendsState {
   selectedSearches: SearchRecord[]
   savedKeywords: KeywordSearchRecord[]
   geo: string
-  timeframe: Timeframe | 'custom'
-  customWeeks: number // 커스텀 기간 (주 단위)
   gprop: string
 }
 
@@ -61,17 +59,22 @@ export default function KeywordTrendsClient() {
     selectedSearches: [],
     savedKeywords: [],
     geo: '',
-    timeframe: DEFAULT_TIMEFRAME,
-    customWeeks: 26,
     gprop: '',
   })
+
+  // UnifiedChart 방식: timeframe/customWeeks를 별도 state로 관리
+  // 기간 변경 시 router 사용 없음 (스크롤 점프 방지)
+  const [timeframe, setTimeframe] = useState<Timeframe | 'custom'>(
+    DEFAULT_TIMEFRAME
+  )
+  const [customWeeks, setCustomWeeks] = useState(26)
 
   // URL 파라미터에서 초기 상태 파싱 (F033: URL 파라미터 기반 상태 관리)
   useEffect(() => {
     const keyword = searchParams.get('keyword') || ''
     const geo = searchParams.get('geo') || ''
     const rawTimeframe = searchParams.get('timeframe')
-    const timeframe =
+    const tf =
       rawTimeframe && TIMEFRAMES.includes(rawTimeframe as Timeframe)
         ? (rawTimeframe as Timeframe)
         : DEFAULT_TIMEFRAME
@@ -82,9 +85,9 @@ export default function KeywordTrendsClient() {
         ...prev,
         keyword,
         geo,
-        timeframe,
         gprop,
       }))
+      setTimeframe(tf)
     }
   }, [searchParams])
 
@@ -97,24 +100,22 @@ export default function KeywordTrendsClient() {
   const [searchFilter, setSearchFilter] = useState('')
 
   // 아키텍처 변경: trendsData는 fullTrendsData에서 필터링한 파생값
+  // timeframe/customWeeks는 별도 state (UnifiedChart 방식)
   const trendsData = useMemo(
     () =>
-      filterTrendsForTimeframe(
-        state.fullTrendsData,
-        state.timeframe,
-        state.customWeeks
-      ),
-    [state.fullTrendsData, state.timeframe, state.customWeeks]
+      filterTrendsForTimeframe(state.fullTrendsData, timeframe, customWeeks),
+    [state.fullTrendsData, timeframe, customWeeks]
   )
 
-  // Medium: URL 동기화 - geo/gprop 변경만 감지 (timeframe은 state 기반)
-  // timeframe 변경은 URL 동기화 제외 → 스크롤 점프 방지
+  // Medium: URL 동기화 - geo/gprop 변경만 감지 (timeframe은 state 기반만)
+  // timeframe/customWeeks 변경 시 router 호출 안 함 → 스크롤 점프 방지
+  // (UnifiedChart와 동일한 방식)
   useEffect(() => {
     if (state.keyword && trendsData.length > 0) {
       const params = new URLSearchParams({
         keyword: state.keyword,
         geo: state.geo,
-        timeframe: DEFAULT_TIMEFRAME, // 기본값 고정, 현재 timeframe 제외
+        timeframe: DEFAULT_TIMEFRAME, // 기본값만 저장
         gprop: state.gprop,
       })
       router.replace(`/trends?${params.toString()}`, { scroll: false })
@@ -123,9 +124,9 @@ export default function KeywordTrendsClient() {
     state.geo,
     state.gprop,
     state.keyword,
-    // state.timeframe 의존성 제거 → timeframe 변경은 state 기반만
     trendsData.length,
     router,
+    // timeframe, customWeeks 제거 ← state 기반 필터링만
   ])
 
   // P1-9: ma13 / yoyChange 를 useMemo로 파생 (단일 calculateTrendsMA13 호출)
@@ -189,17 +190,6 @@ export default function KeywordTrendsClient() {
     }
   }
 
-  // 커스텀 주 수를 timeframe 문자열로 변환
-  const getTimeframeString = (
-    tf: Timeframe | 'custom',
-    weeks?: number
-  ): string => {
-    if (tf === 'custom' && weeks) {
-      return `${weeks}w`
-    }
-    return tf as string
-  }
-
   // 키워드로 트렌드 조회 — 아키텍처 변경: 5y 단일 fetch
   const handleSearchKeyword = async () => {
     const trimmedKeyword = state.keyword.trim()
@@ -237,8 +227,7 @@ export default function KeywordTrendsClient() {
       const urlParams = new URLSearchParams({
         keyword: trimmedKeyword,
         geo: state.geo,
-        timeframe:
-          state.timeframe === 'custom' ? DEFAULT_TIMEFRAME : state.timeframe,
+        timeframe: DEFAULT_TIMEFRAME,
         gprop: state.gprop,
       })
       router.push(`/trends?${urlParams.toString()}`)
@@ -381,9 +370,9 @@ export default function KeywordTrendsClient() {
         keyword: keywordSearch.keyword,
         fullTrendsData: raw as TrendsDataPoint[],
         selectedSearches: overlaySearches,
-        timeframe: DEFAULT_TIMEFRAME,
         isLoading: false,
       }))
+      setTimeframe(DEFAULT_TIMEFRAME)
 
       // URL 업데이트
       const urlParams = new URLSearchParams({
@@ -423,7 +412,7 @@ export default function KeywordTrendsClient() {
       link.href = objectUrl
       const timeframeLabel =
         timeframe === 'custom'
-          ? `${state.customWeeks}w`
+          ? `${customWeeks}w`
           : TIMEFRAME_LABELS[timeframe] || timeframe
       link.download = `${state.keyword}-trends-${timeframeLabel}-${format(new Date(), 'yyyyMMdd')}.png`
       document.body.appendChild(link)
@@ -529,7 +518,7 @@ export default function KeywordTrendsClient() {
   // 기간 변경 시 스크롤 위치 유지 (강화된 복원 로직)
   // 기간 변경 — 아키텍처 변경으로 API 호출 없음 (스크롤 점프 제거)
   const handleTimeframeChange = (tf: Timeframe | 'custom') => {
-    setState(prev => ({ ...prev, timeframe: tf }))
+    setTimeframe(tf)
   }
 
   // 저장된 키워드 삭제 (확인 다이얼로그)
@@ -575,7 +564,7 @@ export default function KeywordTrendsClient() {
             <KeywordSearchForm
               keyword={state.keyword}
               geo={state.geo}
-              timeframe={state.timeframe}
+              timeframe={timeframe}
               gprop={state.gprop}
               isLoading={state.isLoading}
               onKeywordChange={keyword =>
@@ -644,7 +633,7 @@ export default function KeywordTrendsClient() {
                       <Button
                         key={tf}
                         onClick={() => handleTimeframeChange(tf)}
-                        variant={state.timeframe === tf ? 'default' : 'outline'}
+                        variant={timeframe === tf ? 'default' : 'outline'}
                         size="sm"
                       >
                         {TIMEFRAME_LABELS[tf]}
@@ -658,14 +647,11 @@ export default function KeywordTrendsClient() {
                       type="number"
                       min="1"
                       max="260"
-                      value={state.customWeeks}
+                      value={customWeeks}
                       onChange={e => {
                         const weeks = parseInt(e.target.value, 10)
                         if (!isNaN(weeks)) {
-                          setState(prev => ({
-                            ...prev,
-                            customWeeks: Math.max(1, Math.min(260, weeks)),
-                          }))
+                          setCustomWeeks(Math.max(1, Math.min(260, weeks)))
                         }
                       }}
                       onKeyDown={e => {
@@ -687,7 +673,7 @@ export default function KeywordTrendsClient() {
                     </Button>
                     <span className="text-muted-foreground text-sm">주</span>
                     <span className="text-muted-foreground text-sm">
-                      ({((state.customWeeks * 7) / 365).toFixed(2)}년)
+                      ({((customWeeks * 7) / 365).toFixed(2)}년)
                     </span>
                   </div>
                 </div>
@@ -695,19 +681,17 @@ export default function KeywordTrendsClient() {
                 {/* 통합 차트 (기간별 데이터만 변경) */}
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold">
-                    {state.timeframe === 'custom'
-                      ? `${state.customWeeks}주 트렌드 분석`
-                      : `${TIMEFRAME_LABELS[state.timeframe]} 트렌드 분석`}
+                    {timeframe === 'custom'
+                      ? `${customWeeks}주 트렌드 분석`
+                      : `${TIMEFRAME_LABELS[timeframe]} 트렌드 분석`}
                   </h3>
                   <Button
-                    onClick={() => handleDownloadPNG(state.timeframe)}
-                    disabled={downloadingTimeframes.has(
-                      String(state.timeframe)
-                    )}
+                    onClick={() => handleDownloadPNG(timeframe)}
+                    disabled={downloadingTimeframes.has(timeframe)}
                     variant="outline"
                     size="sm"
                   >
-                    {downloadingTimeframes.has(state.timeframe)
+                    {downloadingTimeframes.has(timeframe)
                       ? 'PNG 다운로드 중...'
                       : 'PNG 다운로드'}
                   </Button>
@@ -715,7 +699,7 @@ export default function KeywordTrendsClient() {
 
                 <div
                   ref={el => {
-                    if (el) chartRefs.current[state.timeframe] = el
+                    if (el) chartRefs.current[timeframe] = el
                   }}
                 >
                   <KeywordTrendsChart
