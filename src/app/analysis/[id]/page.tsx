@@ -52,6 +52,7 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
             <MetricsSummary
               metrics={metrics}
               lastUpdatedAt={record.last_updated_at}
+              ticker={record.ticker}
             />
           </section>
 

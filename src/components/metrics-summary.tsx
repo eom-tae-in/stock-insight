@@ -1,13 +1,24 @@
 'use client'
 
 import { MetricsCard } from '@/components/metrics-card'
+import { getCurrencyFromTicker } from '@/lib/utils/currency'
 import type { MetricsSummaryProps } from '@/types/ui'
 
 export function MetricsSummary({
   metrics,
   lastUpdatedAt,
-}: MetricsSummaryProps) {
+  ticker,
+}: MetricsSummaryProps & { ticker: string }) {
   const isYoYPositive = metrics.yoyChange >= 0
+  const currency = getCurrencyFromTicker(ticker)
+
+  // 통화별 가격 포맷팅 (한국₩: 정수, 미국$: 소수점2자리)
+  const formatPrice = (value: number): string => {
+    return value.toLocaleString('en-US', {
+      minimumFractionDigits: currency.decimals,
+      maximumFractionDigits: currency.decimals,
+    })
+  }
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return ''
@@ -21,16 +32,32 @@ export function MetricsSummary({
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <MetricsCard label="현재 종가" value={metrics.currentPrice} unit="$" />
-        <MetricsCard label="13주 이동평균" value={metrics.ma13} unit="$" />
+        <MetricsCard
+          label="현재 종가"
+          value={formatPrice(metrics.currentPrice)}
+          unit={currency.symbol}
+        />
+        <MetricsCard
+          label="13주 이동평균"
+          value={formatPrice(metrics.ma13)}
+          unit={currency.symbol}
+        />
         <MetricsCard
           label="52주 YoY"
           value={metrics.yoyChange}
           unit="%"
           isPositive={isYoYPositive}
         />
-        <MetricsCard label="52주 최고가" value={metrics.week52High} unit="$" />
-        <MetricsCard label="52주 최저가" value={metrics.week52Low} unit="$" />
+        <MetricsCard
+          label="52주 최고가"
+          value={formatPrice(metrics.week52High)}
+          unit={currency.symbol}
+        />
+        <MetricsCard
+          label="52주 최저가"
+          value={formatPrice(metrics.week52Low)}
+          unit={currency.symbol}
+        />
       </div>
 
       {/* 기준점 설명 */}

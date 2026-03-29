@@ -18,6 +18,7 @@ import {
   calculateWeekly52WeekLow,
 } from '@/lib/calculations'
 import { captureChartAsPng } from '@/lib/export'
+import { getCurrencySymbol, formatPrice } from '@/lib/utils/currency'
 import { useChartTheme } from '@/hooks/use-chart-theme'
 import {
   ComposedChart,
@@ -364,7 +365,7 @@ export function UnifiedChart({
               stroke={chartTheme.axisColor}
             />
 
-            {/* 좌측 Y축: 가격 ($) */}
+            {/* 좌측 Y축: 가격 (통화) */}
             {(enabledSeries.close ||
               enabledSeries.ma13 ||
               enabledSeries.week52High ||
@@ -372,7 +373,7 @@ export function UnifiedChart({
               <YAxis
                 yAxisId="left"
                 label={{
-                  value: '가격 ($)',
+                  value: `가격 (${getCurrencySymbol(ticker ?? '')})`,
                   angle: -90,
                   position: 'insideLeft',
                 }}
@@ -420,11 +421,22 @@ export function UnifiedChart({
                 border: `1px solid ${chartTheme.tooltipBorder}`,
                 borderRadius: '6px',
               }}
-              formatter={value => {
-                if (typeof value === 'number') {
-                  return value.toFixed(2)
+              formatter={(value, name) => {
+                if (typeof value !== 'number') return value
+
+                // 가격 시리즈: 통화 포맷 적용
+                const priceSeriesNames = [
+                  '종가',
+                  '13주 MA',
+                  '52주 최고가',
+                  '52주 최저가',
+                ]
+                if (priceSeriesNames.includes(name as string)) {
+                  return formatPrice(value, ticker ?? '')
                 }
-                return value
+
+                // 나머지 시리즈: 소수점 2자리
+                return value.toFixed(2)
               }}
               labelFormatter={label => `날짜: ${label}`}
             />
