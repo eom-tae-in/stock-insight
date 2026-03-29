@@ -281,6 +281,27 @@ export default function KeywordTrendsClient() {
     }))
   }
 
+  // 새로운 종목 추가 (ticker-search에서 선택된 종목)
+  const handleAddTickerOverlay = async (ticker: string) => {
+    try {
+      const response = await apiFetch(`/api/stock?ticker=${ticker}`)
+      if (!response.ok) throw new Error('종목 데이터를 가져오지 못했습니다')
+
+      const data = await response.json()
+      const search = data.data as SearchRecord
+
+      // availableSearches 업데이트
+      setAvailableSearches(prev => [...prev, search])
+
+      // 오버레이 추가
+      handleAddOverlay(search.id)
+      toast.success(`${ticker} 종목을 추가했습니다`)
+    } catch (error) {
+      console.error('Error adding ticker overlay:', error)
+      toast.error('종목을 추가하지 못했습니다')
+    }
+  }
+
   // 현재 키워드 + 오버레이 조합 저장
   const handleSaveCombo = async () => {
     if (!state.keyword || trendsData.length === 0) {
@@ -735,6 +756,7 @@ export default function KeywordTrendsClient() {
                   onRemoveOverlay={handleRemoveOverlay}
                   onSearchFilterChange={setSearchFilter}
                   onSaveCombo={handleSaveCombo}
+                  onAddTickerOverlay={handleAddTickerOverlay}
                 />
 
                 {/* F024, F025: Excel 다운로드 섹션 */}
