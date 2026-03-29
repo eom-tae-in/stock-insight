@@ -9,7 +9,7 @@
  */
 
 import { startOfISOWeek, format } from 'date-fns'
-import { execSync } from 'child_process'
+import { execFileSync } from 'child_process'
 import path from 'path'
 import type { TrendsDataPoint } from '@/types'
 
@@ -24,17 +24,27 @@ interface PyTrendsDataPoint {
 }
 
 /**
- * pytrends Python 스크립트 호출
+ * pytrends Python 스크립트 호출 (F023: geo, timeframe, gprop 파라미터 지원)
  */
-export function callPyTrendsAPI(keyword: string): TrendsDataPoint[] {
+export function callPyTrendsAPI(
+  keyword: string,
+  geo: string = '',
+  timeframe: string = '5y',
+  gprop: string = ''
+): TrendsDataPoint[] {
   try {
     const pythonPath = path.join(process.cwd(), 'venv', 'bin', 'python3')
     const scriptPath = path.join(process.cwd(), 'src', 'lib', 'get_trends.py')
 
-    const result = execSync(`"${pythonPath}" "${scriptPath}" "${keyword}"`, {
-      encoding: 'utf-8',
-      maxBuffer: 10 * 1024 * 1024, // 10MB 버퍼
-    })
+    const result = execFileSync(
+      pythonPath,
+      [scriptPath, keyword, geo, timeframe, gprop],
+      {
+        encoding: 'utf-8',
+        maxBuffer: 10 * 1024 * 1024, // 10MB 버퍼
+        timeout: 30_000, // 30초 상한 (pytrends 응답 지연 방어)
+      }
+    )
 
     const pyData: PyTrendsDataPoint[] = JSON.parse(result)
 
@@ -98,6 +108,7 @@ export async function fetchTrendsData(
   let lastError: Error | null = null
 
   // 1차: companyName으로 시도
+  // F023 geo/timeframe/gprop은 ticker 기반(F004) 경로에서 미지원 - 기본값 사용
   try {
     const trendsData = callPyTrendsAPI(companyName)
     return {

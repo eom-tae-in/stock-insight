@@ -10,6 +10,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseMiddlewareClient } from '@/lib/supabase/middleware-client'
 
 // 인증 없이 접근 가능한 경로
+// 참고: /set-password 는 이메일 OTP 인증 완료 후 세션이 있는 사용자만 접근하므로
+// 공개 경로에 포함하지 않음 (미들웨어 세션 갱신이 자동 처리)
 const PUBLIC_PATHS = ['/login', '/signup', '/api/auth/callback', '/api/health']
 
 export async function middleware(request: NextRequest) {
