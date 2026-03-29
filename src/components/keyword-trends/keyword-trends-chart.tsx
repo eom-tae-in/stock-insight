@@ -233,7 +233,6 @@ export default function KeywordTrendsChart({
               name="13주 이동평균"
               dot={false}
               strokeWidth={2}
-              strokeDasharray="5 5"
               isAnimationActive={false}
             />
 
@@ -247,7 +246,6 @@ export default function KeywordTrendsChart({
                 name="52주 YoY"
                 dot={false}
                 strokeWidth={2}
-                strokeDasharray="3 3"
                 isAnimationActive={false}
               />
             )}
