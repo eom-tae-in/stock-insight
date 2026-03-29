@@ -45,35 +45,49 @@ export async function GET(request: NextRequest) {
       return createErrorResponse('NO_RESULTS', '검색 결과가 없습니다.', 404)
     }
 
-    // 각 ticker에 대해 실제로 5년 데이터를 가져올 수 있는지 검증
-    const validStocks: { symbol: string; longname: string }[] = []
+    // 각 ticker에 대해 실제로 5년 데이터를 가져올 수 있는지 병렬 검증
     const endDate = new Date()
     const startDate = subYears(endDate, 5)
 
-    for (const stock of candidates) {
-      try {
-        // 5년 데이터 조회 시도
-        const historicalData = await yf.historical(stock.symbol, {
-          period1: startDate,
-          period2: endDate,
-          interval: '1wk',
-          events: 'history',
-        })
+    // Promise.allSettled로 병렬 처리 (각 종목 동시에 검증)
+    const validationResults = await Promise.allSettled(
+      candidates.map(async stock => {
+        try {
+          const historicalData = await yf.historical(stock.symbol, {
+            period1: startDate,
+            period2: endDate,
+            interval: '1wk',
+            events: 'history',
+          })
 
-        // 데이터가 존재하면 유효한 종목
-        if (historicalData && historicalData.length > 0) {
-          validStocks.push(stock)
+          if (historicalData && historicalData.length > 0) {
+            return stock
+          }
+          return null
+        } catch {
+          console.debug(`Cannot fetch 5y data for ${stock.symbol}`)
+          return null
         }
-      } catch {
-        // 데이터 조회 실패 → 스킵
-        console.debug(`Cannot fetch 5y data for ${stock.symbol}`)
-      }
+      })
+    )
 
-      // 최대 5개 유효한 종목 찾으면 중단 (성능상 이유)
-      if (validStocks.length >= 5) {
-        break
-      }
-    }
+    // 검증 결과에서 유효한 종목만 추출 (최대 5개)
+    const validStocks: { symbol: string; longname: string }[] =
+      validationResults
+        .filter(
+          (
+            result
+          ): result is {
+            status: 'fulfilled'
+            value: { symbol: string; longname: string } | null
+          } => result.status === 'fulfilled'
+        )
+        .map(result => result.value)
+        .filter(
+          (stock): stock is { symbol: string; longname: string } =>
+            stock !== null
+        )
+        .slice(0, 5)
 
     if (validStocks.length === 0) {
       return createErrorResponse('NO_RESULTS', '검색 결과가 없습니다.', 404)
