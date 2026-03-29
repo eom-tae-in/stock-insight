@@ -73,6 +73,7 @@ export default async function TablePage({ params }: TablePageProps) {
           {/* 데이터 테이블 */}
           <section>
             <DataTable
+              ticker={record.ticker}
               priceData={record.price_data}
               trendsData={record.trends_data}
               ma13Values={ma13Values}

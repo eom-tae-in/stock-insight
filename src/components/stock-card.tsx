@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { formatPrice } from '@/lib/utils/currency'
 import type { StockCardProps } from '@/types'
 
 interface StockCardWithEditProps extends StockCardProps {
@@ -101,7 +102,9 @@ export function StockCard({
 
             {/* 현재가 + 전일 대비 변화 */}
             <div className="mb-4 space-y-2">
-              <p className="text-4xl font-bold">${currentPrice.toFixed(2)}</p>
+              <p className="text-4xl font-bold">
+                {formatPrice(currentPrice, ticker)}
+              </p>
               {previousClose !== undefined && (
                 <p
                   className={cn(
