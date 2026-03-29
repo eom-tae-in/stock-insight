@@ -1,0 +1,135 @@
+/**
+ * 키워드 분류 유틸리티
+ * 영문(A-Z) / 한글(ㄱ-ㅎ) / 기타(#)로 분류
+ */
+
+import type { KeywordSearchRecord } from '@/types/database'
+
+// 한글 유니코드: 가(0xAC00) = ㄱ + 아(0) + (받침 없음)
+// 초성 19개 (유니코드 순서)
+const HANGUL_CONSONANTS = [
+  'ㄱ',
+  'ㄲ',
+  'ㄴ',
+  'ㄷ',
+  'ㄸ',
+  'ㄹ',
+  'ㅁ',
+  'ㅂ',
+  'ㅃ',
+  'ㅅ',
+  'ㅆ',
+  'ㅇ',
+  'ㅈ',
+  'ㅉ',
+  'ㅊ',
+  'ㅋ',
+  'ㅌ',
+  'ㅍ',
+  'ㅎ',
+]
+
+// 쌍자음 정규화: ㄲ→ㄱ, ㄸ→ㄷ, ㅃ→ㅂ, ㅆ→ㅅ, ㅉ→ㅈ
+const NORMALIZE_INITIALS: Record<string, string> = {
+  ㄲ: 'ㄱ',
+  ㄸ: 'ㄷ',
+  ㅃ: 'ㅂ',
+  ㅆ: 'ㅅ',
+  ㅉ: 'ㅈ',
+}
+
+// 사이드바 표시 순서: A-Z (26) → ㄱ-ㅎ (14) → #
+export const ALPHA_INDICES = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
+export const HANGUL_INITIALS = [
+  'ㄱ',
+  'ㄴ',
+  'ㄷ',
+  'ㄹ',
+  'ㅁ',
+  'ㅂ',
+  'ㅅ',
+  'ㅇ',
+  'ㅈ',
+  'ㅊ',
+  'ㅋ',
+  'ㅌ',
+  'ㅍ',
+  'ㅎ',
+]
+export const ALL_INDICES = [...ALPHA_INDICES, ...HANGUL_INITIALS, '#']
+
+/**
+ * 한글 문자에서 초성 추출
+ * 가(0xAC00) ≤ 음절 ≤ 힣(0xD7A3)
+ * 초성 인덱스 = Math.floor((charCode - 0xAC00) / (21 * 28))
+ */
+function getHangulInitial(char: string): string | null {
+  const code = char.charCodeAt(0)
+  if (code < 0xac00 || code > 0xd7a3) return null
+
+  const initialIndex = Math.floor((code - 0xac00) / (21 * 28))
+  const initial = HANGUL_CONSONANTS[initialIndex]
+  return initial ? (NORMALIZE_INITIALS[initial] ?? initial) : null
+}
+
+/**
+ * 키워드의 첫 글자를 분류 인덱스로 변환
+ * - 영문: 대문자 A-Z
+ * - 한글: 초성 ㄱ-ㅎ (쌍자음 정규화)
+ * - 기타: '#'
+ */
+export function getKeywordIndex(keyword: string): string {
+  const trimmed = keyword.trim()
+  if (!trimmed) return '#'
+
+  const firstChar = trimmed[0]
+  const code = firstChar.charCodeAt(0)
+
+  // 영문 대문자
+  if (code >= 65 && code <= 90) {
+    return firstChar
+  }
+
+  // 영문 소문자 → 대문자
+  if (code >= 97 && code <= 122) {
+    return firstChar.toUpperCase()
+  }
+
+  // 한글
+  const hangulInitial = getHangulInitial(firstChar)
+  if (hangulInitial) {
+    return hangulInitial
+  }
+
+  // 기타 (숫자, 특수문자 등)
+  return '#'
+}
+
+/**
+ * 키워드 배열을 인덱스별로 그룹핑
+ * @returns { [index: string]: KeywordSearchRecord[] }
+ */
+export function groupKeywordsByIndex(
+  keywords: KeywordSearchRecord[]
+): Record<string, KeywordSearchRecord[]> {
+  const result: Record<string, KeywordSearchRecord[]> = {}
+
+  for (const keyword of keywords) {
+    const index = getKeywordIndex(keyword.keyword)
+    if (!result[index]) {
+      result[index] = []
+    }
+    result[index].push(keyword)
+  }
+
+  return result
+}
+
+/**
+ * 실제로 키워드가 존재하는 인덱스만 반환 (사이드바 활성 탭 판별용)
+ */
+export function getActiveIndices(
+  grouped: Record<string, KeywordSearchRecord[]>
+): string[] {
+  return ALL_INDICES.filter(idx => (grouped[idx]?.length ?? 0) > 0)
+}

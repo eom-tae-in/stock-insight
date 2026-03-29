@@ -14,7 +14,6 @@ import { calculateTrendsMA13, calculateTrendsYoY } from '@/lib/indicators'
 import { apiFetch, apiFetchJson } from '@/lib/fetch-client'
 import { filterTrendsForTimeframe } from '@/lib/trends-filter'
 import KeywordTrendsChart from './keyword-trends-chart'
-import KeywordSearchList from './keyword-search-list'
 import KeywordSearchForm from './keyword-search-form'
 import OverlayManager from './overlay-manager'
 import {
@@ -124,7 +123,7 @@ export default function KeywordTrendsClient() {
         timeframe: DEFAULT_TIMEFRAME, // 기본값만 저장
         gprop: state.gprop,
       })
-      router.replace(`/trends?${params.toString()}`, { scroll: false })
+      router.replace(`/trends/search?${params.toString()}`, { scroll: false })
     }
   }, [
     state.geo,
@@ -236,7 +235,7 @@ export default function KeywordTrendsClient() {
         timeframe: DEFAULT_TIMEFRAME,
         gprop: state.gprop,
       })
-      router.push(`/trends?${urlParams.toString()}`)
+      router.push(`/trends/search?${urlParams.toString()}`)
 
       toast.success('트렌드 데이터를 가져왔습니다')
     } catch (error) {
@@ -360,6 +359,7 @@ export default function KeywordTrendsClient() {
   }
 
   // 저장된 키워드 복원 — 아키텍처 변경: 5y 단일 fetch
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleRestoreKeyword = async (keywordSearch: KeywordSearchRecord) => {
     setState(prev => ({ ...prev, isLoading: true }))
 
@@ -408,7 +408,7 @@ export default function KeywordTrendsClient() {
         timeframe: DEFAULT_TIMEFRAME,
         gprop: '',
       })
-      router.push(`/trends?${urlParams.toString()}`)
+      router.push(`/trends/search?${urlParams.toString()}`)
 
       toast.success(`"${keywordSearch.keyword}" 데이터를 복원했습니다`)
     } catch (error) {
@@ -585,207 +585,203 @@ export default function KeywordTrendsClient() {
   return (
     <div className="bg-background min-h-screen p-6">
       <div className="mx-auto max-w-7xl">
+        <div className="mb-2">
+          <a
+            href="/trends"
+            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm transition-colors"
+          >
+            ← 내 키워드로 돌아가기
+          </a>
+        </div>
         <h1 className="mb-8 text-3xl font-bold">키워드 트렌드 분석</h1>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
-          {/* 좌측: 저장된 키워드 목록 */}
-          <div className="lg:col-span-1">
-            <KeywordSearchList
-              keywords={state.savedKeywords}
-              onRestore={handleRestoreKeyword}
-              onDelete={setDeleteDialogId}
-            />
-          </div>
+        <div className="space-y-6">
+          {/* 입력 섹션 */}
+          <KeywordSearchForm
+            keyword={state.keyword}
+            geo={state.geo}
+            timeframe={timeframe}
+            gprop={state.gprop}
+            isLoading={state.isLoading}
+            onKeywordChange={keyword =>
+              setState(prev => ({ ...prev, keyword }))
+            }
+            onGeoChange={geo => setState(prev => ({ ...prev, geo }))}
+            onTimeframeChange={tf => {
+              const validTimeframe = TIMEFRAMES.includes(tf as Timeframe)
+                ? (tf as Timeframe)
+                : DEFAULT_TIMEFRAME
+              handleTimeframeChange(validTimeframe)
+            }}
+            onGpropChange={gprop => setState(prev => ({ ...prev, gprop }))}
+            onSearch={handleSearchKeyword}
+          />
 
-          {/* 우측: 입력 및 차트 */}
-          <div className="space-y-6 lg:col-span-3">
-            {/* 입력 섹션 */}
-            <KeywordSearchForm
-              keyword={state.keyword}
-              geo={state.geo}
-              timeframe={timeframe}
-              gprop={state.gprop}
-              isLoading={state.isLoading}
-              onKeywordChange={keyword =>
-                setState(prev => ({ ...prev, keyword }))
-              }
-              onGeoChange={geo => setState(prev => ({ ...prev, geo }))}
-              onTimeframeChange={tf => {
-                const validTimeframe = TIMEFRAMES.includes(tf as Timeframe)
-                  ? (tf as Timeframe)
-                  : DEFAULT_TIMEFRAME
-                handleTimeframeChange(validTimeframe)
-              }}
-              onGpropChange={gprop => setState(prev => ({ ...prev, gprop }))}
-              onSearch={handleSearchKeyword}
-            />
-
-            {/* 지표 요약 */}
-            {trendsData.length > 0 && (
-              <div className="grid grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-muted-foreground text-sm font-medium">
-                      13주 이동평균
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-2xl font-bold">
-                      {currentMA13 !== null ? currentMA13.toFixed(2) : 'N/A'}
-                    </p>
-                  </CardContent>
-                </Card>
-
-                {/* P1-7: YoY 다크모드 색상 - dark: 프리픽스 추가 */}
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-muted-foreground text-sm font-medium">
-                      52주 YoY
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p
-                      className={`text-2xl font-bold ${
-                        yoyChange === null
-                          ? 'text-gray-500 dark:text-gray-400'
-                          : yoyChange >= 0
-                            ? 'text-green-600 dark:text-green-400'
-                            : 'text-red-600 dark:text-red-400'
-                      }`}
-                    >
-                      {yoyChange !== null
-                        ? `${yoyChange >= 0 ? '+' : ''}${yoyChange.toFixed(2)}%`
-                        : 'N/A'}
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-
-            {/* F027: 통합 차트 (기간 선택으로 데이터 변경) */}
-            {state.fullTrendsData.length > 0 && (
-              <>
-                {/* 기간 선택 버튼 + 커스텀 입력 */}
-                <div className="space-y-3">
-                  <div className="flex flex-wrap gap-2">
-                    {TIMEFRAMES.map(tf => (
-                      <Button
-                        key={tf}
-                        onClick={() => handleTimeframeChange(tf)}
-                        variant={timeframe === tf ? 'default' : 'outline'}
-                        size="sm"
-                      >
-                        {TIMEFRAME_LABELS[tf]}
-                      </Button>
-                    ))}
-                  </div>
-
-                  {/* 커스텀 기간 입력 - 명시적 적용 */}
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min="1"
-                      max="260"
-                      value={customWeeksInput}
-                      onChange={e => {
-                        setCustomWeeksInput(e.target.value)
-                      }}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          handleApplyCustomWeeks()
-                        }
-                      }}
-                      onFocus={e => e.target.select()}
-                      className="border-input bg-background h-10 w-20 rounded border px-3 py-2 text-sm"
-                      placeholder="주 수"
-                    />
-                    <Button
-                      onClick={handleApplyCustomWeeks}
-                      variant="outline"
-                      size="sm"
-                      className="h-10"
-                    >
-                      적용
-                    </Button>
-                    <span className="text-muted-foreground text-sm">주</span>
-                    <span className="text-muted-foreground text-sm">
-                      ({((customWeeks * 7) / 365).toFixed(2)}년)
-                    </span>
-                  </div>
-                </div>
-
-                {/* 통합 차트 (기간별 데이터만 변경) */}
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">
-                    {timeframe === 'custom'
-                      ? `${customWeeks}주 트렌드 분석`
-                      : `${TIMEFRAME_LABELS[timeframe]} 트렌드 분석`}
-                  </h3>
-                  <Button
-                    onClick={() => handleDownloadPNG(timeframe)}
-                    disabled={downloadingTimeframes.has(timeframe)}
-                    variant="outline"
-                    size="sm"
-                  >
-                    {downloadingTimeframes.has(timeframe)
-                      ? 'PNG 다운로드 중...'
-                      : 'PNG 다운로드'}
-                  </Button>
-                </div>
-
-                <div
-                  ref={el => {
-                    if (el) chartRefs.current[timeframe] = el
-                  }}
-                >
-                  <KeywordTrendsChart
-                    trendsData={trendsData}
-                    overlays={state.selectedSearches}
-                    ma13Values={ma13Values}
-                    yoyValuesArray={yoyValuesArray}
-                  />
-                </div>
-
-                {/* 오버레이 추가 */}
-                <OverlayManager
-                  selectedSearches={state.selectedSearches}
-                  availableSearches={availableSearches}
-                  searchFilter={searchFilter}
-                  isSaving={isSaving}
-                  onAddOverlay={handleAddOverlay}
-                  onRemoveOverlay={handleRemoveOverlay}
-                  onSearchFilterChange={setSearchFilter}
-                  onSaveCombo={handleSaveCombo}
-                  onAddTickerOverlay={handleAddTickerOverlay}
-                />
-
-                {/* F024, F025: Excel 다운로드 섹션 */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>데이터 다운로드</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <Button
-                      onClick={handleDownloadExcel}
-                      variant="outline"
-                      className="w-full"
-                    >
-                      Excel 다운로드
-                    </Button>
-                  </CardContent>
-                </Card>
-              </>
-            )}
-
-            {/* 빈 상태 */}
-            {state.fullTrendsData.length === 0 && !state.isLoading && (
+          {/* 지표 요약 */}
+          {trendsData.length > 0 && (
+            <div className="grid grid-cols-2 gap-4">
               <Card>
-                <CardContent className="text-muted-foreground py-12 text-center">
-                  <p>키워드를 입력하여 트렌드를 분석하세요</p>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-muted-foreground text-sm font-medium">
+                    13주 이동평균
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-bold">
+                    {currentMA13 !== null ? currentMA13.toFixed(2) : 'N/A'}
+                  </p>
                 </CardContent>
               </Card>
-            )}
-          </div>
+
+              {/* P1-7: YoY 다크모드 색상 - dark: 프리픽스 추가 */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-muted-foreground text-sm font-medium">
+                    52주 YoY
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p
+                    className={`text-2xl font-bold ${
+                      yoyChange === null
+                        ? 'text-gray-500 dark:text-gray-400'
+                        : yoyChange >= 0
+                          ? 'text-green-600 dark:text-green-400'
+                          : 'text-red-600 dark:text-red-400'
+                    }`}
+                  >
+                    {yoyChange !== null
+                      ? `${yoyChange >= 0 ? '+' : ''}${yoyChange.toFixed(2)}%`
+                      : 'N/A'}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* F027: 통합 차트 (기간 선택으로 데이터 변경) */}
+          {state.fullTrendsData.length > 0 && (
+            <>
+              {/* 기간 선택 버튼 + 커스텀 입력 */}
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  {TIMEFRAMES.map(tf => (
+                    <Button
+                      key={tf}
+                      onClick={() => handleTimeframeChange(tf)}
+                      variant={timeframe === tf ? 'default' : 'outline'}
+                      size="sm"
+                    >
+                      {TIMEFRAME_LABELS[tf]}
+                    </Button>
+                  ))}
+                </div>
+
+                {/* 커스텀 기간 입력 - 명시적 적용 */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    max="260"
+                    value={customWeeksInput}
+                    onChange={e => {
+                      setCustomWeeksInput(e.target.value)
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        handleApplyCustomWeeks()
+                      }
+                    }}
+                    onFocus={e => e.target.select()}
+                    className="border-input bg-background h-10 w-20 rounded border px-3 py-2 text-sm"
+                    placeholder="주 수"
+                  />
+                  <Button
+                    onClick={handleApplyCustomWeeks}
+                    variant="outline"
+                    size="sm"
+                    className="h-10"
+                  >
+                    적용
+                  </Button>
+                  <span className="text-muted-foreground text-sm">주</span>
+                  <span className="text-muted-foreground text-sm">
+                    ({((customWeeks * 7) / 365).toFixed(2)}년)
+                  </span>
+                </div>
+              </div>
+
+              {/* 통합 차트 (기간별 데이터만 변경) */}
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">
+                  {timeframe === 'custom'
+                    ? `${customWeeks}주 트렌드 분석`
+                    : `${TIMEFRAME_LABELS[timeframe]} 트렌드 분석`}
+                </h3>
+                <Button
+                  onClick={() => handleDownloadPNG(timeframe)}
+                  disabled={downloadingTimeframes.has(timeframe)}
+                  variant="outline"
+                  size="sm"
+                >
+                  {downloadingTimeframes.has(timeframe)
+                    ? 'PNG 다운로드 중...'
+                    : 'PNG 다운로드'}
+                </Button>
+              </div>
+
+              <div
+                ref={el => {
+                  if (el) chartRefs.current[timeframe] = el
+                }}
+              >
+                <KeywordTrendsChart
+                  trendsData={trendsData}
+                  overlays={state.selectedSearches}
+                  ma13Values={ma13Values}
+                  yoyValuesArray={yoyValuesArray}
+                />
+              </div>
+
+              {/* 오버레이 추가 */}
+              <OverlayManager
+                selectedSearches={state.selectedSearches}
+                availableSearches={availableSearches}
+                searchFilter={searchFilter}
+                isSaving={isSaving}
+                onAddOverlay={handleAddOverlay}
+                onRemoveOverlay={handleRemoveOverlay}
+                onSearchFilterChange={setSearchFilter}
+                onSaveCombo={handleSaveCombo}
+                onAddTickerOverlay={handleAddTickerOverlay}
+              />
+
+              {/* F024, F025: Excel 다운로드 섹션 */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>데이터 다운로드</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Button
+                    onClick={handleDownloadExcel}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    Excel 다운로드
+                  </Button>
+                </CardContent>
+              </Card>
+            </>
+          )}
+
+          {/* 빈 상태 */}
+          {state.fullTrendsData.length === 0 && !state.isLoading && (
+            <Card>
+              <CardContent className="text-muted-foreground py-12 text-center">
+                <p>키워드를 입력하여 트렌드를 분석하세요</p>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* 키워드 삭제 확인 다이얼로그 */}
