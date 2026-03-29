@@ -11,6 +11,9 @@ export function Header() {
   const pathname = usePathname()
 
   const isActiveLink = (href: string) => {
+    if (href === '/trends') {
+      return pathname.startsWith('/trends')
+    }
     return pathname === href
   }
 
