@@ -91,40 +91,11 @@ export const YahooFinanceHistoricalDataSchema = z.object({
 })
 
 /**
- * SerpAPI Google Trends 응답 검증
+ * Google Trends 데이터 포인트 검증
  */
 export const GoogleTrendsDataSchema = z.object({
   date: z.number().int(),
   value: z.number().min(0).max(100),
-})
-
-export const SerpAPIGoogleTrendsSchema = z.object({
-  search_metadata: z
-    .object({
-      status: z.string(),
-      json_endpoint: z.string().optional(),
-      created_at: z.string().optional(),
-      processed_at: z.string().optional(),
-      google_url: z.string().optional(),
-    })
-    .optional(),
-  interest_over_time: z
-    .object({
-      timeline_data: z.array(
-        z.object({
-          date: z.number().int(),
-          values: z.array(
-            z.object({
-              query: z.string(),
-              value: z.number(),
-            })
-          ),
-          hasData: z.array(z.boolean()),
-        })
-      ),
-    })
-    .optional(),
-  error: z.string().optional(),
 })
 
 /**

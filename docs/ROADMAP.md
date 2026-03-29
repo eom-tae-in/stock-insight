@@ -453,3 +453,55 @@ StockInsight은 개인 투자자를 위한 로컬 주식 분석 도구로 다음
   - ✅ `CLAUDE.md` 업데이트: 기술 스택에서 better-sqlite3 제거, Supabase 추가
   - ✅ `docs/PRD.md` 업데이트: 운영 환경 설명 수정
   - ✅ TypeScript 타입 검사: 모든 에러 해결
+
+---
+
+## Phase 7: 키워드 트렌드 분석 기능 확장 🚀 예정
+
+> Google Trends 기반 키워드 검색 + 주식 오버레이 기능 추가 (F017~F026)
+> 기존 가격/트렌드 데이터 분석에서 특정 키워드의 검색 관심도 추이 분석으로 확장
+
+### MVP: 기본 키워드 트렌드 분석 (F017~F022)
+
+- **F017**: 키워드 입력 및 트렌드 조회
+  - `/api/trends` 에서 `keyword` 파라미터 분기 추가
+  - pytrends로 자유 텍스트 키워드 5년 데이터 수집
+
+- **F018**: 트렌드 지수 기반 MA13 계산
+  - `calculateTrendsMA13(trendsData: TrendsDataPoint[])` 함수
+  - 기존 calculateMA13() 로직을 `.value` 기반으로 어댑트
+
+- **F019**: 트렌드 지수 기반 YoY 계산
+  - `calculateTrendsYoY(trendsData: TrendsDataPoint[])` 함수
+  - 트렌드 지수 52주 변화율 계산
+
+- **F020**: 키워드 트렌드 그래프
+  - `src/app/trends/page.tsx` 신규 페이지
+  - Recharts ComposedChart: 트렌드 라인(파란색) + MA13 라인(주황색)
+  - `src/components/keyword-trends/keyword-trends-chart.tsx`
+
+- **F021**: 주식 종목 오버레이 추가
+  - 저장된 주식의 price_data를 min-max 정규화 (0-100)
+  - 최대 3개 종목 선택하여 차트에 오버레이
+  - 이중 Y축 설정
+
+- **F022**: 키워드 + 종목 조합 저장/목록
+  - `keyword_searches` + `keyword_stock_overlays` 테이블에 저장
+  - `src/components/keyword-trends/keyword-search-list.tsx` 목록 컴포넌트
+  - 저장된 조합 클릭 → 차트 복원
+
+### 확장: 추가 옵션 (F023~F026)
+
+- **F023**: 국가/기간/범위 선택
+  - pytrends geo, timeframe, gprop 파라미터 UI 추가
+  - 날짜 범위, 지역, 카테고리 선택
+
+- **F024**: 차트 PNG 다운로드
+  - 기존 html-to-image 로직 재사용
+
+- **F025**: Excel 다운로드
+  - SheetJS 로직 확장: 트렌드 시트 + 종목별 시트
+
+- **F026**: 키워드 + N개 종목 비교
+  - 오버레이 최대 5개로 확장
+  - 검색 필터 및 정렬 기능

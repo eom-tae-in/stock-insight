@@ -43,6 +43,7 @@ export default function KeywordSearchList({
                     size="sm"
                     className="text-destructive hover:text-destructive hover:bg-destructive/10 h-6 w-6 p-0"
                     onClick={() => onDelete(keyword.id)}
+                    aria-label={`"${keyword.keyword}" 키워드 삭제`}
                   >
                     ×
                   </Button>

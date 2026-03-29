@@ -9,11 +9,15 @@
  * - 가격-트렌드 데이터 매칭
  */
 
-import { calculateMA13 } from './indicators'
+import {
+  calculateMA13,
+  calculateTrendsMA13,
+  calculateTrendsYoY,
+} from './indicators'
 import type { PriceDataPoint, TrendsDataPoint, Metrics } from '@/types'
 
-// MA13 re-export
-export { calculateMA13 }
+// 지표 계산 함수 re-export
+export { calculateMA13, calculateTrendsMA13, calculateTrendsYoY }
 
 /**
  * YoY(Year over Year) 계산

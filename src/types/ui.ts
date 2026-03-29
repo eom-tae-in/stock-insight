@@ -160,16 +160,3 @@ export interface CustomChartBuilderProps {
   searchId: string
   onChartCreated?: (chart: CustomChart) => void
 }
-
-/**
- * 다운로드 섹션 Props
- */
-export interface DownloadSectionProps {
-  ticker: string
-  priceData: PriceDataPoint[]
-  trendsData: TrendsDataPoint[]
-  ma13Values: (number | null)[]
-  metrics: import('./database').Metrics
-  onDownloadAllCharts?: () => Promise<void>
-  isPngAllLoading?: boolean
-}

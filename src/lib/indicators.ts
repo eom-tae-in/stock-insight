@@ -58,13 +58,15 @@ export function calculateTrendsMA13(
  * 최근 주(마지막 데이터)의 MA13 값과 52주(약 1년) 전의 MA13 값을 비교하여 변화율 계산
  * 52주 이전 데이터가 없으면 null 반환
  *
+ * @param precomputedMA13 - 선택적 사전계산된 MA13 값 (중복 계산 방지)
  * @returns YoY 변화율 (%)
  */
 export function calculateTrendsYoY(
-  trendsData: TrendsDataPoint[]
+  trendsData: TrendsDataPoint[],
+  precomputedMA13?: (number | null)[]
 ): number | null {
-  // 52주 이동평균 먼저 계산
-  const ma13Values = calculateTrendsMA13(trendsData)
+  // 사전계산된 값이 있으면 사용, 없으면 계산 (Medium: 중복 계산 방지)
+  const ma13Values = precomputedMA13 ?? calculateTrendsMA13(trendsData)
 
   // 최소 65주 필요 (13주 + 52주)
   if (ma13Values.length < 65) {
