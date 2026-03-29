@@ -5,9 +5,11 @@ import { ArrowUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { calculateWeeklyYoY } from '@/lib/calculations'
+import { formatPrice, getCurrencySymbol } from '@/lib/utils/currency'
 import type { PriceDataPoint, TrendsDataPoint } from '@/types'
 
 interface DataTableProps {
+  ticker: string
   priceData: PriceDataPoint[]
   trendsData: TrendsDataPoint[]
   ma13Values: (number | null)[]
@@ -16,6 +18,7 @@ interface DataTableProps {
 const ITEMS_PER_PAGE = 20
 
 export function DataTable({
+  ticker,
   priceData,
   trendsData,
   ma13Values,
@@ -169,7 +172,10 @@ export function DataTable({
               </th>
               <th className="border-muted/60 border-r px-4 py-3">
                 <div className="flex items-center justify-center">
-                  <SortHeader label="주가 ($)" sortKey="close" />
+                  <SortHeader
+                    label={`주가 (${getCurrencySymbol(ticker)})`}
+                    sortKey="close"
+                  />
                 </div>
               </th>
               <th className="border-muted/60 border-r px-4 py-3">
@@ -179,7 +185,10 @@ export function DataTable({
               </th>
               <th className="border-muted/60 border-r px-4 py-3">
                 <div className="flex items-center justify-center">
-                  <SortHeader label="13주 MA ($)" sortKey="ma13" />
+                  <SortHeader
+                    label={`13주 MA (${getCurrencySymbol(ticker)})`}
+                    sortKey="ma13"
+                  />
                 </div>
               </th>
               <th className="px-4 py-3">
@@ -200,7 +209,9 @@ export function DataTable({
                   <div className="text-center font-medium">{row.date}</div>
                 </td>
                 <td className="border-muted/60 border-r px-4 py-3">
-                  <div className="text-center">${row.close.toFixed(2)}</div>
+                  <div className="text-center">
+                    {formatPrice(row.close, ticker)}
+                  </div>
                 </td>
                 <td className="border-muted/60 border-r px-4 py-3">
                   <div className="flex items-center justify-center gap-2">
@@ -214,7 +225,9 @@ export function DataTable({
                   </div>
                 </td>
                 <td className="border-muted/60 border-r px-4 py-3">
-                  <div className="text-center">${row.ma13.toFixed(2)}</div>
+                  <div className="text-center">
+                    {formatPrice(row.ma13, ticker)}
+                  </div>
                 </td>
                 <td className="px-4 py-3">
                   <div

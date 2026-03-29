@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx'
 import { format } from 'date-fns'
+import { formatPrice, getCurrencySymbol } from '@/lib/utils/currency'
 import type { PriceDataPoint, TrendsDataPoint, Metrics } from '@/types/database'
 
 interface GenerateExcelParams {
@@ -26,9 +27,11 @@ export function generateExcelFile({
     throw new Error('주가 데이터가 없습니다.')
   }
 
+  const currencySymbol = getCurrencySymbol(ticker)
+
   // 1. 주가 데이터 시트
   const priceSheetData = [
-    ['일자', '종가 ($)', '13주 MA ($)'],
+    ['일자', `종가 (${currencySymbol})`, `13주 MA (${currencySymbol})`],
     ...priceData.map((item, idx) => [
       item.date,
       item.close,
@@ -45,11 +48,11 @@ export function generateExcelFile({
   // 3. 지표 요약 시트
   const metricsSheetData = [
     ['지표', '값'],
-    ['현재 종가', `$${metrics.currentPrice.toFixed(2)}`],
-    ['13주 이동평균', `$${metrics.ma13.toFixed(2)}`],
+    ['현재 종가', formatPrice(metrics.currentPrice, ticker)],
+    ['13주 이동평균', formatPrice(metrics.ma13, ticker)],
     ['전년도 대비 (%)', `${metrics.yoyChange.toFixed(2)}%`],
-    ['52주 최고가', `$${metrics.week52High.toFixed(2)}`],
-    ['52주 최저가', `$${metrics.week52Low.toFixed(2)}`],
+    ['52주 최고가', formatPrice(metrics.week52High, ticker)],
+    ['52주 최저가', formatPrice(metrics.week52Low, ticker)],
   ]
 
   // 워크북 생성
@@ -97,14 +100,22 @@ export function generateTableExcelFile(
     throw new Error('테이블 데이터가 없습니다.')
   }
 
+  const currencySymbol = getCurrencySymbol(ticker)
+
   // 테이블 데이터 시트
   const tableSheetData = [
-    ['일자', '종가 ($)', '검색 관심도 (0-100)', '13주 MA ($)', 'YoY (%)'],
+    [
+      '일자',
+      `종가 (${currencySymbol})`,
+      '검색 관심도 (0-100)',
+      `13주 MA (${currencySymbol})`,
+      'YoY (%)',
+    ],
     ...tableData.map(row => [
       row.date,
-      row.close.toFixed(2),
+      formatPrice(row.close, ticker),
       row.trends,
-      row.ma13 !== null ? row.ma13.toFixed(2) : '',
+      row.ma13 !== null ? formatPrice(row.ma13, ticker) : '',
       row.yoy.toFixed(2),
     ]),
   ]
