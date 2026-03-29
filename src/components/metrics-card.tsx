@@ -16,9 +16,7 @@ export function MetricsCard({
         <div className="flex-1">
           <p className="text-muted-foreground text-sm font-medium">{label}</p>
           <div className="mt-2 flex items-baseline gap-1">
-            {unit && unit === '$' && (
-              <p className="text-muted-foreground text-sm">{unit}</p>
-            )}
+            {unit && <p className="text-muted-foreground text-sm">{unit}</p>}
             <p
               className={cn(
                 'text-2xl font-bold',
@@ -28,9 +26,6 @@ export function MetricsCard({
             >
               {typeof value === 'number' ? value.toFixed(2) : value}
             </p>
-            {unit && unit !== '$' && (
-              <p className="text-muted-foreground text-sm">{unit}</p>
-            )}
           </div>
         </div>
         {icon && <div className="text-muted-foreground">{icon}</div>}
