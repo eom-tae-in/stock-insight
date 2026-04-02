@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 import {
   ALPHA_INDICES,
   HANGUL_INITIALS,
+  SHOW_ALL_INDEX,
   type KeywordLanguage,
 } from '@/lib/utils/keyword-classifier'
 import type { KeywordSearchRecord } from '@/types/database'
@@ -50,8 +51,17 @@ export function KeywordIndexSidebar({
 
   const isActive = (index: string) => (grouped[index]?.length ?? 0) > 0
 
-  // 현재 탭의 인덱스 목록
-  const currentIndices = CATEGORY_INDICES[activeTab]
+  // "전체" 버튼의 활성 상태 (현재 언어의 모든 인덱스에 키워드가 있으면 활성)
+  const hasAnyKeyword = CATEGORY_INDICES[activeTab].some(idx => isActive(idx))
+
+  // 현재 탭의 인덱스 목록 ("전체" 추가)
+  const currentIndices = [SHOW_ALL_INDEX, ...CATEGORY_INDICES[activeTab]]
+
+  // "전체" 선택 시 표시할 총 키워드 개수
+  const totalKeywordCount = CATEGORY_INDICES[activeTab].reduce(
+    (sum, idx) => sum + (grouped[idx]?.length ?? 0),
+    0
+  )
 
   // 탭 버튼 목록
   const tabs: CategoryTab[] = ['한글', '영어', '기호']
@@ -113,8 +123,14 @@ export function KeywordIndexSidebar({
       >
         <div className="flex flex-col gap-0.5">
           {currentIndices.map(index => {
-            const active = isActive(index)
+            // "전체" 버튼 특수 처리
+            const isShowAll = index === SHOW_ALL_INDEX
+            const active = isShowAll ? hasAnyKeyword : isActive(index)
             const selected = selectedIndex === index
+            const displayLabel = isShowAll ? '전체' : index
+            const displayCount = isShowAll
+              ? totalKeywordCount
+              : (grouped[index]?.length ?? 0)
 
             return (
               <button
@@ -139,10 +155,10 @@ export function KeywordIndexSidebar({
                   // 비활성
                   !active && ['text-muted-foreground/25', 'cursor-default']
                 )}
-                aria-label={`${index} 키워드로 필터링`}
+                aria-label={`${displayLabel} 키워드로 필터링`}
                 aria-pressed={selected}
               >
-                <span>{index}</span>
+                <span>{displayLabel}</span>
                 {/* 활성 상태일 때 키워드 개수 표시 */}
                 {active && (
                   <span
@@ -153,7 +169,7 @@ export function KeywordIndexSidebar({
                         : 'text-muted-foreground/50'
                     )}
                   >
-                    {grouped[index]?.length ?? 0}
+                    {displayCount}
                   </span>
                 )}
               </button>

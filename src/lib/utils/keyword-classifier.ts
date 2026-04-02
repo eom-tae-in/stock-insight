@@ -58,6 +58,9 @@ export const HANGUL_INITIALS = [
 ]
 export const ALL_INDICES = [...ALPHA_INDICES, ...HANGUL_INITIALS, '#']
 
+// "전체" 인덱스 상수
+export const SHOW_ALL_INDEX = 'all'
+
 // 언어 분류 타입
 export type KeywordLanguage = 'ko' | 'en' | 'symbol'
 
