@@ -28,7 +28,6 @@ import {
 } from '@/lib/utils/keyword-classifier'
 import { toast } from 'sonner'
 import { apiFetchJson, apiFetch } from '@/lib/fetch-client'
-import { cn } from '@/lib/utils'
 import type { KeywordSearchRecord } from '@/types/database'
 
 interface MyKeywordsClientProps {
@@ -86,11 +85,6 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
 
   // 언어 탭 필터링
   const [languageTab, setLanguageTab] = useState<KeywordLanguage>('ko')
-
-  // 선택된 키워드 (상세 보기용)
-  const [selectedKeywordId, setSelectedKeywordId] = useState<string | null>(
-    null
-  )
 
   // 무한스크롤
   const [displayCount, setDisplayCount] = useState(100)
@@ -366,9 +360,6 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
     )
   }
 
-  // 선택된 키워드 정보
-  const selectedKeyword = keywords.find(k => k.id === selectedKeywordId)
-
   // 데이터 있음
   return (
     <Container className="py-8 pb-24 sm:pb-8">
@@ -384,91 +375,9 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
           onLanguageTabChange={setLanguageTab}
         />
 
-        {/* 우측: 키워드 그리드 또는 상세 정보 */}
+        {/* 우측: 키워드 그리드 + 액션바 */}
         <div className="min-w-0 flex-1">
-          {selectedKeyword ? (
-            // 상세 보기: 선택된 키워드 정보 표시
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <button
-                  onClick={() => setSelectedKeywordId(null)}
-                  className="text-primary flex items-center gap-1 text-sm hover:underline"
-                >
-                  ← 목록으로 돌아가기
-                </button>
-              </div>
-              <div className="max-w-2xl">
-                <KeywordCard
-                  keyword={selectedKeyword}
-                  isManageMode={false}
-                  isSelected={false}
-                  isEditing={false}
-                  isDetailView={true}
-                  onDelete={() => {
-                    setDeleteTarget('single')
-                    setDeletingId(selectedKeyword.id)
-                    setSelectedKeywordId(null)
-                  }}
-                />
-              </div>
-              <div className="mt-6 space-y-2 text-sm">
-                <div className="border-border/50 bg-card/50 rounded-lg border p-4">
-                  <h3 className="mb-3 font-semibold">저장된 정보</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">키워드</span>
-                      <span className="font-medium">
-                        {selectedKeyword.keyword}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">13주 MA</span>
-                      <span className="font-mono">
-                        {selectedKeyword.ma13 != null
-                          ? selectedKeyword.ma13.toFixed(1)
-                          : '—'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">YoY</span>
-                      <span
-                        className={cn(
-                          'font-mono',
-                          selectedKeyword.yoy_change == null
-                            ? 'text-muted-foreground'
-                            : selectedKeyword.yoy_change >= 0
-                              ? 'text-green-600 dark:text-green-400'
-                              : 'text-red-600 dark:text-red-400'
-                        )}
-                      >
-                        {selectedKeyword.yoy_change != null
-                          ? `${selectedKeyword.yoy_change >= 0 ? '+' : ''}${selectedKeyword.yoy_change.toFixed(1)}%`
-                          : '—'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">저장 날짜</span>
-                      <span className="font-mono">
-                        {new Date(
-                          selectedKeyword.searched_at
-                        ).toLocaleDateString('ko-KR', {
-                          year: 'numeric',
-                          month: '2-digit',
-                          day: '2-digit',
-                        })}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <Link href={`/trends/search?keywordId=${selectedKeyword.id}`}>
-                <Button className="w-full">
-                  <Search className="mr-2 h-4 w-4" />
-                  상세 분석 보기
-                </Button>
-              </Link>
-            </div>
-          ) : displayedKeywords.length === 0 ? (
+          {displayedKeywords.length === 0 ? (
             <EmptyLanguageState language={languageTab} />
           ) : (
             <>
@@ -485,7 +394,6 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
                         isManageMode={isManageMode}
                         isSelected={selectedIds.has(keyword.id)}
                         isEditing={editingId === keyword.id}
-                        isDetailView={selectedKeywordId === keyword.id}
                         onDelete={() => {
                           setDeleteTarget('single')
                           setDeletingId(keyword.id)
@@ -494,7 +402,6 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
                         onEditStart={() => setEditingId(keyword.id)}
                         onEditSave={handleEditSave}
                         onEditCancel={() => setEditingId(null)}
-                        onSelect={() => setSelectedKeywordId(keyword.id)}
                       />
                     </div>
                   )
