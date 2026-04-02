@@ -58,6 +58,34 @@ export const HANGUL_INITIALS = [
 ]
 export const ALL_INDICES = [...ALPHA_INDICES, ...HANGUL_INITIALS, '#']
 
+// 언어 분류 타입
+export type KeywordLanguage = 'ko' | 'en' | 'symbol'
+
+/**
+ * 키워드의 언어 분류 (한글 / 영어 / 기호)
+ * @returns 'ko' (한글) | 'en' (영어) | 'symbol' (숫자/특수문자)
+ */
+export function getKeywordLanguage(keyword: string): KeywordLanguage {
+  const trimmed = keyword.trim()
+  if (!trimmed) return 'symbol'
+
+  const firstChar = trimmed[0]
+  const code = firstChar.charCodeAt(0)
+
+  // 영문
+  if ((code >= 65 && code <= 90) || (code >= 97 && code <= 122)) {
+    return 'en'
+  }
+
+  // 한글
+  if (code >= 0xac00 && code <= 0xd7a3) {
+    return 'ko'
+  }
+
+  // 숫자/기호
+  return 'symbol'
+}
+
 /**
  * 한글 문자에서 초성 추출
  * 가(0xAC00) ≤ 음절 ≤ 힣(0xD7A3)
@@ -132,4 +160,14 @@ export function getActiveIndices(
   grouped: Record<string, KeywordSearchRecord[]>
 ): string[] {
   return ALL_INDICES.filter(idx => (grouped[idx]?.length ?? 0) > 0)
+}
+
+/**
+ * 언어별로 키워드 필터링
+ */
+export function filterKeywordsByLanguage(
+  keywords: KeywordSearchRecord[],
+  language: KeywordLanguage
+): KeywordSearchRecord[] {
+  return keywords.filter(k => getKeywordLanguage(k.keyword) === language)
 }
