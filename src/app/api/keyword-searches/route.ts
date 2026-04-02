@@ -10,6 +10,7 @@ import {
   getAllKeywordSearches,
   upsertKeywordSearch,
   deleteKeywordSearch,
+  updateKeywordName,
 } from '@/lib/db/queries'
 import { KeywordSearchRecord } from '@/types/database'
 import { randomUUID } from 'crypto'
@@ -175,6 +176,79 @@ export async function DELETE(request: NextRequest) {
     console.error('[DELETE /api/keyword-searches] Error:', error)
     return NextResponse.json(
       { error: 'Failed to delete keyword search' },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * PATCH /api/keyword-searches
+ * Update a keyword search record (rename keyword)
+ *
+ * Request body:
+ * {
+ *   id: string,
+ *   keyword: string
+ * }
+ */
+export async function PATCH(request: NextRequest) {
+  try {
+    const supabase = await createSupabaseServerClient()
+
+    // 인증 확인
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { id, keyword } = body
+
+    // 입력 검증
+    if (!id || !keyword || typeof keyword !== 'string') {
+      return NextResponse.json(
+        { error: 'Missing or invalid required fields: id, keyword' },
+        { status: 400 }
+      )
+    }
+
+    const trimmed = keyword.trim()
+    if (!trimmed || trimmed.length > 100) {
+      return NextResponse.json(
+        { error: 'Invalid keyword length (1-100 characters)' },
+        { status: 400 }
+      )
+    }
+
+    // Keyword 업데이트
+    const updated = await updateKeywordName(id, trimmed, supabase)
+
+    if (!updated) {
+      return NextResponse.json(
+        { error: 'Keyword search not found' },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json(
+      {
+        data: {
+          id,
+          keyword: trimmed,
+          updated_at: new Date().toISOString(),
+        },
+        message: 'Keyword updated successfully',
+      },
+      { status: 200 }
+    )
+  } catch (error) {
+    console.error('[PATCH /api/keyword-searches] Error:', error)
+    return NextResponse.json(
+      { error: 'Failed to update keyword search' },
       { status: 500 }
     )
   }

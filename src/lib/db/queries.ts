@@ -118,6 +118,18 @@ export const deleteKeywordSearch = async (
   client?: SupabaseClient
 ): Promise<boolean> => db.deleteKeywordSearch(keywordSearchId, client)
 
+export const updateKeywordName = async (
+  keywordSearchId: string,
+  newKeyword: string,
+  client?: SupabaseClient
+): Promise<boolean> =>
+  db.renameKeywordSearch(keywordSearchId, newKeyword, client)
+
+export const markKeywordAsViewed = async (
+  keywordSearchId: string,
+  client?: SupabaseClient
+): Promise<boolean> => db.markKeywordAsViewed(keywordSearchId, client)
+
 // ============================================================================
 // keyword_trends_data 테이블 CRUD
 // ============================================================================

@@ -150,6 +150,25 @@ export interface DbAdapter {
   ): Promise<boolean>
 
   /**
+   * Rename a keyword search record
+   * Returns true if updated, false if not found
+   */
+  renameKeywordSearch(
+    keywordSearchId: string,
+    newKeyword: string,
+    client?: SupabaseClient
+  ): Promise<boolean>
+
+  /**
+   * Mark a keyword as viewed (update last_viewed_at)
+   * Returns true if updated, false if not found
+   */
+  markKeywordAsViewed(
+    keywordSearchId: string,
+    client?: SupabaseClient
+  ): Promise<boolean>
+
+  /**
    * Save trends data for a keyword search
    */
   insertKeywordTrendsData(
@@ -620,6 +639,46 @@ export const supabaseAdapter: DbAdapter = {
     const { data, error } = await supabase
       .from('keyword_searches')
       .delete()
+      .eq('id', keywordSearchId)
+      .select('id')
+
+    if (error) throw error
+
+    return (data && data.length > 0) || false
+  },
+
+  async renameKeywordSearch(
+    keywordSearchId: string,
+    newKeyword: string,
+    client?: SupabaseClient
+  ): Promise<boolean> {
+    const supabase = client ?? getSupabaseClient()
+
+    const { data, error } = await supabase
+      .from('keyword_searches')
+      .update({
+        keyword: newKeyword,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', keywordSearchId)
+      .select('id')
+
+    if (error) throw error
+
+    return (data && data.length > 0) || false
+  },
+
+  async markKeywordAsViewed(
+    keywordSearchId: string,
+    client?: SupabaseClient
+  ): Promise<boolean> {
+    const supabase = client ?? getSupabaseClient()
+
+    const { data, error } = await supabase
+      .from('keyword_searches')
+      .update({
+        last_viewed_at: new Date().toISOString(),
+      })
       .eq('id', keywordSearchId)
       .select('id')
 
