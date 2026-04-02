@@ -50,11 +50,12 @@ export type GeoCode = (typeof GEO_CODES)[number]
 export const GPROPS = ['', 'youtube', 'news', 'froogle', 'images'] as const
 export type Gprop = (typeof GPROPS)[number]
 
-// 오버레이 색상 팔레트
+// 오버레이 색상 팔레트 (기존 차트 색상과 충돌 없음)
+// 기존: #3b82f6(파랑), #f97316(주황), #ec4899(분홍)
 export const OVERLAY_COLORS = [
-  '#22c55e',
-  '#a855f7',
-  '#ef4444',
-  '#f59e0b',
-  '#06b6d4',
+  '#10b981', // 에메랄드 초록
+  '#8b5cf6', // 보라
+  '#06b6d4', // 청록
+  '#6366f1', // 인디고
+  '#ec4899', // 핫핑크 (분홍 - 더 밝은 톤)
 ] as const
