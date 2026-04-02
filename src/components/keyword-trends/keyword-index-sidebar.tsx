@@ -1,57 +1,53 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { ALL_INDICES } from '@/lib/utils/keyword-classifier'
 
 interface KeywordIndexSidebarProps {
-  activeIndices: string[]
+  categoryIndices: string[]
   selectedIndex: string | null
   onSelect: (index: string) => void
 }
 
 export function KeywordIndexSidebar({
-  activeIndices,
+  categoryIndices,
   selectedIndex,
   onSelect,
 }: KeywordIndexSidebarProps) {
   return (
-    <aside className={cn('border-border/50 bg-card/50 w-12 shrink-0 border-r')}>
+    <aside
+      className={cn(
+        'border-border/30 w-16 shrink-0 border-r',
+        'from-card to-card/50 bg-gradient-to-b'
+      )}
+    >
       <nav
         className={cn(
-          'sticky top-16 flex flex-col gap-1.5 px-2 py-3',
+          'sticky top-16 flex flex-col gap-2.5 px-3 py-4',
           'max-h-[calc(100vh-5rem)] overflow-y-auto'
         )}
       >
-        {ALL_INDICES.map(index => {
-          const isActive = activeIndices.includes(index)
+        {categoryIndices.map(index => {
           const isSelected = selectedIndex === index
 
           return (
             <button
               key={index}
-              onClick={() => isActive && onSelect(index)}
-              disabled={!isActive}
+              onClick={() => onSelect(index)}
               className={cn(
-                'h-9 w-9 rounded-lg text-xs font-medium transition-all duration-200',
+                'h-11 w-10 rounded-xl text-sm font-semibold transition-all duration-200',
                 'flex items-center justify-center',
-                'relative',
                 // 선택됨
                 isSelected && [
-                  'from-primary to-primary/80 bg-gradient-to-br',
-                  'text-primary-foreground shadow-primary/30 shadow-md',
-                  'scale-105',
+                  'from-primary to-primary/85 bg-gradient-to-br',
+                  'text-primary-foreground shadow-primary/25 shadow-lg',
+                  'scale-110',
                 ],
-                // 활성 (키워드 있음, 미선택)
-                isActive &&
-                  !isSelected && [
-                    'text-foreground/80',
-                    'hover:bg-muted/70 cursor-pointer',
-                    'hover:text-foreground hover:shadow-sm',
-                  ],
-                // 비활성 (키워드 없음)
-                !isActive && [
-                  'text-muted-foreground/40',
-                  'pointer-events-none cursor-default',
+                // 미선택
+                !isSelected && [
+                  'border-border/20 border',
+                  'text-foreground/70 hover:text-foreground',
+                  'hover:bg-muted/80 hover:shadow-md',
+                  'cursor-pointer',
                 ]
               )}
               aria-label={`${index} 키워드로 필터링`}

@@ -20,6 +20,8 @@ import { KeywordIndexSidebar } from '@/components/keyword-trends/keyword-index-s
 import {
   groupKeywordsByIndex,
   getActiveIndices,
+  ALPHA_INDICES,
+  HANGUL_INITIALS,
 } from '@/lib/utils/keyword-classifier'
 import { toast } from 'sonner'
 import { apiFetchJson, apiFetch } from '@/lib/fetch-client'
@@ -28,6 +30,8 @@ import type { KeywordSearchRecord } from '@/types/database'
 interface MyKeywordsClientProps {
   initialKeywords: KeywordSearchRecord[]
 }
+
+type IndexCategory = 'hangul' | 'alpha' | 'symbol'
 
 function EmptyKeywordsState() {
   return (
@@ -52,6 +56,7 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
   const [selectedIndex, setSelectedIndex] = useState<string | null>(null)
   const [deleteDialogId, setDeleteDialogId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [indexCategory, setIndexCategory] = useState<IndexCategory>('hangul')
 
   // fetch 로직을 useCallback으로 추출 (중복 제거)
   const fetchKeywords = useCallback(async () => {
@@ -79,12 +84,26 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
   // 활성 인덱스 (키워드가 있는 인덱스만)
   const activeIndices = useMemo(() => getActiveIndices(grouped), [grouped])
 
-  // 초기 selectedIndex 설정 (첫 번째 활성 인덱스) - useEffect로 변경
-  useEffect(() => {
-    if (selectedIndex === null && activeIndices.length > 0) {
-      setSelectedIndex(activeIndices[0])
+  // 카테고리별 인덱스 필터링
+  const categoryIndices = useMemo(() => {
+    if (indexCategory === 'hangul') {
+      return HANGUL_INITIALS.filter(idx => activeIndices.includes(idx))
+    } else if (indexCategory === 'alpha') {
+      return ALPHA_INDICES.filter(idx => activeIndices.includes(idx))
+    } else {
+      return activeIndices.filter(idx => idx === '#')
     }
-  }, [activeIndices, selectedIndex])
+  }, [indexCategory, activeIndices])
+
+  // 초기 selectedIndex 설정 (카테고리 변경 시 첫 번째 활성 인덱스)
+  useEffect(() => {
+    if (
+      (selectedIndex === null || !categoryIndices.includes(selectedIndex)) &&
+      categoryIndices.length > 0
+    ) {
+      setSelectedIndex(categoryIndices[0])
+    }
+  }, [categoryIndices, selectedIndex])
 
   // 선택된 인덱스의 키워드 목록
   const displayedKeywords = useMemo(() => {
@@ -170,10 +189,35 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
     <Container className="py-8">
       {header}
 
+      {/* 카테고리 탭 */}
+      <div className="mb-6 flex gap-2">
+        <Button
+          variant={indexCategory === 'hangul' ? 'default' : 'outline'}
+          onClick={() => setIndexCategory('hangul')}
+          className="rounded-full px-6"
+        >
+          한글
+        </Button>
+        <Button
+          variant={indexCategory === 'alpha' ? 'default' : 'outline'}
+          onClick={() => setIndexCategory('alpha')}
+          className="rounded-full px-6"
+        >
+          English
+        </Button>
+        <Button
+          variant={indexCategory === 'symbol' ? 'default' : 'outline'}
+          onClick={() => setIndexCategory('symbol')}
+          className="rounded-full px-6"
+        >
+          기호
+        </Button>
+      </div>
+
       <div className="flex gap-4">
         {/* 좌측 사이드바: 인덱스 탭 */}
         <KeywordIndexSidebar
-          activeIndices={activeIndices}
+          categoryIndices={categoryIndices}
           selectedIndex={selectedIndex}
           onSelect={setSelectedIndex}
         />
