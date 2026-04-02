@@ -1,0 +1,33 @@
+- generic [active] [ref=e1]:
+    - generic [ref=e2]:
+        - banner [ref=e3]:
+            - heading "StockInsight" [level=1] [ref=e4]
+            - button "테마 전환" [ref=e5]:
+                - img [ref=e6]
+                - img [ref=e12]
+                - img [ref=e14]
+                - text: 테마 전환
+        - main [ref=e17]:
+            - generic [ref=e18]:
+                - generic [ref=e20]:
+                    - generic [ref=e21]:
+                        - heading "환영합니다" [level=2] [ref=e22]
+                        - paragraph [ref=e23]: 로컬 주식 분석 도구에 로그인하세요
+                    - generic [ref=e24]:
+                        - generic [ref=e25]: SNS로 빠르게 로그인
+                        - button "🔍 Google로 로그인" [ref=e26]
+                    - generic [ref=e28]: 또는
+                    - generic [ref=e30]:
+                        - textbox "이메일" [ref=e31]
+                        - textbox "비밀번호" [ref=e32]
+                        - button "로그인" [ref=e33]
+                        - paragraph [ref=e34]:
+                            - text: 아직 계정이 없으신가요?
+                            - link "회원가입" [ref=e35] [cursor=pointer]:
+                                - /url: /signup
+                    - paragraph [ref=e36]: 로그인하면 우리의 서비스 약관에 동의하는 것입니다.
+                - generic [ref=e38]:
+                    - generic [ref=e39]: 📊
+                    - paragraph [ref=e40]: 5년 가격 흐름 분석
+    - region "Notifications alt+T"
+    - alert [ref=e41]

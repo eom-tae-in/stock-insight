@@ -100,6 +100,7 @@ export interface KeywordSearchRecord {
   searched_at: string // ISO 8601 타임스탬프
   created_at: string // ISO 8601 타임스탬프
   updated_at: string // ISO 8601 타임스탬프
+  last_viewed_at?: string | null // 내 키워드에서 마지막으로 본 시간 (미조회 배지 판별용)
 }
 
 /**
@@ -115,6 +116,7 @@ export interface KeywordSearchRecordRaw {
   searched_at: string
   created_at: string
   updated_at: string
+  last_viewed_at?: string | null // 내 키워드에서 마지막으로 본 시간
 }
 
 /**
