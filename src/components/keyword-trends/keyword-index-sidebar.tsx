@@ -15,10 +15,10 @@ export function KeywordIndexSidebar({
   onSelect,
 }: KeywordIndexSidebarProps) {
   return (
-    <aside className={cn('w-12 shrink-0 border-r', 'bg-card')}>
+    <aside className={cn('border-border/50 bg-card/50 w-12 shrink-0 border-r')}>
       <nav
         className={cn(
-          'sticky top-16 flex flex-col gap-1 px-1 py-2',
+          'sticky top-16 flex flex-col gap-1.5 px-2 py-3',
           'max-h-[calc(100vh-5rem)] overflow-y-auto'
         )}
       >
@@ -32,17 +32,27 @@ export function KeywordIndexSidebar({
               onClick={() => isActive && onSelect(index)}
               disabled={!isActive}
               className={cn(
-                'h-8 w-full rounded text-xs font-medium transition-all',
+                'h-9 w-9 rounded-lg text-xs font-medium transition-all duration-200',
                 'flex items-center justify-center',
+                'relative',
                 // 선택됨
-                isSelected && 'bg-primary text-primary-foreground shadow-sm',
+                isSelected && [
+                  'from-primary to-primary/80 bg-gradient-to-br',
+                  'text-primary-foreground shadow-primary/30 shadow-md',
+                  'scale-105',
+                ],
                 // 활성 (키워드 있음, 미선택)
                 isActive &&
-                  !isSelected &&
-                  'text-foreground hover:bg-muted cursor-pointer',
+                  !isSelected && [
+                    'text-foreground/80',
+                    'hover:bg-muted/70 cursor-pointer',
+                    'hover:text-foreground hover:shadow-sm',
+                  ],
                 // 비활성 (키워드 없음)
-                !isActive &&
-                  'text-muted-foreground/30 pointer-events-none cursor-default'
+                !isActive && [
+                  'text-muted-foreground/40',
+                  'pointer-events-none cursor-default',
+                ]
               )}
               aria-label={`${index} 키워드로 필터링`}
               aria-pressed={isSelected}
