@@ -78,7 +78,9 @@ function EmptyLanguageState({ language }: { language: KeywordLanguage }) {
 export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
   const [keywords, setKeywords] =
     useState<KeywordSearchRecord[]>(initialKeywords)
-  const [selectedIndex, setSelectedIndex] = useState<string | null>(null)
+  const [selectedIndex, setSelectedIndex] = useState<string | null>(
+    SHOW_ALL_INDEX
+  )
   const [isLoading, setIsLoading] = useState(false)
 
   // 언어 탭 필터링
@@ -130,16 +132,19 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
 
   // 선택된 인덱스 유효성 확인 및 필요시 업데이트
   useEffect(() => {
-    // grouped가 변경되었을 때 selectedIndex가 여전히 유효한지 확인
+    // "전체" 상태면 grouped 확인 스킵
+    if (selectedIndex === SHOW_ALL_INDEX) return
+
+    // grouped가 변경되었을 때 특정 인덱스가 유효한지 확인
     if (!selectedIndex || !(grouped[selectedIndex]?.length > 0)) {
       const first = ALL_INDICES.find(idx => (grouped[idx]?.length ?? 0) > 0)
-      setSelectedIndex(first ?? null)
+      setSelectedIndex(first ?? SHOW_ALL_INDEX)
     }
   }, [selectedIndex, grouped])
 
   // 언어 탭 변경 시 selectedIndex 초기화 + 관리 모드 해제 + displayCount 초기화
   useEffect(() => {
-    setSelectedIndex(null)
+    setSelectedIndex(SHOW_ALL_INDEX)
     setDisplayCount(100)
     setIsManageMode(false)
     setSelectedIds(new Set())
