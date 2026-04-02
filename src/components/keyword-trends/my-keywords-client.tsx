@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { Search, RefreshCw, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -23,6 +23,7 @@ import {
   getActiveIndices,
   ALL_INDICES,
   filterKeywordsByLanguage,
+  SHOW_ALL_INDEX,
   type KeywordLanguage,
 } from '@/lib/utils/keyword-classifier'
 import { toast } from 'sonner'
@@ -83,6 +84,10 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
   // 언어 탭 필터링
   const [languageTab, setLanguageTab] = useState<KeywordLanguage>('ko')
 
+  // 무한스크롤
+  const [displayCount, setDisplayCount] = useState(100)
+  const lastElementRef = useRef<HTMLDivElement>(null)
+
   // 관리 모드 관련 상태
   const [isManageMode, setIsManageMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -132,18 +137,53 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
     }
   }, [selectedIndex, grouped])
 
-  // 언어 탭 변경 시 selectedIndex 초기화 + 관리 모드 해제
+  // 언어 탭 변경 시 selectedIndex 초기화 + 관리 모드 해제 + displayCount 초기화
   useEffect(() => {
     setSelectedIndex(null)
+    setDisplayCount(100)
     setIsManageMode(false)
     setSelectedIds(new Set())
   }, [languageTab])
 
-  // 선택된 인덱스의 키워드 목록
+  // 선택된 인덱스의 키워드 목록 (무한스크롤 적용)
   const displayedKeywords = useMemo(() => {
     if (!selectedIndex) return []
-    return grouped[selectedIndex] ?? []
-  }, [selectedIndex, grouped])
+
+    // "전체" 선택 시: 모든 인덱스의 키워드를 합쳐서 반환
+    if (selectedIndex === SHOW_ALL_INDEX) {
+      const allKeywords: KeywordSearchRecord[] = []
+      ALL_INDICES.forEach(idx => {
+        const keywordsForIndex = grouped[idx] ?? []
+        allKeywords.push(...keywordsForIndex)
+      })
+      return allKeywords.slice(0, displayCount)
+    }
+
+    // 특정 인덱스 선택 시: 해당 인덱스만 반환
+    const indexKeywords = grouped[selectedIndex] ?? []
+    return indexKeywords.slice(0, displayCount)
+  }, [selectedIndex, grouped, displayCount])
+
+  // 무한스크롤 감지
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => {
+        if (
+          entries[0].isIntersecting &&
+          displayedKeywords.length === displayCount
+        ) {
+          setDisplayCount(prev => prev + 100)
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    if (lastElementRef.current) {
+      observer.observe(lastElementRef.current)
+    }
+
+    return () => observer.disconnect()
+  }, [displayCount, displayedKeywords.length])
 
   // 관리 모드 토글
   const handleToggleManageMode = () => {
@@ -337,23 +377,30 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
           ) : (
             <>
               <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                {displayedKeywords.map(keyword => (
-                  <KeywordCard
-                    key={keyword.id}
-                    keyword={keyword}
-                    isManageMode={isManageMode}
-                    isSelected={selectedIds.has(keyword.id)}
-                    isEditing={editingId === keyword.id}
-                    onDelete={() => {
-                      setDeleteTarget('single')
-                      setDeletingId(keyword.id)
-                    }}
-                    onToggleSelect={() => handleToggleSelect(keyword.id)}
-                    onEditStart={() => setEditingId(keyword.id)}
-                    onEditSave={handleEditSave}
-                    onEditCancel={() => setEditingId(null)}
-                  />
-                ))}
+                {displayedKeywords.map((keyword, index) => {
+                  const isLastElement = index === displayedKeywords.length - 1
+                  return (
+                    <div
+                      key={keyword.id}
+                      ref={isLastElement ? lastElementRef : null}
+                    >
+                      <KeywordCard
+                        keyword={keyword}
+                        isManageMode={isManageMode}
+                        isSelected={selectedIds.has(keyword.id)}
+                        isEditing={editingId === keyword.id}
+                        onDelete={() => {
+                          setDeleteTarget('single')
+                          setDeletingId(keyword.id)
+                        }}
+                        onToggleSelect={() => handleToggleSelect(keyword.id)}
+                        onEditStart={() => setEditingId(keyword.id)}
+                        onEditSave={handleEditSave}
+                        onEditCancel={() => setEditingId(null)}
+                      />
+                    </div>
+                  )
+                })}
               </div>
 
               {/* 관리 모드 액션바 */}
