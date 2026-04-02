@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { Search } from 'lucide-react'
+import { Search, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -22,6 +22,7 @@ import {
   getActiveIndices,
 } from '@/lib/utils/keyword-classifier'
 import { toast } from 'sonner'
+import { apiFetchJson, apiFetch } from '@/lib/fetch-client'
 import type { KeywordSearchRecord } from '@/types/database'
 
 interface MyKeywordsClientProps {
@@ -50,6 +51,27 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
     useState<KeywordSearchRecord[]>(initialKeywords)
   const [selectedIndex, setSelectedIndex] = useState<string | null>(null)
   const [deleteDialogId, setDeleteDialogId] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+
+  // fetch 로직을 useCallback으로 추출 (중복 제거)
+  const fetchKeywords = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const data = await apiFetchJson<KeywordSearchRecord[]>(
+        '/api/keyword-searches'
+      )
+      setKeywords(Array.isArray(data) ? data : [])
+    } catch {
+      // 실패해도 initialKeywords 사용
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  // 마운트 시 API에서 키워드 fetch (새로 저장된 키워드 반영)
+  useEffect(() => {
+    fetchKeywords()
+  }, [fetchKeywords])
 
   // 키워드 그룹핑
   const grouped = useMemo(() => groupKeywordsByIndex(keywords), [keywords])
@@ -57,8 +79,8 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
   // 활성 인덱스 (키워드가 있는 인덱스만)
   const activeIndices = useMemo(() => getActiveIndices(grouped), [grouped])
 
-  // 초기 selectedIndex 설정 (첫 번째 활성 인덱스)
-  useMemo(() => {
+  // 초기 selectedIndex 설정 (첫 번째 활성 인덱스) - useEffect로 변경
+  useEffect(() => {
     if (selectedIndex === null && activeIndices.length > 0) {
       setSelectedIndex(activeIndices[0])
     }
@@ -73,12 +95,12 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
   // 키워드 삭제 핸들러
   const handleDeleteKeyword = async (id: string) => {
     try {
-      const response = await fetch(`/api/keyword-searches?id=${id}`, {
+      const response = await apiFetch(`/api/keyword-searches?id=${id}`, {
         method: 'DELETE',
       })
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || '삭제에 실패했습니다.')
+        const errorBody = await response.json().catch(() => ({}))
+        throw new Error(errorBody.error || '삭제에 실패했습니다.')
       }
 
       // 로컬 상태 업데이트
@@ -106,17 +128,35 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
   // 헤더 영역
   const header = (
     <div className="mb-8 flex items-center justify-between">
-      <h1 className="text-3xl font-bold">내 키워드</h1>
-      <Link href="/trends/search">
-        <Button>
-          <Search className="mr-2 h-4 w-4" />새 키워드 검색
+      <div>
+        <h1 className="text-3xl font-bold">내 키워드</h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          {keywords.length}개의 키워드 저장됨
+        </p>
+      </div>
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={async () => {
+            await fetchKeywords()
+            toast.success('키워드를 새로고침했습니다')
+          }}
+          disabled={isLoading}
+        >
+          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
         </Button>
-      </Link>
+        <Link href="/trends/search">
+          <Button>
+            <Search className="mr-2 h-4 w-4" />새 키워드 검색
+          </Button>
+        </Link>
+      </div>
     </div>
   )
 
-  // 빈 상태
-  if (keywords.length === 0) {
+  // 빈 상태 (로딩 완료 후에만 표시)
+  if (!isLoading && keywords.length === 0) {
     return (
       <Container className="py-8">
         {header}
@@ -130,7 +170,7 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
     <Container className="py-8">
       {header}
 
-      <div className="flex gap-0">
+      <div className="flex gap-4">
         {/* 좌측 사이드바: 인덱스 탭 */}
         <KeywordIndexSidebar
           activeIndices={activeIndices}
@@ -139,8 +179,8 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
         />
 
         {/* 우측: 키워드 그리드 */}
-        <div className="min-w-0 flex-1 pl-6">
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        <div className="min-w-0 flex-1">
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {displayedKeywords.map(keyword => (
               <KeywordCard
                 key={keyword.id}
@@ -154,7 +194,7 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
 
       {/* 삭제 확인 다이얼로그 */}
       <AlertDialog
-        open={deleteDialogId != null}
+        open={deleteDialogId !== null}
         onOpenChange={open => {
           if (!open) setDeleteDialogId(null)
         }}
