@@ -71,6 +71,7 @@ export default function KeywordTrendsChart({
   yoyValuesArray,
 }: KeywordTrendsChartProps) {
   // P0-4 / P1-10: 오버레이별 Map 미리 계산 (O(n²) → O(n+m))
+  // Google Trends(주 단위) ↔ Yahoo Finance(일 단위) 날짜 매칭
   const overlayMaps = useMemo(
     () =>
       overlays.map(search => {
@@ -81,12 +82,30 @@ export default function KeywordTrendsChart({
         const maxPrice = Math.max(...prices)
         const range = maxPrice - minPrice
 
-        const map = new Map<string, number>()
+        // 연도-주차별 주가 데이터 그룹화 (Google Trends와 일치 시키기)
+        const weeklyPrices = new Map<string, number[]>()
         search.price_data?.forEach(p => {
-          const normalized =
-            range === 0 ? 50 : ((p.close - minPrice) / range) * 100
-          map.set(p.date, Math.round(normalized * 100) / 100)
+          const date = parseISO(p.date)
+          const year = date.getFullYear()
+          const weekNum = Math.ceil((date.getDate() + date.getDay()) / 7)
+          const weekKey = `${year}-W${String(weekNum).padStart(2, '0')}`
+
+          if (!weeklyPrices.has(weekKey)) {
+            weeklyPrices.set(weekKey, [])
+          }
+          weeklyPrices.get(weekKey)!.push(p.close)
         })
+
+        // 주차별 평균값으로 정규화
+        const map = new Map<string, number>()
+        weeklyPrices.forEach((pricesInWeek, weekKey) => {
+          const avgPrice =
+            pricesInWeek.reduce((a, b) => a + b) / pricesInWeek.length
+          const normalized =
+            range === 0 ? 50 : ((avgPrice - minPrice) / range) * 100
+          map.set(weekKey, Math.round(normalized * 100) / 100)
+        })
+
         return map
       }),
     [overlays]
@@ -112,17 +131,22 @@ export default function KeywordTrendsChart({
   const chartData: ChartDataPoint[] = useMemo(
     () =>
       trendsData.map((point, idx) => {
+        const date = parseISO(point.date)
+        const year = date.getFullYear()
+        const weekNum = Math.ceil((date.getDate() + date.getDay()) / 7)
+        const weekKey = `${year}-W${String(weekNum).padStart(2, '0')}`
+
         const row: ChartDataPoint = {
-          date: format(parseISO(point.date), 'MMM dd'),
+          date: format(date, 'MMM dd'),
           fullDate: point.date,
           trendsValue: point.value,
           ma13: ma13Values[idx] ?? null,
           yoyValue: yoyValuesArray?.[idx] ?? null,
         }
 
-        // 오버레이 주식 데이터 추가 (Map 기반 O(1) 조회)
+        // 오버레이 주식 데이터 추가 (Map 기반 O(1) 조회 - 주차별 일치)
         overlays.forEach((_, overlayIdx) => {
-          const normalized = overlayMaps[overlayIdx].get(point.date)
+          const normalized = overlayMaps[overlayIdx].get(weekKey)
           if (normalized !== undefined) {
             row[`overlay${overlayIdx}`] = normalized
           }
