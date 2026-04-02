@@ -94,6 +94,7 @@ export default function KeywordTrendsClient() {
   // keywordId 파라미터로 저장된 키워드 복원
   useEffect(() => {
     const keywordId = searchParams.get('keywordId')
+    const overlayId = searchParams.get('overlayId')
     if (!keywordId || state.savedKeywords.length === 0) return
 
     const restoreKeywordFromId = async () => {
@@ -113,7 +114,12 @@ export default function KeywordTrendsClient() {
         const overlayData = await overlayRes.json()
         const overlays = overlayData.data as KeywordStockOverlay[]
 
-        const overlaySearches = overlays
+        // overlayId가 있으면 해당 overlay만 필터링
+        const targetOverlays = overlayId
+          ? overlays.filter(o => o.id === overlayId)
+          : overlays
+
+        const overlaySearches = targetOverlays
           .map(o => availableSearches.find(s => s.id === o.search_id))
           .filter(Boolean) as SearchRecord[]
 

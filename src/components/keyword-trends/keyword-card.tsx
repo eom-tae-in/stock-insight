@@ -14,13 +14,11 @@ interface KeywordCardProps {
   isManageMode: boolean
   isSelected: boolean
   isEditing: boolean
-  isDetailView?: boolean
   onDelete?: () => void
   onToggleSelect?: (id: string) => void
   onEditStart?: (id: string) => void
   onEditSave?: (id: string, newKeyword: string) => Promise<void>
   onEditCancel?: () => void
-  onSelect?: (id: string) => void
 }
 
 export function KeywordCard({
@@ -28,13 +26,11 @@ export function KeywordCard({
   isManageMode,
   isSelected,
   isEditing,
-  isDetailView,
   onDelete,
   onToggleSelect,
   onEditStart,
   onEditSave,
   onEditCancel,
-  onSelect,
 }: KeywordCardProps) {
   const [editValue, setEditValue] = useState(keyword.keyword)
   const [isSaving, setIsSaving] = useState(false)
@@ -103,27 +99,19 @@ export function KeywordCard({
 
   // 일반 모드 (비관리 모드)
   if (!isManageMode) {
-    const handleCardClick = () => {
-      onSelect?.(keyword.id)
-    }
-
     return (
       <div
         className={cn(
           'group border-border/50 from-card to-card/80 relative rounded-xl border bg-gradient-to-br p-4 transition-all duration-200',
           'hover:border-primary/70 hover:shadow-primary/10 hover:shadow-md',
-          'cursor-pointer backdrop-blur-sm',
-          isDetailView && 'border-primary shadow-primary/20 shadow-lg'
+          'cursor-pointer backdrop-blur-sm'
         )}
-        onClick={handleCardClick}
       >
-        {/* 오버레이 링크 (카드 전체 클릭 가능) - Detail View에서는 숨김 */}
-        {!isDetailView && (
-          <Link
-            href={`/trends/search?keywordId=${keyword.id}`}
-            className="absolute inset-0 rounded-xl"
-          />
-        )}
+        {/* 오버레이 링크 (카드 전체 클릭 가능) */}
+        <Link
+          href={`/keywords/${keyword.id}`}
+          className="absolute inset-0 rounded-xl"
+        />
 
         {/* 콘텐츠 및 인터랙티브 요소 (링크보다 위) */}
         <div className="relative z-10">
