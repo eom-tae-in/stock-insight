@@ -91,6 +91,77 @@ export default function KeywordTrendsClient() {
     }
   }, [searchParams])
 
+  // keywordId 파라미터로 저장된 키워드 복원
+  useEffect(() => {
+    const keywordId = searchParams.get('keywordId')
+    if (!keywordId || state.savedKeywords.length === 0) return
+
+    const restoreKeywordFromId = async () => {
+      try {
+        setState(prev => ({ ...prev, isLoading: true }))
+
+        // 저장된 키워드 찾기
+        const keywordSearch = state.savedKeywords.find(k => k.id === keywordId)
+        if (!keywordSearch) throw new Error('Keyword not found')
+
+        // 1단계: 오버레이 데이터 로드
+        const overlayRes = await apiFetch(
+          `/api/keyword-searches/${keywordId}/overlays`
+        )
+        if (!overlayRes.ok) throw new Error('Failed to fetch overlays')
+
+        const overlayData = await overlayRes.json()
+        const overlays = overlayData.data as KeywordStockOverlay[]
+
+        const overlaySearches = overlays
+          .map(o => availableSearches.find(s => s.id === o.search_id))
+          .filter(Boolean) as SearchRecord[]
+
+        // 2단계: 5y 데이터 재조회
+        const params = new URLSearchParams({
+          keyword: keywordSearch.keyword,
+          geo: '',
+          timeframe: '5y',
+          gprop: '',
+        })
+
+        const res = await apiFetch(`/api/trends?${params.toString()}`)
+        if (!res.ok) throw new Error('Failed to fetch trends')
+
+        const data = await res.json()
+        const raw = data?.data?.trendsData
+        if (!Array.isArray(raw)) throw new Error('Invalid response format')
+
+        setState(prev => ({
+          ...prev,
+          keyword: keywordSearch.keyword,
+          fullTrendsData: raw as TrendsDataPoint[],
+          selectedSearches: overlaySearches,
+          isLoading: false,
+        }))
+        setTimeframe(DEFAULT_TIMEFRAME)
+
+        // URL 업데이트 (keywordId 제거)
+        const urlParams = new URLSearchParams({
+          keyword: keywordSearch.keyword,
+          geo: '',
+          timeframe: DEFAULT_TIMEFRAME,
+          gprop: '',
+        })
+        router.push(`/trends/search?${urlParams.toString()}`)
+
+        toast.success(`"${keywordSearch.keyword}" 데이터를 복원했습니다`)
+      } catch (error) {
+        console.error('Error restoring keyword:', error)
+        setState(prev => ({ ...prev, isLoading: false }))
+        toast.error('저장된 키워드를 불러오지 못했습니다')
+      }
+    }
+
+    restoreKeywordFromId()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, state.savedKeywords, router])
+
   // customWeeks 변경 시 입력 필드 동기화
   useEffect(() => {
     setCustomWeeksInput(String(customWeeks))
@@ -103,6 +174,12 @@ export default function KeywordTrendsClient() {
     Set<string>
   >(new Set())
   const [searchFilter, setSearchFilter] = useState('')
+
+  // 페이지 진입 시: 저장된 종목 목록 + 저장된 키워드 목록 로드
+  useEffect(() => {
+    fetchAvailableSearches()
+    fetchSavedKeywords()
+  }, [])
 
   // 아키텍처 변경: trendsData는 fullTrendsData에서 필터링한 파생값
   // timeframe/customWeeks는 별도 state (UnifiedChart 방식)
@@ -162,12 +239,6 @@ export default function KeywordTrendsClient() {
       return ((currentValue - previousYearValue) / previousYearValue) * 100
     })
   }, [trendsData])
-
-  // 페이지 진입 시: 저장된 종목 목록 + 저장된 키워드 목록 로드
-  useEffect(() => {
-    fetchAvailableSearches()
-    fetchSavedKeywords()
-  }, [])
 
   // P0-2: 401 처리를 apiFetchJson으로 위임
   const fetchAvailableSearches = async () => {
