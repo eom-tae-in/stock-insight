@@ -102,6 +102,7 @@ export default function OverlayManager({
 
     setShowSuggestions(false)
     setSuggestions([])
+    onSearchFilterChange('')
     setActiveIndex(-1)
 
     if (existingSearch) {
