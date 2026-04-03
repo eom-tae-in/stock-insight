@@ -1,2 +1,0 @@
-[     268ms] [ERROR] Refused to apply style from 'http://localhost:3000/_next/static/chunks/730f42ab5b4cd4aa.css' because its MIME type ('text/html') is not a supported stylesheet MIME type, and strict MIME checking is enabled. @ http://localhost:3000/login?next=%2F:0
-[     299ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:3000/login?next=%2F:0

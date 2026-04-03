@@ -11,8 +11,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getSearchById, deleteSearch } from '@/lib/db/queries'
-import { createErrorResponse } from '@/lib/api-helpers'
-import type { ApiResponse, SearchRecord } from '@/types'
+import {
+  createErrorResponse,
+  validateApiAuth,
+  createSuccessResponse,
+} from '@/lib/api-helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,15 +24,13 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // 인증 확인
+    // 인증 검증 (중앙화된 헬퍼 사용)
     const supabase = await createSupabaseServerClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-    if (!user || authError) {
-      return createErrorResponse('UNAUTHORIZED', '로그인이 필요합니다.', 401)
+    const authResult = await validateApiAuth(supabase)
+    if (authResult instanceof NextResponse) {
+      return authResult // 에러 응답
     }
+    const { userId } = authResult
 
     const { id } = await params
 
@@ -39,7 +40,7 @@ export async function GET(
     }
 
     // userId를 전달하여 RLS 검증 (필수)
-    const search = await getSearchById(id, user.id, supabase)
+    const search = await getSearchById(id, userId, supabase)
 
     if (!search) {
       return createErrorResponse(
@@ -49,14 +50,7 @@ export async function GET(
       )
     }
 
-    // 성공 응답
-    const response: ApiResponse<SearchRecord> = {
-      success: true,
-      data: search,
-      timestamp: new Date().toISOString(),
-    }
-
-    return NextResponse.json(response, { status: 200 })
+    return createSuccessResponse(search, 200)
   } catch (error) {
     console.error('Error fetching search:', error)
     return createErrorResponse(
@@ -72,14 +66,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // 인증 확인
+    // 인증 검증 (중앙화된 헬퍼 사용)
     const supabase = await createSupabaseServerClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-    if (!user || authError) {
-      return createErrorResponse('UNAUTHORIZED', '로그인이 필요합니다.', 401)
+    const authResult = await validateApiAuth(supabase)
+    if (authResult instanceof NextResponse) {
+      return authResult // 에러 응답
     }
 
     const { id } = await params
@@ -100,14 +91,7 @@ export async function DELETE(
       )
     }
 
-    // 성공 응답
-    const response: ApiResponse<{ id: string }> = {
-      success: true,
-      data: { id },
-      timestamp: new Date().toISOString(),
-    }
-
-    return NextResponse.json(response, { status: 200 })
+    return createSuccessResponse({ id }, 200)
   } catch (error) {
     console.error('Error deleting search:', error)
     return createErrorResponse(

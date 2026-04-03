@@ -26,34 +26,27 @@ import {
   addStockOverlay,
   insertOverlayChartTimeseries,
 } from '@/lib/db/queries'
-import { createErrorResponse } from '@/lib/api-helpers'
-import type { ApiResponse, KeywordSearchRecord } from '@/types'
+import {
+  createErrorResponse,
+  validateApiAuth,
+  createSuccessResponse,
+} from '@/lib/api-helpers'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
-    // 인증 확인
+    // 인증 검증 (중앙화된 헬퍼 사용)
     const supabase = await createSupabaseServerClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-    if (!user || authError) {
-      return createErrorResponse('UNAUTHORIZED', '로그인이 필요합니다.', 401)
+    const authResult = await validateApiAuth(supabase)
+    if (authResult instanceof NextResponse) {
+      return authResult // 에러 응답
     }
 
     // 저장된 키워드 목록 조회
     const keywords = await getAllKeywordSearches(supabase)
 
-    // 성공 응답
-    const response: ApiResponse<KeywordSearchRecord[]> = {
-      success: true,
-      data: keywords,
-      timestamp: new Date().toISOString(),
-    }
-
-    return NextResponse.json(response, { status: 200 })
+    return createSuccessResponse(keywords, 200)
   } catch (error) {
     console.error('Error fetching keyword searches:', error)
     return createErrorResponse(
@@ -66,15 +59,13 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    // 인증 확인
+    // 인증 검증 (중앙화된 헬퍼 사용)
     const supabase = await createSupabaseServerClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-    if (!user || authError) {
-      return createErrorResponse('UNAUTHORIZED', '로그인이 필요합니다.', 401)
+    const authResult = await validateApiAuth(supabase)
+    if (authResult instanceof NextResponse) {
+      return authResult // 에러 응답
     }
+    const { userId } = authResult
 
     // 요청 바디 파싱
     const body = await request.json()
@@ -117,7 +108,7 @@ export async function POST(request: NextRequest) {
     const keywordSearchId = await upsertKeywordSearch(
       {
         id: '',
-        user_id: user.id,
+        user_id: userId,
         keyword,
         trends_data: [],
         searched_at: new Date().toISOString(),
@@ -186,13 +177,7 @@ export async function POST(request: NextRequest) {
       throw new Error('Failed to retrieve created keyword')
     }
 
-    const response: ApiResponse<KeywordSearchRecord> = {
-      success: true,
-      data: created,
-      timestamp: new Date().toISOString(),
-    }
-
-    return NextResponse.json(response, { status: 201 })
+    return createSuccessResponse(created, 201)
   } catch (error) {
     console.error('Error creating keyword search:', error)
     return createErrorResponse(
@@ -205,14 +190,11 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    // 인증 확인
+    // 인증 검증 (중앙화된 헬퍼 사용)
     const supabase = await createSupabaseServerClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-    if (!user || authError) {
-      return createErrorResponse('UNAUTHORIZED', '로그인이 필요합니다.', 401)
+    const authResult = await validateApiAuth(supabase)
+    if (authResult instanceof NextResponse) {
+      return authResult // 에러 응답
     }
 
     // 쿼리 파라미터에서 id 추출
@@ -235,14 +217,7 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // 성공 응답
-    const response: ApiResponse<{ id: string }> = {
-      success: true,
-      data: { id },
-      timestamp: new Date().toISOString(),
-    }
-
-    return NextResponse.json(response, { status: 200 })
+    return createSuccessResponse({ id }, 200)
   } catch (error) {
     console.error('Error deleting keyword search:', error)
     return createErrorResponse(

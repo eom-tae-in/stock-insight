@@ -8,8 +8,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getKeywordStockOverlays } from '@/lib/db/queries'
-import { createErrorResponse } from '@/lib/api-helpers'
-import type { ApiResponse, KeywordStockOverlay } from '@/types'
+import {
+  createErrorResponse,
+  validateApiAuth,
+  createSuccessResponse,
+} from '@/lib/api-helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,14 +21,11 @@ export async function GET(
   { params }: { params: Promise<{ keywordId: string }> }
 ) {
   try {
-    // 인증 확인
+    // 인증 검증 (중앙화된 헬퍼 사용)
     const supabase = await createSupabaseServerClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-    if (!user || authError) {
-      return createErrorResponse('UNAUTHORIZED', '로그인이 필요합니다.', 401)
+    const authResult = await validateApiAuth(supabase)
+    if (authResult instanceof NextResponse) {
+      return authResult // 에러 응답
     }
 
     const { keywordId } = await params
@@ -38,14 +38,7 @@ export async function GET(
     // 오버레이 목록 조회
     const overlays = await getKeywordStockOverlays(keywordId, supabase)
 
-    // 성공 응답
-    const response: ApiResponse<KeywordStockOverlay[]> = {
-      success: true,
-      data: overlays,
-      timestamp: new Date().toISOString(),
-    }
-
-    return NextResponse.json(response, { status: 200 })
+    return createSuccessResponse(overlays, 200)
   } catch (error) {
     console.error('Error fetching overlays:', error)
     return createErrorResponse(
