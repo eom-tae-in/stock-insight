@@ -326,13 +326,13 @@ export default function KeywordTrendsClient() {
     }
   }
 
-  // 오버레이할 주식 추가 (F026: 최대 5개로 확장)
+  // 오버레이할 주식 추가 (F026: 최대 1개)
   const handleAddOverlay = (searchId: string) => {
     const search = availableSearches.find(s => s.id === searchId)
     if (!search) return
 
-    if (state.selectedSearches.length >= 5) {
-      toast.error('최대 5개까지만 추가할 수 있습니다')
+    if (state.selectedSearches.length >= 1) {
+      toast.error('최대 1개까지만 추가할 수 있습니다')
       return
     }
 
@@ -795,16 +795,27 @@ export default function KeywordTrendsClient() {
                     ? `${customWeeks}주 트렌드 분석`
                     : `${TIMEFRAME_LABELS[timeframe]} 트렌드 분석`}
                 </h3>
-                <Button
-                  onClick={() => handleDownloadPNG(timeframe)}
-                  disabled={downloadingTimeframes.has(timeframe)}
-                  variant="outline"
-                  size="sm"
-                >
-                  {downloadingTimeframes.has(timeframe)
-                    ? 'PNG 다운로드 중...'
-                    : 'PNG 다운로드'}
-                </Button>
+                <div className="flex gap-2">
+                  {state.keyword && state.selectedSearches.length > 0 && (
+                    <Button
+                      onClick={handleSaveCombo}
+                      disabled={isSaving}
+                      size="sm"
+                    >
+                      {isSaving ? '저장 중...' : '조합 저장'}
+                    </Button>
+                  )}
+                  <Button
+                    onClick={() => handleDownloadPNG(timeframe)}
+                    disabled={downloadingTimeframes.has(timeframe)}
+                    variant="outline"
+                    size="sm"
+                  >
+                    {downloadingTimeframes.has(timeframe)
+                      ? 'PNG 다운로드 중...'
+                      : 'PNG 다운로드'}
+                  </Button>
+                </div>
               </div>
 
               <div
@@ -825,11 +836,9 @@ export default function KeywordTrendsClient() {
                 selectedSearches={state.selectedSearches}
                 availableSearches={availableSearches}
                 searchFilter={searchFilter}
-                isSaving={isSaving}
                 onAddOverlay={handleAddOverlay}
                 onRemoveOverlay={handleRemoveOverlay}
                 onSearchFilterChange={setSearchFilter}
-                onSaveCombo={handleSaveCombo}
                 onAddTickerOverlay={handleAddTickerOverlay}
               />
 
