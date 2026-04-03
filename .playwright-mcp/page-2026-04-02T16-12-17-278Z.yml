@@ -1,31 +1,31 @@
 - generic [active] [ref=e1]:
-  - generic [ref=e2]:
-    - banner [ref=e3]:
-      - heading "StockInsight" [level=1] [ref=e4]
-      - button "테마 전환" [ref=e5]:
-        - img
-        - generic [ref=e6]: 테마 전환
-    - main [ref=e7]:
-      - generic [ref=e8]:
-        - generic [ref=e10]:
-          - generic [ref=e11]:
-            - heading "환영합니다" [level=2] [ref=e12]
-            - paragraph [ref=e13]: 로컬 주식 분석 도구에 로그인하세요
-          - generic [ref=e14]:
-            - generic [ref=e15]: SNS로 빠르게 로그인
-            - button "🔍 Google로 로그인" [ref=e16]
-          - generic [ref=e18]: 또는
-          - generic [ref=e20]:
-            - textbox "이메일" [ref=e21]
-            - textbox "비밀번호" [ref=e22]
-            - button "로그인" [ref=e23]
-            - paragraph [ref=e24]:
-              - text: 아직 계정이 없으신가요?
-              - link "회원가입" [ref=e25] [cursor=pointer]:
-                - /url: /signup
-          - paragraph [ref=e26]: 로그인하면 우리의 서비스 약관에 동의하는 것입니다.
-        - generic [ref=e28]:
-          - generic [ref=e29]: 📊
-          - paragraph [ref=e30]: 5년 가격 흐름 분석
-  - region "Notifications alt+T"
-  - alert [ref=e31]
+    - generic [ref=e2]:
+        - banner [ref=e3]:
+            - heading "StockInsight" [level=1] [ref=e4]
+            - button "테마 전환" [ref=e5]:
+                - img
+                - generic [ref=e6]: 테마 전환
+        - main [ref=e7]:
+            - generic [ref=e8]:
+                - generic [ref=e10]:
+                    - generic [ref=e11]:
+                        - heading "환영합니다" [level=2] [ref=e12]
+                        - paragraph [ref=e13]: 로컬 주식 분석 도구에 로그인하세요
+                    - generic [ref=e14]:
+                        - generic [ref=e15]: SNS로 빠르게 로그인
+                        - button "🔍 Google로 로그인" [ref=e16]
+                    - generic [ref=e18]: 또는
+                    - generic [ref=e20]:
+                        - textbox "이메일" [ref=e21]
+                        - textbox "비밀번호" [ref=e22]
+                        - button "로그인" [ref=e23]
+                        - paragraph [ref=e24]:
+                            - text: 아직 계정이 없으신가요?
+                            - link "회원가입" [ref=e25] [cursor=pointer]:
+                                - /url: /signup
+                    - paragraph [ref=e26]: 로그인하면 우리의 서비스 약관에 동의하는 것입니다.
+                - generic [ref=e28]:
+                    - generic [ref=e29]: 📊
+                    - paragraph [ref=e30]: 5년 가격 흐름 분석
+    - region "Notifications alt+T"
+    - alert [ref=e31]

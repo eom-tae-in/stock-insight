@@ -22,11 +22,9 @@ interface OverlayManagerProps {
   selectedSearches: SearchRecord[]
   availableSearches: SearchRecord[]
   searchFilter: string
-  isSaving: boolean
   onAddOverlay: (searchId: string) => void
   onRemoveOverlay: (searchId: string) => void
   onSearchFilterChange: (value: string) => void
-  onSaveCombo: () => void
   onAddTickerOverlay?: (ticker: string) => void // 새 종목 추가용
 }
 
@@ -34,11 +32,9 @@ export default function OverlayManager({
   selectedSearches,
   availableSearches,
   searchFilter,
-  isSaving,
   onAddOverlay,
   onRemoveOverlay,
   onSearchFilterChange,
-  onSaveCombo,
   onAddTickerOverlay,
 }: OverlayManagerProps) {
   const [suggestions, setSuggestions] = useState<TickerSuggestion[]>([])
@@ -237,11 +233,6 @@ export default function OverlayManager({
             ))}
           </div>
         )}
-
-        {/* 저장 버튼 */}
-        <Button onClick={onSaveCombo} disabled={isSaving} className="w-full">
-          {isSaving ? '저장중...' : '현재 조합 저장'}
-        </Button>
       </CardContent>
     </Card>
   )
