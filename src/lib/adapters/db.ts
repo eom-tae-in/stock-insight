@@ -153,6 +153,7 @@ class SupabaseDbAdapter implements DbAdapter {
       .from('searches')
       .upsert(
         {
+          user_id: record.user_id,
           ticker: record.ticker.toUpperCase(),
           company_name: record.company_name,
           currency: record.currency || 'USD',
