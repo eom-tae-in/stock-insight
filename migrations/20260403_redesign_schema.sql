@@ -9,15 +9,16 @@
 -- 1. 기존 테이블 전부 삭제 (재설계이므로)
 -- ============================================================================
 
-DROP TABLE IF EXISTS overlay_chart_timeseries;
-DROP TABLE IF EXISTS keyword_chart_timeseries;
-DROP TABLE IF EXISTS keyword_stock_overlays;
-DROP TABLE IF EXISTS keyword_trends_data;
-DROP TABLE IF EXISTS keyword_searches;
-DROP TABLE IF EXISTS trends_data;
-DROP TABLE IF EXISTS price_data;
-DROP TABLE IF EXISTS searches;
-DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS overlay_chart_timeseries CASCADE;
+DROP TABLE IF EXISTS keyword_chart_timeseries CASCADE;
+DROP TABLE IF EXISTS keyword_stock_overlays CASCADE;
+DROP TABLE IF EXISTS keyword_trends_data CASCADE;
+DROP TABLE IF EXISTS keyword_searches CASCADE;
+DROP TABLE IF EXISTS stock_price_data CASCADE;
+DROP TABLE IF EXISTS trends_data CASCADE;
+DROP TABLE IF EXISTS price_data CASCADE;
+DROP TABLE IF EXISTS searches CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
 
 -- ============================================================================
 -- 2. users 테이블 (Supabase auth.users와 연계)

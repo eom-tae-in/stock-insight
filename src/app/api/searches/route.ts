@@ -40,7 +40,8 @@ export async function GET() {
     }
 
     // 인증된 클라이언트로 DB에서 자신의 저장된 종목 조회 (RLS 적용)
-    const records = await getAllSearches(supabase)
+    // userId를 반드시 전달 (RLS 검증)
+    const records = await getAllSearches(user.id, supabase)
 
     return createSuccessResponse(records, 200)
   } catch (error) {

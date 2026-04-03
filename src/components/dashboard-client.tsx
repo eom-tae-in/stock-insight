@@ -224,11 +224,11 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
                   id={record.id}
                   ticker={record.ticker}
                   companyName={record.company_name}
-                  currentPrice={record.current_price}
-                  previousClose={record.previous_close}
-                  yoyChange={record.yoy_change}
+                  currentPrice={record.current_price ?? 0}
+                  previousClose={record.previous_close ?? 0}
+                  yoyChange={record.yoy_change ?? 0}
                   sparklineData={record.price_data}
-                  lastUpdatedAt={record.last_updated_at}
+                  lastUpdatedAt={record.last_updated_at ?? record.searched_at}
                   onRefresh={() => handleRefresh(record.id)}
                   onDelete={() => handleDelete(record.id)}
                   isLoading={loadingIds.has(record.id)}

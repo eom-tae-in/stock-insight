@@ -1,15 +1,17 @@
 # StockInsight 개발 규칙
 
-**로컬 주식 분석 도구: Yahoo Finance + Google Trends 데이터 결합 비교**
+**Supabase 기반 주식 분석 도구: Yahoo Finance + Google Trends 종합 분석**
+
+**🔴 현재 상태**: MVP 100% 완료 + Phase 7 (키워드 트렌드) 80% 진행 중
 
 ---
 
 ## 프로젝트 개요
 
-- **목적**: 특정 종목의 5년 가격 흐름과 대중 검색 관심도를 비교 분석하는 로컬 투자 판단 도구
-- **범위**: 로컬 개발 환경 전용 (배포 없음, `npm run dev`로만 실행)
-- **구조**: 3페이지 (대시보드 / 검색 / 상세) + 16개 기능
-- **기술 스택**: Next.js 15.5.3 + React 19 + TypeScript 5 + better-sqlite3 + Recharts
+- **목적**: Yahoo Finance 주가 + Google Trends 검색 관심도를 결합하여 종목 분석
+- **범위**: Supabase PostgreSQL 클라우드 DB 기반 (로컬 develop 환경)
+- **구조**: 5페이지 (대시보드 / 검색 / 분석 / 트렌드 / 키워드) + 26개 기능
+- **기술 스택**: Next.js 15.5.3 + React 19 + TypeScript 5 + Supabase + TailwindCSS v4 + shadcn/ui
 - **외부 API**: yahoo-finance2 (주가), SerpAPI (Google Trends)
 
 ---
@@ -436,12 +438,169 @@ if (!SERPAPI_KEY) {
 
 ---
 
-## Supabase 마이그레이션 전략 (신규)
+---
+
+## 🔴 CRITICAL 이슈 (즉시 처리 필수)
+
+### Issue 1: RLS/user_id 위반 오류
+
+**파일**: `src/lib/adapters/db.ts`, `src/app/api/searches/route.ts`
+
+**문제**:
+
+```typescript
+// ❌ 잘못된 예 - RLS 정책 위반
+const { data } = await supabase.from('searches').select('*')
+
+// ✅ 올바른 예 - user_id 필터링 필수
+const { data } = await supabase
+  .from('searches')
+  .select('*')
+  .eq('user_id', userId)
+```
+
+**필수 조치**:
+
+- [ ] `getAllSearches()`: user_id 필터링 추가
+- [ ] `getSearch()`: user_id 검증 추가
+- [ ] 모든 수정 작업(POST/PUT/DELETE)에서 user_id 명시
+- [ ] 커밋: `5c67081` 이후 재발 방지 (최근 수정됨)
+
+### Issue 2: SearchRecord 데이터 불완전
+
+**파일**: `src/types/database.ts`, `src/lib/adapters/db.ts`
+
+**문제**: `getAllSearches()`에서 price_data, trends_data를 로드하지 않음
+
+```typescript
+// ❌ 현재 상태
+return {
+  id: row.id,
+  ticker: row.ticker,
+  price_data: [], // ← 빈 배열
+  trends_data: [], // ← 빈 배열
+}
+
+// ✅ 필수 수정
+const priceData = await getStockPriceData(id, supabase)
+const trendsData = await getTrendsData(id, supabase)
+return {
+  ...record,
+  price_data: priceData,
+  trends_data: trendsData,
+}
+```
+
+**필수 조치**:
+
+- [ ] `getAllSearches()`: price_data, trends_data 로드
+- [ ] 또는 lazy loading: 필요할 때만 로드 (성능 최적화)
+- [ ] 대시보드 렌더링 전 데이터 유효성 검증
+
+### Issue 3: Type Guard와 인터페이스 불일치
+
+**파일**: `src/lib/type-guards.ts`, `src/types/database.ts`
+
+**문제**:
+
+```typescript
+// database.ts: optional 필드
+interface SearchRecord {
+  current_price?: number
+  yoy_change?: number
+}
+
+// type-guards.ts: required로 검사 (불일치!)
+isSearchRecord() {
+  typeof obj.current_price === 'number'  // ❌ 필수로 검사
+}
+```
+
+**필수 조치**:
+
+- [ ] database.ts에서 필수/선택 필드 명확히 정의
+- [ ] type-guards.ts에서 실제 구조에 맞게 검사
+- [ ] 모든 타입 가드 함수 검증
+
+### Issue 4: overlay-manager 자동완성 버그
+
+**파일**: `src/components/keyword-trends/overlay-manager.tsx`
+
+**문제**: 종목 선택 후 입력값이 초기화되지 않음
+
+**필수 조치**:
+
+- [ ] 선택 콜백에서 입력값 초기화 로직 추가
+- [ ] 테스트: 자동완성 선택 후 입력값 확인
+
+---
+
+## 🟠 HIGH 우선순위 (1-2주)
+
+### Architecture: N+1 쿼리 최적화
+
+**파일**: `src/app/keywords/[keywordId]/page.tsx` (라인 54-93)
+
+```typescript
+// ❌ 순차 조회 (느림)
+const chartTimeseries = await getKeywordChartTimeseries(keywordId, supabase)
+const overlayRecords = await getKeywordStockOverlays(keywordId, supabase)
+
+// ✅ 병렬 조회 (빠름)
+const [chartTimeseries, overlayRecords] = await Promise.all([
+  getKeywordChartTimeseries(keywordId, supabase),
+  getKeywordStockOverlays(keywordId, supabase),
+])
+```
+
+### Architecture: 레이아웃 분리
+
+**필수**: 인증 페이지와 앱 페이지 분리
+
+```
+src/app/
+├── (auth)/layout.tsx           # 최소 헤더
+│   ├── login/, signup/
+├── (app)/layout.tsx            # 풀 헤더
+│   ├── page.tsx, search/, analysis/
+```
+
+### API: params 처리 통일
+
+**필수**: 모든 동적 라우트에서 `await params` 사용
+
+```typescript
+// ✅ 올바른 예
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params // 항상 await 필수
+}
+```
+
+---
+
+## 🟡 환경 정리 필수
+
+### 즉시 제거할 항목
+
+| 항목                 | 크기   | 조치                                                               |
+| -------------------- | ------ | ------------------------------------------------------------------ |
+| **venv/**            | 140MB  | `rm -rf venv/`                                                     |
+| **.playwright-mcp/** | 1.3MB  | `rm -rf .playwright-mcp/ && echo ".playwright-mcp/" >> .gitignore` |
+| **tw-animate-css**   | 패키지 | `npm uninstall tw-animate-css` (Tailwind v4에 포함됨)              |
+
+---
+
+## Supabase 마이그레이션 전략
 
 ### 📋 마이그레이션 현재 상태
 
-- ✅ SQLite 기반 기능 완성
-- 🔄 Supabase(PostgreSQL) 점진적 마이그레이션 계획 중
+- ✅ SQLite → Supabase 완전 마이그레이션 완료 (2026-04-03)
+- ✅ RLS 정책 설정 완료
+- 🚀 Phase 7 (키워드 트렌드 분석) 진행 중 (80% 진행)
 
 ### 🎯 8가지 핵심 원칙 (엄격)
 
@@ -613,21 +772,125 @@ feat: Supabase 마이그레이션 - Phase N: [간단한 설명]
 
 ---
 
+---
+
+## 📊 TypeScript/코드 표준 (Supabase 기반)
+
+### snake_case ↔ camelCase 변환 규칙
+
+- **Database**: snake_case (`user_id`, `company_name`, `price_data`, `trends_data`)
+- **Application**: camelCase (`userId`, `companyName`, `priceData`, `trendsData`)
+- **변환 위치**: `src/lib/adapters/db.ts` (반드시 단일 책임)
+
+```typescript
+// ✅ 올바른 패턴
+function toSearchRecord(dbRow: DatabaseRow): SearchRecord {
+  return {
+    id: dbRow.id,
+    userId: dbRow.user_id, // 변환
+    ticker: dbRow.ticker,
+    companyName: dbRow.company_name, // 변환
+    priceData: dbRow.price_data || [],
+    trendsData: dbRow.trends_data || [],
+  }
+}
+```
+
+### Props 인터페이스 명시 (필수)
+
+```typescript
+// ✅ 필수
+interface StockCardProps {
+  id: string // 필수
+  ticker: string // 필수
+  currentPrice?: number // 선택 (? 표시)
+  className?: string
+}
+
+// ❌ 금지
+interface Props {
+  // Props 이름이 너무 일반적
+  data: any // any 사용 금지
+}
+```
+
+### RLS 검증 패턴
+
+```typescript
+// ✅ 모든 쿼리에 필수
+async function getSearchesByUser(userId: string) {
+  const { data } = await supabase
+    .from('searches')
+    .select('*')
+    .eq('user_id', userId) // RLS 정책과 일치
+  return data || []
+}
+```
+
+---
+
+## 🎯 현재 개발 우선순위 (2026-04-03)
+
+### 1순위 (CRITICAL - 즉시)
+
+1. RLS/user_id 위반 해결
+2. SearchRecord 데이터 완전성 보장
+3. Type Guard 일치 검증
+4. overlay-manager 자동완성 버그 수정
+
+### 2순위 (HIGH - 1주)
+
+5. N+1 쿼리 최적화
+6. 레이아웃 분리 구현
+7. params 처리 통일
+8. 인증 검증 중앙화
+
+### 3순위 (MEDIUM - 2주)
+
+9. 환경 정리 (venv, .playwright-mcp 제거)
+10. snake_case/camelCase 변환 레이어
+11. 컴포넌트 Props 인터페이스 통일
+12. Phase 7 완료 (F023-F026)
+
+---
+
+## ✅ 각 작업 시작 전 체크리스트
+
+**새 기능 구현 시**:
+
+- [ ] TypeScript strict 모드 통과
+- [ ] Props 인터페이스 명시적 정의
+- [ ] user_id 필터링 추가 (DB 관련)
+- [ ] 타입 가드 적용
+- [ ] Tailwind 클래스만 사용 (inline style 최소)
+- [ ] 다크모드 지원 (dark:)
+
+**병합 전 (PR)**:
+
+- [ ] `npm run check-all` 통과
+- [ ] CRITICAL 이슈 해결
+- [ ] 테스트 실행
+- [ ] 파일 상호작용 확인
+
+---
+
 ## 요약
 
-이 규칙 문서는 **AI Agent가 StockInsight 개발 시 반드시 따라야 할 기준**을 정의합니다.
+이 규칙은 **Supabase 기반 StockInsight Phase 7 개발 시 반드시 따라야 할 기준**을 정의합니다.
 
 **핵심 원칙:**
 
-1. 로컬 전용 → 배포 설정 금지
-2. 3테이블 DB + 16개 기능 → 파일 상호작용 주의
-3. 두 API 데이터 정규화 → ISO week 기반 통일
-4. Phase 1→2→3→4 순서 → 구조 우선 접근법
-5. API 연동 Task마다 Playwright 테스트
+1. **RLS 필수** → 모든 쿼리에 user_id 필터링
+2. **타입 안전성** → any 금지, 명시적 Props 인터페이스
+3. **데이터 완전성** → price_data, trends_data 항상 로드
+4. **병렬 처리** → Promise.all() 활용, N+1 방지
+5. **Supabase First** → SQLite는 더 이상 사용 안 함
 
-**불명확한 사항이 있을 때:**
+**불명확할 때**:
 
-1. PRD.md와 ROADMAP.md를 우선 참고
-2. 기존 코드의 패턴 따르기
-3. 금지 사항 확인하기
-4. 작은 변경부터 시작해서 영향도 파악하기
+1. PRD.md & ROADMAP.md 참고
+2. 기존 코드 패턴 따르기
+3. CRITICAL 이슈 우선 처리
+4. 작은 변경부터 시작
+
+**마지막 업데이트**: 2026-04-03 (5개 에이전트 종합 분석 반영)

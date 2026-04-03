@@ -38,8 +38,8 @@ export async function GET(
       return createErrorResponse('INVALID_ID', '유효하지 않은 ID입니다.', 400)
     }
 
-    // 종목 조회
-    const search = await getSearchById(id, supabase)
+    // userId를 전달하여 RLS 검증 (필수)
+    const search = await getSearchById(id, user.id, supabase)
 
     if (!search) {
       return createErrorResponse(

@@ -21,17 +21,20 @@ export const upsertSearch = async (
 
 export const getSearchById = async (
   searchId: string,
+  userId: string,
   client?: SupabaseClient
-): Promise<SearchRecord | null> => db.getSearch(searchId, client)
+): Promise<SearchRecord | null> => db.getSearch(searchId, userId, client)
 
 export const getSearchByTicker = async (
   ticker: string,
+  userId: string,
   client?: SupabaseClient
-): Promise<SearchRecord | null> => db.getSearchByTicker(ticker, client)
+): Promise<SearchRecord | null> => db.getSearchByTicker(ticker, userId, client)
 
 export const getAllSearches = async (
+  userId: string,
   client?: SupabaseClient
-): Promise<SearchRecord[]> => db.getAllSearches(client)
+): Promise<SearchRecord[]> => db.getAllSearches(userId, client)
 
 export const deleteSearch = async (
   searchId: string,
