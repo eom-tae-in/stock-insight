@@ -63,21 +63,38 @@ export function isTrendsDataPointArray(
 
 /**
  * SearchRecord 타입 가드
+ *
+ * 필수 필드: id, user_id, ticker, company_name, searched_at
+ * Optional 필드: currency, current_price, yoy_change, price_data (배열), trends_data (배열)
  */
 export function isSearchRecord(value: unknown): value is SearchRecord {
   if (typeof value !== 'object' || value === null) return false
   const obj = value as Record<string, unknown>
   return (
+    // 필수 필드
     typeof obj.id === 'string' &&
+    typeof obj.user_id === 'string' &&
     typeof obj.ticker === 'string' &&
     typeof obj.company_name === 'string' &&
-    typeof obj.current_price === 'number' &&
-    typeof obj.yoy_change === 'number' &&
-    isPriceDataPointArray(obj.price_data) &&
-    isTrendsDataPointArray(obj.trends_data) &&
-    typeof obj.last_updated_at === 'string' &&
     typeof obj.searched_at === 'string' &&
-    typeof obj.created_at === 'string'
+    // Optional 필드 (타입 검증 only)
+    (obj.currency === undefined || typeof obj.currency === 'string') &&
+    (obj.current_price === undefined ||
+      typeof obj.current_price === 'number') &&
+    (obj.previous_close === undefined ||
+      typeof obj.previous_close === 'number') &&
+    (obj.ma13 === undefined || typeof obj.ma13 === 'number') &&
+    (obj.yoy_change === undefined || typeof obj.yoy_change === 'number') &&
+    (obj.week52_high === undefined || typeof obj.week52_high === 'number') &&
+    (obj.week52_low === undefined || typeof obj.week52_low === 'number') &&
+    (obj.last_updated_at === undefined ||
+      typeof obj.last_updated_at === 'string') &&
+    (obj.created_at === undefined || typeof obj.created_at === 'string') &&
+    // 데이터 배열
+    Array.isArray(obj.price_data) &&
+    (obj.price_data.length === 0 || obj.price_data.every(isPriceDataPoint)) &&
+    Array.isArray(obj.trends_data) &&
+    (obj.trends_data.length === 0 || obj.trends_data.every(isTrendsDataPoint))
   )
 }
 
@@ -213,6 +230,7 @@ export function parseSearchRecordRaw(
 
     return {
       id: raw.id as string,
+      user_id: raw.user_id as string,
       ticker: raw.ticker as string,
       company_name: raw.company_name as string,
       currency: raw.currency as string | undefined,

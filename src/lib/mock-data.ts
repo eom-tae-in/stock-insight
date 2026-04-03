@@ -119,6 +119,7 @@ export function getMockSearchRecords(): SearchRecord[] {
 
     return {
       id: `mock-${item.ticker}`,
+      user_id: '00000000-0000-0000-0000-000000000000', // 더미 사용자 ID (mock용)
       ticker: item.ticker,
       company_name: item.name,
       current_price: metrics.currentPrice,

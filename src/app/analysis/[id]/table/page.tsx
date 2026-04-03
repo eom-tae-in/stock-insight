@@ -5,6 +5,7 @@ import { Container } from '@/components/layout/container'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/data-table'
 import { TableHeader } from '@/components/table-header'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getSearchById } from '@/lib/db/queries'
 import { calculateMA13, calculateWeeklyYoY } from '@/lib/calculations'
 import { ArrowLeft } from 'lucide-react'
@@ -18,8 +19,21 @@ export const dynamic = 'force-dynamic'
 export default async function TablePage({ params }: TablePageProps) {
   const { id } = await params
 
-  // DB에서 종목 데이터 직접 조회
-  const record = await getSearchById(id)
+  // 인증된 서버 클라이언트로 종목 데이터 조회
+  const supabase = await createSupabaseServerClient()
+
+  // 사용자 정보 조회
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (!user || authError) {
+    notFound()
+  }
+
+  // userId를 전달하여 RLS 검증 (필수)
+  const record = await getSearchById(id, user.id, supabase)
 
   if (!record) {
     notFound()
@@ -67,7 +81,9 @@ export default async function TablePage({ params }: TablePageProps) {
           {/* 마지막 업데이트 */}
           <p className="text-muted-foreground mb-8 text-sm">
             마지막 업데이트:{' '}
-            {new Date(record.last_updated_at).toLocaleDateString('ko-KR')}
+            {new Date(
+              record.last_updated_at ?? record.searched_at
+            ).toLocaleDateString('ko-KR')}
           </p>
 
           {/* 데이터 테이블 */}

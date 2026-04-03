@@ -22,7 +22,19 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
 
   // 인증된 서버 클라이언트로 종목 데이터 조회 (RLS 적용됨)
   const supabase = await createSupabaseServerClient()
-  const record = await getSearchById(id, supabase)
+
+  // 사용자 정보 조회
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (!user || authError) {
+    notFound()
+  }
+
+  // userId를 전달하여 RLS 검증 (필수)
+  const record = await getSearchById(id, user.id, supabase)
 
   if (!record) {
     notFound()
@@ -43,7 +55,9 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
             </h1>
             <p className="text-muted-foreground mt-2 text-sm">
               마지막 업데이트:{' '}
-              {new Date(record.last_updated_at).toLocaleDateString('ko-KR')}
+              {new Date(
+                record.last_updated_at ?? record.searched_at
+              ).toLocaleDateString('ko-KR')}
             </p>
           </div>
 

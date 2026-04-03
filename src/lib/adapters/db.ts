@@ -24,13 +24,18 @@ export interface DbAdapter {
   upsertSearch(record: SearchRecord, client?: SupabaseClient): Promise<string>
   getSearch(
     searchId: string,
+    userId: string,
     client?: SupabaseClient
   ): Promise<SearchRecord | null>
   getSearchByTicker(
     ticker: string,
+    userId: string,
     client?: SupabaseClient
   ): Promise<SearchRecord | null>
-  getAllSearches(client?: SupabaseClient): Promise<SearchRecord[]>
+  getAllSearches(
+    userId: string,
+    client?: SupabaseClient
+  ): Promise<SearchRecord[]>
   deleteSearch(searchId: string, client?: SupabaseClient): Promise<boolean>
 
   // ============ stock_price_data (주가 시계열) ============
@@ -170,17 +175,23 @@ class SupabaseDbAdapter implements DbAdapter {
 
   async getSearch(
     searchId: string,
+    userId: string,
     client?: SupabaseClient
   ): Promise<SearchRecord | null> {
     const supabase = client ?? getSupabaseClient()
 
+    // RLS 검증: 해당 종목이 사용자 소유인지 확인
     const { data, error } = await supabase
       .from('searches')
       .select('*')
       .eq('id', searchId)
+      .eq('user_id', userId) // ← RLS 필터링
       .single()
 
     if (error) return null
+
+    // 가격 데이터 조회
+    const priceData = await this.getPriceDataBySearchId(searchId, client)
 
     return {
       id: data.id,
@@ -188,11 +199,10 @@ class SupabaseDbAdapter implements DbAdapter {
       ticker: data.ticker,
       company_name: data.company_name,
       currency: data.currency,
-      current_price: 0,
-      yoy_change: 0,
-      price_data: [],
+      current_price:
+        priceData.length > 0 ? priceData[priceData.length - 1].close : 0,
+      price_data: priceData,
       trends_data: [],
-      last_updated_at: new Date().toISOString(),
       searched_at: data.searched_at,
       created_at: data.created_at,
     }
@@ -200,17 +210,23 @@ class SupabaseDbAdapter implements DbAdapter {
 
   async getSearchByTicker(
     ticker: string,
+    userId: string,
     client?: SupabaseClient
   ): Promise<SearchRecord | null> {
     const supabase = client ?? getSupabaseClient()
 
+    // RLS 검증: 해당 종목이 사용자 소유인지 확인
     const { data, error } = await supabase
       .from('searches')
       .select('*')
       .eq('ticker', ticker.toUpperCase())
+      .eq('user_id', userId) // ← RLS 필터링
       .single()
 
     if (error) return null
+
+    // 가격 데이터 조회
+    const priceData = await this.getPriceDataBySearchId(data.id, client)
 
     return {
       id: data.id,
@@ -218,40 +234,54 @@ class SupabaseDbAdapter implements DbAdapter {
       ticker: data.ticker,
       company_name: data.company_name,
       currency: data.currency,
-      current_price: 0,
-      yoy_change: 0,
-      price_data: [],
+      current_price:
+        priceData.length > 0 ? priceData[priceData.length - 1].close : 0,
+      price_data: priceData,
       trends_data: [],
-      last_updated_at: new Date().toISOString(),
       searched_at: data.searched_at,
       created_at: data.created_at,
     }
   }
 
-  async getAllSearches(client?: SupabaseClient): Promise<SearchRecord[]> {
+  async getAllSearches(
+    userId: string,
+    client?: SupabaseClient
+  ): Promise<SearchRecord[]> {
     const supabase = client ?? getSupabaseClient()
 
+    // RLS 검증: 사용자 자신의 종목만 조회
     const { data, error } = await supabase
       .from('searches')
       .select('*')
+      .eq('user_id', userId) // ← RLS 필터링 (필수)
       .order('searched_at', { ascending: false })
 
     if (error) throw error
 
-    return (data || []).map(row => ({
-      id: row.id,
-      user_id: row.user_id,
-      ticker: row.ticker,
-      company_name: row.company_name,
-      currency: row.currency,
-      current_price: 0,
-      yoy_change: 0,
-      price_data: [],
-      trends_data: [],
-      last_updated_at: new Date().toISOString(),
-      searched_at: row.searched_at,
-      created_at: row.created_at,
-    }))
+    // 각 종목의 price_data 병렬 로드 (N+1 쿼리 방지)
+    const searchesWithPrices = await Promise.all(
+      (data || []).map(async row => {
+        const priceData = await this.getPriceDataBySearchId(row.id, client)
+        return {
+          id: row.id,
+          user_id: row.user_id,
+          ticker: row.ticker,
+          company_name: row.company_name,
+          currency: row.currency,
+          current_price:
+            priceData.length > 0
+              ? priceData[priceData.length - 1].close
+              : undefined,
+          yoy_change: undefined, // 대시보드에서는 간단히 표시, 상세 계산은 분석 페이지에서
+          price_data: priceData,
+          trends_data: [],
+          searched_at: row.searched_at,
+          created_at: row.created_at,
+        }
+      })
+    )
+
+    return searchesWithPrices
   }
 
   async deleteSearch(
@@ -332,6 +362,7 @@ class SupabaseDbAdapter implements DbAdapter {
       .from('keyword_searches')
       .upsert(
         {
+          user_id: record.user_id,
           keyword: record.keyword,
           searched_at: record.searched_at,
           updated_at: new Date().toISOString(),

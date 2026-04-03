@@ -26,25 +26,32 @@ export interface TrendsDataPoint {
 
 /**
  * 검색 기록 (searches 테이블)
- * 종목의 메타데이터와 핵심 지표를 저장
+ * 종목의 메타데이터 + 가격 데이터
+ *
+ * 참고:
+ * - DB: user_id, ticker, company_name, currency, created_at, searched_at
+ * - stock_price_data: 별도 테이블에 저장 (조회 시 자동으로 로드됨)
+ * - keyword_chart_timeseries: 키워드 기반 트렌드 데이터 (SearchRecord와 별도)
  */
 export interface SearchRecord {
-  id: string // UUID 또는 auto-increment
+  id: string // UUID
+  user_id: string // 사용자 UUID (필수, RLS 기준)
   ticker: string // 종목 심볼 (예: AAPL)
   company_name: string // 회사명 (예: Apple Inc.)
-  currency?: string // ISO 통화 코드 (예: 'USD', 'KRW', 'EUR' - Yahoo Finance에서 수집)
-  current_price: number // 현재 종가
-  previous_close?: number // 이전 종가
-  ma13?: number // 13주 이동평균
-  yoy_change: number // 연간 변화율 (%)
-  week52_high?: number // 52주 최고가
-  week52_low?: number // 52주 최저가
-  price_data: PriceDataPoint[] // 5년 주간 주가 배열 (JSON)
-  trends_data: TrendsDataPoint[] // 5년 주간 트렌드 배열 (JSON)
-  last_updated_at: string // ISO 8601 타임스탬프
-  searched_at: string // ISO 8601 타임스탬프
-  created_at: string // ISO 8601 타임스탬프
-  user_id?: string // 사용자 UUID (OAuth 로그인한 사용자)
+  currency?: string // ISO 통화 코드 (예: 'USD', 'KRW', 'EUR')
+  // 계산된 지표 (price_data에서 계산되므로 모두 optional)
+  current_price?: number // 현재 종가 (price_data[-1].close)
+  previous_close?: number // 이전 종가 (price_data[-2].close)
+  ma13?: number // 13주 이동평균 (계산된 값)
+  yoy_change?: number // 연간 변화율 (%) (계산된 값)
+  week52_high?: number // 52주 최고가 (계산된 값)
+  week52_low?: number // 52주 최저가 (계산된 값)
+  // 데이터 배열 (항상 로드되어야 함)
+  price_data: PriceDataPoint[] // 5년 주간 주가 배열 (필수: stock_price_data 테이블에서 로드)
+  trends_data: TrendsDataPoint[] // 5년 주간 트렌드 배열 (선택: 향후 Google Trends 연동)
+  last_updated_at?: string // ISO 8601 타임스탰프
+  searched_at: string // ISO 8601 타임스탬프 (DB 필드)
+  created_at?: string // ISO 8601 타임스탰프 (DB 필드)
 }
 
 /**

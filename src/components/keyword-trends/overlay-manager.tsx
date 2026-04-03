@@ -100,11 +100,18 @@ export default function OverlayManager({
     // 자동완성 제안에서 회사명 찾기
     const suggestion = suggestions.find(s => s.symbol === ticker)
 
+    // UI 상태 초기화
     setShowSuggestions(false)
     setSuggestions([])
-    onSearchFilterChange('')
+    onSearchFilterChange('') // 입력값 초기화
     setActiveIndex(-1)
 
+    // Input 포커스 제거 (자동완성 드롭다운 재표시 방지)
+    if (inputRef.current) {
+      inputRef.current.blur()
+    }
+
+    // 오버레이 추가
     if (existingSearch) {
       onAddOverlay(existingSearch.id)
     } else if (onAddTickerOverlay) {

@@ -41,8 +41,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // 이미 저장된 종목인지 확인
-    const existing = await getSearchByTicker(ticker, supabase)
+    // 이미 저장된 종목인지 확인 (userId 전달하여 RLS 검증)
+    const existing = await getSearchByTicker(ticker, user.id, supabase)
     if (existing) {
       const response: ApiResponse<SearchRecord> = {
         success: true,
