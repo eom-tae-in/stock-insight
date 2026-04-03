@@ -227,12 +227,12 @@ export default function OverlayManager({
                 .filter(
                   search =>
                     !searchFilter ||
-                    search.ticker
-                      .toLowerCase()
-                      .includes(searchFilter.toLowerCase()) ||
-                    search.company_name
-                      .toLowerCase()
-                      .includes(searchFilter.toLowerCase())
+                    (search.ticker?.toLowerCase() ?? '').includes(
+                      searchFilter.toLowerCase()
+                    ) ||
+                    (search.company_name?.toLowerCase() ?? '').includes(
+                      searchFilter.toLowerCase()
+                    )
                 )
                 .map(search => (
                   <SelectItem key={search.id} value={search.id}>
