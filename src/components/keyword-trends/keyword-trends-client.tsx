@@ -358,9 +358,16 @@ export default function KeywordTrendsClient() {
   }
 
   // 새로운 종목 추가 (ticker-search에서 선택된 종목)
-  const handleAddTickerOverlay = async (ticker: string) => {
+  const handleAddTickerOverlay = async (
+    ticker: string,
+    companyName?: string
+  ) => {
     try {
-      const response = await apiFetch(`/api/stock?ticker=${ticker}`)
+      const params = new URLSearchParams({
+        ticker,
+        ...(companyName && { companyName }),
+      })
+      const response = await apiFetch(`/api/stock?${params.toString()}`)
       if (!response.ok) throw new Error('종목 데이터를 가져오지 못했습니다')
 
       const data = await response.json()

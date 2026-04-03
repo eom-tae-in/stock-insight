@@ -1,57 +1,95 @@
 /**
- * Task 009: 주가 데이터 수집 API Route
+ * Task: 새 종목 추가 API Route
  *
- * GET /api/stock?ticker=AAPL
- * Response: ApiResponse<{ companyName, currentPrice, previousClose, priceData }>
+ * GET /api/stock?ticker={ticker}
+ * Response: ApiResponse<SearchRecord>
+ *
+ * ticker-search에서 선택한 종목을 searches 테이블에 저장
  */
 
-import { NextRequest } from 'next/server'
-import { fetchStockData } from '@/lib/services/stock-service'
-import { TickerInputSchema } from '@/lib/validation'
-import { createSuccessResponse, createErrorResponse } from '@/lib/api-helpers'
+import { NextRequest, NextResponse } from 'next/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { upsertSearch, getSearchByTicker } from '@/lib/db/queries'
+import { createErrorResponse } from '@/lib/api-helpers'
+import type { ApiResponse, SearchRecord } from '@/types'
+
+export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   try {
-    // 쿼리 파라미터 추출
-    const ticker = request.nextUrl.searchParams.get('ticker')
+    // 인증 확인
+    const supabase = await createSupabaseServerClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+    if (!user || authError) {
+      return createErrorResponse('UNAUTHORIZED', '로그인이 필요합니다.', 401)
+    }
+
+    // 쿼리 파라미터에서 ticker 추출
+    const { searchParams } = new URL(request.url)
+    const ticker = searchParams.get('ticker')
+    const companyName = searchParams.get('companyName') || ticker || 'Unknown'
 
     // ticker 검증
-    const result = TickerInputSchema.safeParse(ticker)
-    if (!result.success) {
+    if (!ticker || ticker.length === 0) {
       return createErrorResponse(
-        'INVALID_TICKER',
-        '올바른 종목 심볼을 입력하세요 (1-12자, 영문/숫자/점 포함)',
+        'INVALID_INPUT',
+        '종목 티커가 필요합니다.',
         400
       )
     }
 
-    const validatedTicker = result.data
-
-    // 주가 데이터 수집
-    const stockData = await fetchStockData(validatedTicker)
-
-    // 성공 응답
-    return createSuccessResponse(stockData, 200)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-
-    // ticker를 찾을 수 없음
-    if (
-      message.includes('No data found') ||
-      message.includes('No price data')
-    ) {
-      return createErrorResponse(
-        'TICKER_NOT_FOUND',
-        '종목을 찾을 수 없습니다. 정확한 심볼을 확인해주세요.',
-        404
-      )
+    // 이미 저장된 종목인지 확인
+    const existing = await getSearchByTicker(ticker, supabase)
+    if (existing) {
+      const response: ApiResponse<SearchRecord> = {
+        success: true,
+        data: existing,
+        timestamp: new Date().toISOString(),
+      }
+      return NextResponse.json(response, { status: 200 })
     }
 
-    // 기타 에러
-    console.error('Stock data fetch error:', error)
+    // 새 SearchRecord 생성 및 저장
+    // (실제 가격 데이터는 나중에 백그라운드 작업으로 추가)
+    const searchRecord: SearchRecord = {
+      id: '', // upsertSearch에서 생성
+      user_id: user.id,
+      ticker: ticker.toUpperCase(),
+      company_name: companyName,
+      currency: 'USD',
+      current_price: 0,
+      previous_close: undefined,
+      ma13: undefined,
+      yoy_change: 0,
+      week52_high: undefined,
+      week52_low: undefined,
+      price_data: [],
+      trends_data: [],
+      last_updated_at: new Date().toISOString(),
+      searched_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+    }
+
+    // DB에 저장
+    const searchId = await upsertSearch(searchRecord, supabase)
+    searchRecord.id = searchId
+
+    // 성공 응답
+    const response: ApiResponse<SearchRecord> = {
+      success: true,
+      data: searchRecord,
+      timestamp: new Date().toISOString(),
+    }
+
+    return NextResponse.json(response, { status: 201 })
+  } catch (error) {
+    console.error('Error creating stock record:', error)
     return createErrorResponse(
-      'STOCK_FETCH_FAILED',
-      '주가 데이터를 가져오지 못했습니다.',
+      'DB_ERROR',
+      error instanceof Error ? error.message : '종목을 저장하지 못했습니다.',
       500
     )
   }
