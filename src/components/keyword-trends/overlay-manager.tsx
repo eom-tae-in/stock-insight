@@ -27,7 +27,7 @@ interface OverlayManagerProps {
   onAddOverlay: (searchId: string) => void
   onRemoveOverlay: (searchId: string) => void
   onSearchFilterChange: (value: string) => void
-  onAddTickerOverlay?: (ticker: string) => void // 새 종목 추가용
+  onAddTickerOverlay?: (ticker: string, companyName?: string) => void // 새 종목 추가용
 }
 
 export default function OverlayManager({
@@ -92,20 +92,23 @@ export default function OverlayManager({
   }
 
   const handleSelectSuggestion = (ticker: string) => {
-    setShowSuggestions(false)
-    setSuggestions([])
-    setActiveIndex(-1)
-
     // 저장된 종목에서 찾기
     const existingSearch = availableSearches.find(
       s => s.ticker.toUpperCase() === ticker.toUpperCase()
     )
 
+    // 자동완성 제안에서 회사명 찾기
+    const suggestion = suggestions.find(s => s.symbol === ticker)
+
+    setShowSuggestions(false)
+    setSuggestions([])
+    setActiveIndex(-1)
+
     if (existingSearch) {
       onAddOverlay(existingSearch.id)
     } else if (onAddTickerOverlay) {
       // 새로운 종목 추가 (keyword-trends-client에서 처리)
-      onAddTickerOverlay(ticker)
+      onAddTickerOverlay(ticker, suggestion?.longname)
     }
   }
 
