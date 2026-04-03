@@ -23,23 +23,20 @@ interface PyTrendsDataPoint {
 
 /**
  * API URL 결정 헬퍼
- * - 로컬 개발: http://localhost:3000
- * - Vercel 배포: https://{project}.vercel.app
+ * - 로컬 개발: /api/trends-internal (Node.js Route)
+ * - Vercel 배포: /api/trends (Python Serverless Function)
  */
-function getApiUrl(path: string): string {
-  if (typeof window !== 'undefined') {
-    // 클라이언트 사이드
-    return `${window.location.origin}${path}`
-  }
-
-  // 서버 사이드
+function getApiUrl(): string {
   const vercelUrl = process.env.VERCEL_URL
-  if (vercelUrl) {
-    return `https://${vercelUrl}${path}`
+  const isVercelEnv = !!vercelUrl
+
+  // Vercel 배포 환경 → Python Serverless Function 사용
+  if (isVercelEnv) {
+    return '/api/trends'
   }
 
-  // 로컬 개발
-  return `http://localhost:3000${path}`
+  // 로컬 개발 환경 → Node.js API Route 사용
+  return '/api/trends-internal'
 }
 
 /**
@@ -54,7 +51,7 @@ export async function callPyTrendsAPI(
   gprop: string = ''
 ): Promise<TrendsDataPoint[]> {
   // API 엔드포인트 결정
-  const apiUrl = getApiUrl('/api/trends')
+  const apiUrl = getApiUrl()
 
   // 타임아웃 설정 (30초)
   const controller = new AbortController()
