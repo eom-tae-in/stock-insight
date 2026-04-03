@@ -1,21 +1,15 @@
 /**
  * Task 010: Google Trends 데이터 수집 서비스
  *
- * pytrends를 사용하여 Google Trends 데이터를 수집합니다.
- * - Python 스크립트 (src/lib/get_trends.py) 호출 via child_process
+ * Vercel Python Serverless Function (api/trends.py)을 호출하여
+ * Google Trends 데이터를 수집합니다.
  * - 검색 키워드: companyName 우선, 실패 시 `${ticker} stock` 폴백
  * - 5년 주간 데이터 수집
  * - 날짜 정규화 (ISO week 기준 → 월요일)
  */
 
 import { startOfISOWeek, format } from 'date-fns'
-import { execFile } from 'child_process'
-import { promisify } from 'util'
-import path from 'path'
 import type { TrendsDataPoint } from '@/types'
-
-// Critical: execFileSync 대신 promisify(execFile) 사용 - 이벤트 루프 블로킹 방지
-const execFileAsync = promisify(execFile)
 
 export interface TrendsDataResult {
   trendsData: TrendsDataPoint[]
@@ -28,8 +22,30 @@ interface PyTrendsDataPoint {
 }
 
 /**
- * pytrends Python 스크립트 호출 (F023: geo, timeframe, gprop 파라미터 지원)
- * Critical: execFileSync → execFile (비동기) 변환 - 이벤트 루프 블로킹 방지
+ * API URL 결정 헬퍼
+ * - 로컬 개발: http://localhost:3000
+ * - Vercel 배포: https://{project}.vercel.app
+ */
+function getApiUrl(path: string): string {
+  if (typeof window !== 'undefined') {
+    // 클라이언트 사이드
+    return `${window.location.origin}${path}`
+  }
+
+  // 서버 사이드
+  const vercelUrl = process.env.VERCEL_URL
+  if (vercelUrl) {
+    return `https://${vercelUrl}${path}`
+  }
+
+  // 로컬 개발
+  return `http://localhost:3000${path}`
+}
+
+/**
+ * Vercel Python Serverless Function 호출 (F023: geo, timeframe, gprop 파라미터 지원)
+ * - 로컬: http://localhost:3000/api/trends
+ * - Vercel: https://{project-name}.vercel.app/api/trends
  */
 export async function callPyTrendsAPI(
   keyword: string,
@@ -37,22 +53,35 @@ export async function callPyTrendsAPI(
   timeframe: string = '5y',
   gprop: string = ''
 ): Promise<TrendsDataPoint[]> {
+  // API 엔드포인트 결정
+  const apiUrl = getApiUrl('/api/trends')
+
+  // 타임아웃 설정 (30초)
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 30_000)
+
   try {
-    // 시스템 Python 3 사용 (venv 제거 후)
-    const pythonPath = 'python3'
-    const scriptPath = path.join(process.cwd(), 'src', 'lib', 'get_trends.py')
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        keyword,
+        geo,
+        timeframe,
+        gprop,
+      }),
+      signal: controller.signal,
+    })
 
-    const { stdout } = await execFileAsync(
-      pythonPath,
-      [scriptPath, keyword, geo, timeframe, gprop],
-      {
-        encoding: 'utf-8',
-        maxBuffer: 10 * 1024 * 1024, // 10MB 버퍼
-        timeout: 30_000, // 30초 상한 (pytrends 응답 지연 방어)
-      }
-    )
+    clearTimeout(timeoutId)
 
-    const pyData: PyTrendsDataPoint[] = JSON.parse(stdout)
+    if (!response.ok) {
+      throw new Error(`API returned ${response.status}`)
+    }
+
+    const pyData: PyTrendsDataPoint[] = await response.json()
 
     if (!pyData || pyData.length === 0) {
       throw new Error('No trends data available')
@@ -94,9 +123,12 @@ export async function callPyTrendsAPI(
 
     return trendsData
   } catch (error) {
+    clearTimeout(timeoutId)
+
     if (error instanceof SyntaxError) {
-      throw new Error(`Failed to parse Python script output: ${error.message}`)
+      throw new Error(`Failed to parse API response: ${error.message}`)
     }
+
     throw error
   }
 }
