@@ -20,6 +20,9 @@ export type {
   SearchRecordRaw,
   Metrics,
   CalculatedMetrics,
+  KeywordSearchRecord,
+  KeywordSearchRecordRaw,
+  KeywordStockOverlay,
   KeywordTrendsMetrics,
 } from './database'
 
