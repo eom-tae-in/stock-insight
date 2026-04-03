@@ -188,34 +188,18 @@ export default function KeywordTrendsChart({
               }}
             />
 
-            {/* 오른쪽 Y축: 정규화된 주가 또는 YoY */}
-            {overlays.length > 0 ? (
-              <YAxis
-                yAxisId="right"
-                orientation="right"
-                domain={[0, 100]}
-                tick={{ fontSize: 12, fill: 'hsl(var(--foreground))' }}
-                label={{
-                  value: '정규화된 주가 (0-100)',
-                  angle: 90,
-                  position: 'insideRight',
-                  fill: 'hsl(var(--foreground))',
-                }}
-              />
-            ) : (
-              // 오버레이 없을 때: 오른쪽 Y축을 YoY용으로 사용
-              <YAxis
-                yAxisId="right"
-                orientation="right"
-                tick={{ fontSize: 12, fill: 'hsl(var(--foreground))' }}
-                label={{
-                  value: '52주 YoY (%)',
-                  angle: 90,
-                  position: 'insideRight',
-                  fill: 'hsl(var(--foreground))',
-                }}
-              />
-            )}
+            {/* 오른쪽 Y축: 항상 52주 YoY (%) */}
+            <YAxis
+              yAxisId="right"
+              orientation="right"
+              tick={{ fontSize: 12, fill: 'hsl(var(--foreground))' }}
+              label={{
+                value: '52주 YoY (%)',
+                angle: 90,
+                position: 'insideRight',
+                fill: 'hsl(var(--foreground))',
+              }}
+            />
 
             {/* P1-10: Tooltip - O(n) find 제거, Map O(1) 조회 */}
             <Tooltip
@@ -260,10 +244,10 @@ export default function KeywordTrendsChart({
               isAnimationActive={false}
             />
 
-            {/* 52주 YoY 라인 (오버레이 있으면 3번째 Y축, 없으면 오른쪽 Y축) */}
+            {/* 52주 YoY 라인 */}
             {yoyValuesArray && yoyValuesArray.some(v => v !== null) && (
               <Line
-                yAxisId={overlays.length > 0 ? 'right' : 'right'}
+                yAxisId="right"
                 type="monotone"
                 dataKey="yoyValue"
                 stroke="#ec4899"
@@ -278,7 +262,7 @@ export default function KeywordTrendsChart({
             {overlays.map((search, idx) => (
               <Line
                 key={search.id}
-                yAxisId="right"
+                yAxisId="left"
                 type="monotone"
                 dataKey={`overlay${idx}`}
                 stroke={OVERLAY_COLORS[idx % OVERLAY_COLORS.length]}
@@ -301,6 +285,12 @@ export default function KeywordTrendsChart({
             <span className="mr-2 inline-block h-0.5 w-8 bg-orange-500" />
             13주 이동평균: 트렌드 지수의 13주 이동평균
           </p>
+          {yoyValuesArray && yoyValuesArray.some(v => v !== null) && (
+            <p>
+              <span className="mr-2 inline-block h-0.5 w-8 bg-pink-500" />
+              52주 YoY: 52주 전 대비 트렌드 지수 변화율 (%)
+            </p>
+          )}
           {overlays.map((search, idx) => (
             <p key={search.id}>
               <span
