@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -11,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { cn } from '@/lib/utils'
 import type { SearchRecord } from '@/types/database'
 
 interface TickerSuggestion {
@@ -40,8 +42,10 @@ export default function OverlayManager({
   const [suggestions, setSuggestions] = useState<TickerSuggestion[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(-1)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
 
   // Debounce된 자동완성 검색
   const fetchSuggestions = useCallback(async (query: string) => {
@@ -88,9 +92,9 @@ export default function OverlayManager({
   }
 
   const handleSelectSuggestion = (ticker: string) => {
-    if (selectedSearches.length >= 1) return
     setShowSuggestions(false)
     setSuggestions([])
+    setActiveIndex(-1)
 
     // 저장된 종목에서 찾기
     const existingSearch = availableSearches.find(
@@ -105,11 +109,36 @@ export default function OverlayManager({
     }
   }
 
-  // 클릭 바깥쪽 감지
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSuggestions || suggestions.length === 0) return
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setActiveIndex(prev => (prev + 1) % suggestions.length)
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setActiveIndex(prev => (prev <= 0 ? suggestions.length - 1 : prev - 1))
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      if (activeIndex >= 0) {
+        handleSelectSuggestion(suggestions[activeIndex].symbol)
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      setShowSuggestions(false)
+      setActiveIndex(-1)
+    }
+  }
+
+  // 외부 클릭 감지 (containerRef 기준)
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (inputRef.current && !inputRef.current.contains(e.target as Node)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
         setShowSuggestions(false)
+        setActiveIndex(-1)
       }
     }
 
@@ -133,12 +162,13 @@ export default function OverlayManager({
       </CardHeader>
       <CardContent className="space-y-4">
         {/* F026: 종목 검색 필터 + 검색 제안 */}
-        <div className="relative">
+        <div className="relative" ref={containerRef}>
           <Input
             ref={inputRef}
             placeholder="종목 검색 (Ticker 또는 회사명)"
             value={searchFilter}
             onChange={e => handleInputChange(e.target.value)}
+            onKeyDown={handleKeyDown}
             onFocus={() => {
               if (suggestions.length > 0) {
                 setShowSuggestions(true)
@@ -151,12 +181,15 @@ export default function OverlayManager({
           {/* 자동완성 드롭다운 */}
           {showSuggestions && suggestions.length > 0 && (
             <div className="bg-popover border-input absolute top-full right-0 left-0 z-50 mt-1 max-h-64 overflow-y-auto rounded-md border shadow-lg">
-              {suggestions.map(suggestion => (
+              {suggestions.map((suggestion, idx) => (
                 <button
                   key={suggestion.symbol}
                   type="button"
                   onClick={() => handleSelectSuggestion(suggestion.symbol)}
-                  className="hover:bg-accent flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition-colors"
+                  className={cn(
+                    'flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition-colors',
+                    idx === activeIndex ? 'bg-accent' : 'hover:bg-accent'
+                  )}
                 >
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-semibold">
@@ -216,7 +249,7 @@ export default function OverlayManager({
             {selectedSearches.map((search, idx) => (
               <div
                 key={search.id}
-                className="bg-muted flex items-center justify-between rounded p-2"
+                className="bg-muted group hover:bg-muted/70 flex items-center justify-between rounded p-2 transition-colors"
               >
                 <span className="text-sm font-medium">
                   {idx + 1}. {search.ticker} - {search.company_name}
@@ -226,8 +259,9 @@ export default function OverlayManager({
                   size="sm"
                   onClick={() => onRemoveOverlay(search.id)}
                   aria-label={`${search.ticker} 오버레이 제거`}
+                  className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-7 w-7 p-0 transition-colors"
                 >
-                  ✕
+                  <X className="h-4 w-4" />
                 </Button>
               </div>
             ))}
