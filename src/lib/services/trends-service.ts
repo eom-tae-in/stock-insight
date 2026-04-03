@@ -38,7 +38,8 @@ export async function callPyTrendsAPI(
   gprop: string = ''
 ): Promise<TrendsDataPoint[]> {
   try {
-    const pythonPath = path.join(process.cwd(), 'venv', 'bin', 'python3')
+    // 시스템 Python 3 사용 (venv 제거 후)
+    const pythonPath = 'python3'
     const scriptPath = path.join(process.cwd(), 'src', 'lib', 'get_trends.py')
 
     const { stdout } = await execFileAsync(

@@ -2,7 +2,6 @@
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Header } from '@/components/layout/header'
 import { Container } from '@/components/layout/container'
 import { SearchForm } from '@/components/search-form'
 import { LoadingSkeleton } from '@/components/loading-skeleton'
@@ -146,71 +145,66 @@ export default function SearchPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <Header />
-      <main className="flex-1">
-        <Container size="sm" className="py-16">
-          <div className="mb-12 text-center">
-            <h1 className="mb-3 text-3xl font-bold">새 종목 조회</h1>
-            <p className="text-muted-foreground">
-              특정 종목의 5년 가격 흐름과 대중 검색 관심도를 비교하여 투자
-              판단을 지원합니다.
+    <Container size="sm" className="py-16">
+      <div className="mb-12 text-center">
+        <h1 className="mb-3 text-3xl font-bold">새 종목 조회</h1>
+        <p className="text-muted-foreground">
+          특정 종목의 5년 가격 흐름과 대중 검색 관심도를 비교하여 투자 판단을
+          지원합니다.
+        </p>
+        <p className="text-muted-foreground mt-1 text-sm">
+          예시: AAPL, TSLA, MSFT
+        </p>
+      </div>
+
+      {/* Ticker 입력 폼 */}
+      <div className="mb-8">
+        <SearchForm
+          onSubmit={handleSubmit}
+          isLoading={isLoading}
+          error={error || undefined}
+        />
+      </div>
+
+      {/* 회사명 검색 결과 (후보 목록) */}
+      {candidates.length > 0 && !isLoading && (
+        <div className="mb-8">
+          <div className="space-y-2">
+            <p className="text-muted-foreground text-sm font-semibold">
+              검색 결과
             </p>
-            <p className="text-muted-foreground mt-1 text-sm">
-              예시: AAPL, TSLA, MSFT
-            </p>
-          </div>
-
-          {/* Ticker 입력 폼 */}
-          <div className="mb-8">
-            <SearchForm
-              onSubmit={handleSubmit}
-              isLoading={isLoading}
-              error={error || undefined}
-            />
-          </div>
-
-          {/* 회사명 검색 결과 (후보 목록) */}
-          {candidates.length > 0 && !isLoading && (
-            <div className="mb-8">
-              <div className="space-y-2">
-                <p className="text-muted-foreground text-sm font-semibold">
-                  검색 결과
-                </p>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {candidates.map(candidate => (
-                    <Button
-                      key={candidate.symbol}
-                      variant="outline"
-                      className="h-auto flex-col items-start justify-start px-4 py-3"
-                      onClick={() => handleCandidateSelect(candidate.symbol)}
-                    >
-                      <span className="font-bold">{candidate.symbol}</span>
-                      <span className="text-muted-foreground text-xs">
-                        {candidate.longname}
-                      </span>
-                    </Button>
-                  ))}
-                </div>
-              </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {candidates.map(candidate => (
+                <Button
+                  key={candidate.symbol}
+                  variant="outline"
+                  className="h-auto flex-col items-start justify-start px-4 py-3"
+                  onClick={() => handleCandidateSelect(candidate.symbol)}
+                >
+                  <span className="font-bold">{candidate.symbol}</span>
+                  <span className="text-muted-foreground text-xs">
+                    {candidate.longname}
+                  </span>
+                </Button>
+              ))}
             </div>
-          )}
+          </div>
+        </div>
+      )}
 
-          {/* 진행 상태 표시 */}
-          {progress.stage !== 'idle' && (
-            <div className="mb-8">
-              <ProgressIndicator
-                stage={progress.stage}
-                message={progress.message}
-                error={progress.error}
-              />
-            </div>
-          )}
+      {/* 진행 상태 표시 */}
+      {progress.stage !== 'idle' && (
+        <div className="mb-8">
+          <ProgressIndicator
+            stage={progress.stage}
+            message={progress.message}
+            error={progress.error}
+          />
+        </div>
+      )}
 
-          {/* 로딩 스켈레톤 */}
-          {isLoading && <LoadingSkeleton />}
-        </Container>
-      </main>
-    </div>
+      {/* 로딩 스켈레톤 */}
+      {isLoading && <LoadingSkeleton />}
+    </Container>
   )
 }
