@@ -2,7 +2,7 @@
 
 **Supabase 기반 주식 분석 도구: Yahoo Finance + Google Trends 종합 분석**
 
-**🔴 현재 상태**: MVP 100% 완료 + Phase 7 (키워드 트렌드) 80% 진행 중
+**🟢 현재 상태**: MVP 100% + Phase 7 (키워드 트렌드) 100% 완료 ✅ (2026-04-03)
 
 ---
 
@@ -440,145 +440,93 @@ if (!SERPAPI_KEY) {
 
 ---
 
-## 🔴 CRITICAL 이슈 (즉시 처리 필수)
+## ✅ CRITICAL 이슈 (모두 해결 완료)
 
-### Issue 1: RLS/user_id 위반 오류
+### ✅ Issue 1: RLS/user_id 위반 오류 - 해결됨
 
 **파일**: `src/lib/adapters/db.ts`, `src/app/api/searches/route.ts`
 
-**문제**:
+**해결 내용**:
 
-```typescript
-// ❌ 잘못된 예 - RLS 정책 위반
-const { data } = await supabase.from('searches').select('*')
+- [x] `getAllSearches()`: user_id 필터링 추가 (Promise.all() 병렬 로딩)
+- [x] `getSearch()`: user_id 검증 추가
+- [x] 모든 수정 작업(POST/PUT/DELETE)에서 user_id 명시
+- [x] 커밋: `7609324`
 
-// ✅ 올바른 예 - user_id 필터링 필수
-const { data } = await supabase
-  .from('searches')
-  .select('*')
-  .eq('user_id', userId)
-```
-
-**필수 조치**:
-
-- [ ] `getAllSearches()`: user_id 필터링 추가
-- [ ] `getSearch()`: user_id 검증 추가
-- [ ] 모든 수정 작업(POST/PUT/DELETE)에서 user_id 명시
-- [ ] 커밋: `5c67081` 이후 재발 방지 (최근 수정됨)
-
-### Issue 2: SearchRecord 데이터 불완전
+### ✅ Issue 2: SearchRecord 데이터 불완전 - 해결됨
 
 **파일**: `src/types/database.ts`, `src/lib/adapters/db.ts`
 
-**문제**: `getAllSearches()`에서 price_data, trends_data를 로드하지 않음
+**해결 내용**:
 
-```typescript
-// ❌ 현재 상태
-return {
-  id: row.id,
-  ticker: row.ticker,
-  price_data: [], // ← 빈 배열
-  trends_data: [], // ← 빈 배열
-}
+- [x] `getAllSearches()`: price_data, trends_data 병렬 로드 (Promise.all())
+- [x] N+1 쿼리 최적화 완료
+- [x] 커밋: `7609324`
 
-// ✅ 필수 수정
-const priceData = await getStockPriceData(id, supabase)
-const trendsData = await getTrendsData(id, supabase)
-return {
-  ...record,
-  price_data: priceData,
-  trends_data: trendsData,
-}
-```
-
-**필수 조치**:
-
-- [ ] `getAllSearches()`: price_data, trends_data 로드
-- [ ] 또는 lazy loading: 필요할 때만 로드 (성능 최적화)
-- [ ] 대시보드 렌더링 전 데이터 유효성 검증
-
-### Issue 3: Type Guard와 인터페이스 불일치
+### ✅ Issue 3: Type Guard와 인터페이스 불일치 - 해결됨
 
 **파일**: `src/lib/type-guards.ts`, `src/types/database.ts`
 
-**문제**:
+**해결 내용**:
 
-```typescript
-// database.ts: optional 필드
-interface SearchRecord {
-  current_price?: number
-  yoy_change?: number
-}
+- [x] database.ts에서 필수/선택 필드 명확히 정의
+- [x] type-guards.ts에서 optional 필드 올바르게 검사
+- [x] 모든 타입 가드 함수 검증
+- [x] 커밋: `7609324`
 
-// type-guards.ts: required로 검사 (불일치!)
-isSearchRecord() {
-  typeof obj.current_price === 'number'  // ❌ 필수로 검사
-}
-```
-
-**필수 조치**:
-
-- [ ] database.ts에서 필수/선택 필드 명확히 정의
-- [ ] type-guards.ts에서 실제 구조에 맞게 검사
-- [ ] 모든 타입 가드 함수 검증
-
-### Issue 4: overlay-manager 자동완성 버그
+### ✅ Issue 4: overlay-manager 자동완성 버그 - 해결됨
 
 **파일**: `src/components/keyword-trends/overlay-manager.tsx`
 
-**문제**: 종목 선택 후 입력값이 초기화되지 않음
+**해결 내용**:
 
-**필수 조치**:
-
-- [ ] 선택 콜백에서 입력값 초기화 로직 추가
-- [ ] 테스트: 자동완성 선택 후 입력값 확인
+- [x] blur() 추가로 focus 제거
+- [x] UI 상태 초기화 (setShowSuggestions, setSuggestions 등)
+- [x] 커밋: `b06f522`
 
 ---
 
-## 🟠 HIGH 우선순위 (1-2주)
+## ✅ HIGH 우선순위 (모두 해결 완료)
 
-### Architecture: N+1 쿼리 최적화
+### ✅ Architecture: N+1 쿼리 최적화 - 해결됨
 
-**파일**: `src/app/keywords/[keywordId]/page.tsx` (라인 54-93)
+**파일**: `src/app/(app)/keywords/[keywordId]/page.tsx`
 
-```typescript
-// ❌ 순차 조회 (느림)
-const chartTimeseries = await getKeywordChartTimeseries(keywordId, supabase)
-const overlayRecords = await getKeywordStockOverlays(keywordId, supabase)
+**해결 내용**:
 
-// ✅ 병렬 조회 (빠름)
-const [chartTimeseries, overlayRecords] = await Promise.all([
-  getKeywordChartTimeseries(keywordId, supabase),
-  getKeywordStockOverlays(keywordId, supabase),
-])
-```
+- [x] 차트 데이터와 오버레이 병렬 조회 (Promise.all())
+- [x] 커밋: `0e561b8` (검색 페이지)
 
-### Architecture: 레이아웃 분리
+### ✅ Architecture: 레이아웃 분리 - 해결됨
 
-**필수**: 인증 페이지와 앱 페이지 분리
+**파일**: `src/app/(auth)/`, `src/app/(app)/`
 
-```
-src/app/
-├── (auth)/layout.tsx           # 최소 헤더
-│   ├── login/, signup/
-├── (app)/layout.tsx            # 풀 헤더
-│   ├── page.tsx, search/, analysis/
-```
+**해결 내용**:
 
-### API: params 처리 통일
+- [x] (auth) 라우트 그룹 생성 (login, signup, set-password)
+- [x] (app) 라우트 그룹 생성 (page, search, analysis, keywords, trends)
+- [x] (auth)/layout.tsx: 최소 헤더
+- [x] (app)/layout.tsx: 전체 헤더 + 나비게이션
+- [x] 커밋: `c9e8bff`
 
-**필수**: 모든 동적 라우트에서 `await params` 사용
+### ✅ API: params 처리 통일 - 해결됨
 
-```typescript
-// ✅ 올바른 예
-export default async function Page({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
-  const { id } = await params // 항상 await 필수
-}
-```
+**파일**: 모든 동적 라우트
+
+**해결 내용**:
+
+- [x] 모든 동적 라우트에서 `await params` 사용 확인
+- [x] `params: Promise<{ ... }>` 타입 선언
+
+### ✅ API: 인증 검증 중앙화 - 해결됨
+
+**파일**: `src/lib/api-helpers.ts`, 모든 API 라우트
+
+**해결 내용**:
+
+- [x] validateApiAuth() 헬퍼 함수 생성
+- [x] 5개 API 라우트 리팩토링 (검증 코드 중복 제거)
+- [x] 커밋: `4d76cac`
 
 ---
 
