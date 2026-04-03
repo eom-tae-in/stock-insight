@@ -1,18 +1,19 @@
 /**
- * 키워드 커스텀 목록 페이지
+ * 키워드 커스텀 목록 페이지 (재설계)
  * Route: /keywords/[keywordId]
- * - 저장된 키워드에 연결된 모든 종목(overlay) 표시
- * - 각 종목별 커스텀 분석 보기 가능
+ *
+ * 저장된 차트 데이터와 오버레이 데이터를 조회하여 페이지 렌더링
  */
 
 import { redirect } from 'next/navigation'
-import { Header } from '@/components/layout/header'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getKeywordSearchById, getKeywordStockOverlays } from '@/lib/db/queries'
+import {
+  getKeywordSearchById,
+  getKeywordStockOverlays,
+  getKeywordChartTimeseries,
+  getOverlayChartTimeseries,
+} from '@/lib/db/queries'
 import { KeywordDetailClient } from '@/components/keyword-detail/keyword-detail-client'
-import type { KeywordStockOverlay, SearchRecord } from '@/types/database'
-
-type OverlayDetail = KeywordStockOverlay & Partial<SearchRecord>
 
 export const metadata = {
   title: '키워드 커스텀 목록 | StockInsight',
@@ -24,7 +25,6 @@ export default async function KeywordDetailPage({
 }: {
   params: Promise<{ keywordId: string }>
 }) {
-  // 인증 확인
   const supabase = await createSupabaseServerClient()
   const {
     data: { user },
@@ -36,79 +36,67 @@ export default async function KeywordDetailPage({
 
   const { keywordId } = await params
 
-  // 키워드 정보 조회
+  // 1. 키워드 정보 조회
   const keyword = await getKeywordSearchById(keywordId, supabase)
   if (!keyword) {
     redirect('/trends')
   }
 
-  // 키워드에 연결된 overlay 조회
-  let overlays: KeywordStockOverlay[] = []
-  let overlayDetails: OverlayDetail[] = []
+  // 2. 차트 시계열 데이터 조회
+  let chartTimeseries: Array<{
+    weekIndex: number
+    date: string
+    trendsValue: number
+    ma13Value: number | null
+    yoyValue: number | null
+  }> = []
 
   try {
-    overlays = await getKeywordStockOverlays(keywordId, supabase)
-
-    // 각 overlay의 종목 정보(SearchRecord) 조회
-    if (overlays.length > 0) {
-      overlayDetails = await Promise.all(
-        overlays.map(async overlay => {
-          // /api/searches/[id] 엔드포인트에서 종목 정보 조회
-          const baseUrl = process.env.VERCEL_URL
-            ? `https://${process.env.VERCEL_URL}`
-            : 'http://localhost:3000'
-
-          const response = await fetch(
-            `${baseUrl}/api/searches/${overlay.search_id}`,
-            {
-              // 캐시 비활성화 (항상 최신 데이터 조회)
-              cache: 'no-store',
-            }
-          )
-
-          if (!response.ok) {
-            console.error(
-              `Failed to fetch search ${overlay.search_id}:`,
-              response.status
-            )
-            return {
-              ...overlay,
-              ticker: 'N/A',
-              company_name: 'Unknown',
-              current_price: 0,
-              yoy_change: 0,
-            }
-          }
-
-          const { data: searchRecord } = await response.json()
-          return {
-            ...overlay,
-            ...searchRecord,
-          }
-        })
-      )
-    }
+    chartTimeseries = await getKeywordChartTimeseries(keywordId, supabase)
   } catch (error) {
-    console.error('Failed to fetch overlays or search records:', error)
-    // 에러 발생해도 overlay 목록만 표시
-    overlayDetails = overlays.map(o => ({
-      ...o,
-      ticker: 'N/A',
-      company_name: 'Unknown',
-      current_price: 0,
-      yoy_change: 0,
-    }))
+    console.error('Failed to fetch chart timeseries:', error)
+  }
+
+  // 3. 오버레이 정보 조회
+  let overlays: Array<{
+    id: string
+    ticker: string
+    companyName: string
+    displayOrder: number
+    chartData: Array<{
+      date: string
+      normalizedPrice: number
+      rawPrice: number
+    }>
+  }> = []
+
+  try {
+    const overlayRecords = await getKeywordStockOverlays(keywordId, supabase)
+
+    overlays = await Promise.all(
+      overlayRecords.map(async overlay => {
+        const overlayData = await getOverlayChartTimeseries(
+          overlay.id,
+          supabase
+        )
+        return {
+          id: overlay.id,
+          ticker: overlay.ticker,
+          companyName: overlay.company_name,
+          displayOrder: overlay.display_order,
+          chartData: overlayData,
+        }
+      })
+    )
+  } catch (error) {
+    console.error('Failed to fetch overlays:', error)
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <Header />
-      <main className="flex-1">
-        <KeywordDetailClient
-          keyword={keyword}
-          overlayDetails={overlayDetails}
-        />
-      </main>
-    </div>
+    <KeywordDetailClient
+      keyword={keyword}
+      chartData={chartTimeseries}
+      overlays={overlays}
+    />
   )
 }

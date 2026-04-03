@@ -385,7 +385,7 @@ export default function KeywordTrendsClient() {
     }
   }
 
-  // 현재 키워드 + 오버레이 조합 저장
+  // 현재 키워드 + 오버레이 조합 저장 (재설계: 모든 차트 데이터를 한 번에 저장)
   const handleSaveCombo = async () => {
     if (!state.keyword || trendsData.length === 0) {
       toast.error('먼저 트렌드를 조회해주세요')
@@ -395,14 +395,96 @@ export default function KeywordTrendsClient() {
     setIsSaving(true)
 
     try {
+      // 1. 차트 시계열 데이터 구성 (trends + ma13 + yoy)
+      const chartData = trendsData.map((point, index) => ({
+        weekIndex: index,
+        date: point.date,
+        trendsValue: point.value,
+        ma13Value: ma13Values[index] ?? null,
+        yoyValue: yoyValuesArray?.[index] ?? null,
+      }))
+
+      // 2. 오버레이 시계열 데이터 구성 (정규화된 주가)
+      const overlaysData = state.selectedSearches.map(search => {
+        // 이 종목의 주가 데이터
+        const prices = search.price_data?.map(p => p.close) ?? []
+        if (prices.length === 0) {
+          return {
+            searchId: search.id,
+            ticker: search.ticker,
+            companyName: search.company_name,
+            overlayData: [],
+          }
+        }
+
+        const minPrice = Math.min(...prices)
+        const maxPrice = Math.max(...prices)
+        const range = maxPrice - minPrice
+
+        // 주간별로 주가 그룹화 (Google Trends와 일치)
+        const weeklyPrices = new Map<string, number[]>()
+        search.price_data?.forEach(p => {
+          const date = new Date(p.date)
+          const year = date.getFullYear()
+          const weekNum = Math.ceil((date.getDate() + date.getDay()) / 7)
+          const weekKey = `${year}-W${String(weekNum).padStart(2, '0')}`
+
+          if (!weeklyPrices.has(weekKey)) {
+            weeklyPrices.set(weekKey, [])
+          }
+          weeklyPrices.get(weekKey)!.push(p.close)
+        })
+
+        // 차트의 각 날짜와 매칭
+        const overlayData = chartData.map(chartPoint => {
+          const date = new Date(chartPoint.date)
+          const year = date.getFullYear()
+          const weekNum = Math.ceil((date.getDate() + date.getDay()) / 7)
+          const weekKey = `${year}-W${String(weekNum).padStart(2, '0')}`
+
+          const pricesInWeek = weeklyPrices.get(weekKey) ?? []
+          if (pricesInWeek.length === 0) {
+            return {
+              date: chartPoint.date,
+              normalizedPrice: 0,
+              rawPrice: 0,
+            }
+          }
+
+          const avgPrice =
+            pricesInWeek.reduce((a, b) => a + b) / pricesInWeek.length
+          const normalized =
+            range === 0 ? 50 : ((avgPrice - minPrice) / range) * 100
+
+          return {
+            date: chartPoint.date,
+            normalizedPrice: Math.round(normalized * 100) / 100,
+            rawPrice: Math.round(avgPrice * 100) / 100,
+          }
+        })
+
+        return {
+          searchId: search.id,
+          ticker: search.ticker,
+          companyName: search.company_name,
+          overlayData,
+        }
+      })
+
+      console.log('[handleSaveCombo] Saving data:', {
+        keyword: state.keyword,
+        chartDataLength: chartData.length,
+        overlaysLength: overlaysData.length,
+      })
+
+      // 3. 한 번에 모든 데이터 저장
       const res = await apiFetch('/api/keyword-searches', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           keyword: state.keyword,
-          trendsData: trendsData,
-          ma13: currentMA13,
-          yoy_change: yoyChange,
+          chartData,
+          overlays: overlaysData,
         }),
       })
 
@@ -412,36 +494,9 @@ export default function KeywordTrendsClient() {
       }
 
       const createData = await res.json()
-      const keywordSearchId = createData.data.id
-      console.log('[handleSaveCombo] Keyword saved with ID:', keywordSearchId)
-      console.log('[handleSaveCombo] Saving overlays:', {
-        overlayCount: state.selectedSearches.length,
-        searches: state.selectedSearches.map(s => ({
-          id: s.id,
-          ticker: s.ticker,
-        })),
-      })
-
-      await Promise.all(
-        state.selectedSearches.map((search, i) => {
-          console.log(
-            `[handleSaveCombo] Posting overlay ${i}:`,
-            search.ticker,
-            search.id
-          )
-          return apiFetch(`/api/keyword-searches/${keywordSearchId}/overlays`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              searchId: search.id,
-              displayOrder: i,
-            }),
-          }).then(overlayRes => {
-            if (!overlayRes.ok)
-              throw new Error(`Failed to save overlay: ${search.ticker}`)
-            console.log(`[handleSaveCombo] Overlay ${i} saved successfully`)
-          })
-        })
+      console.log(
+        '[handleSaveCombo] Keyword saved with ID:',
+        createData.data.id
       )
 
       toast.success('키워드와 오버레이 조합을 저장했습니다')

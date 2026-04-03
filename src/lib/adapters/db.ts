@@ -1,307 +1,171 @@
 /**
- * Database Adapter - Supabase Implementation
+ * Database Adapter - Supabase Implementation (재설계)
  *
- * Phase 6: SQLite 제거 후 Supabase 단일 DB 기반으로 통합
- * 모든 데이터베이스 작업을 Supabase(PostgreSQL)를 통해 수행합니다.
- *
- * IMPORTANT: Transaction handling은 각 adapter 메서드 내부에서 처리됩니다.
- * Callers는 transaction 세부사항을 알 필요가 없습니다.
+ * 새로운 스키마:
+ * - searches: 종목 저장소
+ * - stock_price_data: 5년 일일 주가
+ * - keyword_searches: 키워드 저장 기록
+ * - keyword_chart_timeseries: 차트 전체 시계열 (trends, ma13, yoy)
+ * - keyword_stock_overlays: 키워드-종목 매핑
+ * - overlay_chart_timeseries: 정규화된 주가 시계열
  */
 
-import {
+import type {
   SearchRecord,
   PriceDataPoint,
-  TrendsDataPoint,
   KeywordSearchRecord,
   KeywordStockOverlay,
 } from '@/types/database'
-
-// Import Supabase client
 import { getSupabaseClient } from '@/lib/supabase'
-import { SupabaseClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
-// Import type guards (moved to top level to avoid repeated dynamic imports)
-import { parseSearchRecordRaw } from '../type-guards'
-
-/**
- * Database Adapter Interface
- * Defines all database operations required by the application.
- * Implementations exist for SQLite and Supabase.
- *
- * All methods are async to support both SQLite (via wrappers) and Supabase.
- * This allows for gradual migration without changing the core logic.
- *
- * NOTE: Transaction handling is internal to each adapter implementation.
- * Each method is responsible for its own transactional semantics.
- */
 export interface DbAdapter {
-  /**
-   * Upsert a search record (insert or update)
-   * Preserves id if ticker already exists
-   * Internally handles transaction if needed
-   * @param client - Optional Supabase client (if not provided, uses default)
-   */
+  // ============ searches (종목) ============
   upsertSearch(record: SearchRecord, client?: SupabaseClient): Promise<string>
-
-  /**
-   * Get a search record by id
-   */
   getSearch(
     searchId: string,
     client?: SupabaseClient
   ): Promise<SearchRecord | null>
-
-  /**
-   * Get a search record by ticker symbol
-   */
   getSearchByTicker(
     ticker: string,
     client?: SupabaseClient
   ): Promise<SearchRecord | null>
-
-  /**
-   * Get all search records (most recent first)
-   */
   getAllSearches(client?: SupabaseClient): Promise<SearchRecord[]>
-
-  /**
-   * Delete a search record (cascades to related data)
-   * Returns true if deleted, false if not found
-   * Internally handles transaction if needed
-   */
   deleteSearch(searchId: string, client?: SupabaseClient): Promise<boolean>
 
-  /**
-   * Save price data for a search
-   * Replaces existing data for this search
-   * Internally handles transaction if needed
-   */
+  // ============ stock_price_data (주가 시계열) ============
   insertPriceData(
     searchId: string,
     priceData: PriceDataPoint[],
     client?: SupabaseClient
   ): Promise<void>
-
-  /**
-   * Get price data for a search
-   */
   getPriceDataBySearchId(
     searchId: string,
     client?: SupabaseClient
   ): Promise<PriceDataPoint[]>
 
-  /**
-   * Save trends data for a search
-   * Replaces existing data for this search
-   * Internally handles transaction if needed
-   */
-  insertTrendsData(
-    searchId: string,
-    trendsData: TrendsDataPoint[],
-    client?: SupabaseClient
-  ): Promise<void>
-
-  /**
-   * Get trends data for a search
-   */
-  getTrendsDataBySearchId(
-    searchId: string,
-    client?: SupabaseClient
-  ): Promise<TrendsDataPoint[]>
-
-  /**
-   * Upsert a keyword search record
-   * Preserves id if keyword already exists for user
-   * Internally handles transaction if needed
-   */
+  // ============ keyword_searches (키워드) ============
   upsertKeywordSearch(
     record: KeywordSearchRecord,
     client?: SupabaseClient
   ): Promise<string>
-
-  /**
-   * Get a keyword search record by id
-   */
   getKeywordSearch(
     keywordSearchId: string,
     client?: SupabaseClient
   ): Promise<KeywordSearchRecord | null>
-
-  /**
-   * Get a keyword search record by keyword
-   */
   getKeywordSearchByKeyword(
     keyword: string,
     client?: SupabaseClient
   ): Promise<KeywordSearchRecord | null>
-
-  /**
-   * Get all keyword search records (most recent first)
-   */
   getAllKeywordSearches(client?: SupabaseClient): Promise<KeywordSearchRecord[]>
-
-  /**
-   * Delete a keyword search record (cascades to related data)
-   * Returns true if deleted, false if not found
-   */
   deleteKeywordSearch(
     keywordSearchId: string,
     client?: SupabaseClient
   ): Promise<boolean>
-
-  /**
-   * Rename a keyword search record
-   * Returns true if updated, false if not found
-   */
-  renameKeywordSearch(
-    keywordSearchId: string,
-    newKeyword: string,
-    client?: SupabaseClient
-  ): Promise<boolean>
-
-  /**
-   * Mark a keyword as viewed (update last_viewed_at)
-   * Returns true if updated, false if not found
-   */
   markKeywordAsViewed(
     keywordSearchId: string,
     client?: SupabaseClient
   ): Promise<boolean>
 
-  /**
-   * Save trends data for a keyword search
-   */
-  insertKeywordTrendsData(
+  // ============ keyword_chart_timeseries (차트 시계열 - 핵심) ============
+  insertKeywordChartTimeseries(
     keywordSearchId: string,
-    trendsData: TrendsDataPoint[],
+    chartData: Array<{
+      weekIndex: number
+      date: string
+      trendsValue: number
+      ma13Value: number | null
+      yoyValue: number | null
+    }>,
     client?: SupabaseClient
   ): Promise<void>
 
-  /**
-   * Get trends data for a keyword search
-   */
-  getKeywordTrendsDataByKeywordSearchId(
+  getKeywordChartTimeseries(
     keywordSearchId: string,
     client?: SupabaseClient
-  ): Promise<TrendsDataPoint[]>
+  ): Promise<
+    Array<{
+      weekIndex: number
+      date: string
+      trendsValue: number
+      ma13Value: number | null
+      yoyValue: number | null
+    }>
+  >
 
-  /**
-   * Add a stock overlay to a keyword search
-   * Returns the created overlay id
-   */
+  // ============ keyword_stock_overlays (오버레이) ============
   addStockOverlay(
     keywordSearchId: string,
     searchId: string,
+    ticker: string,
+    companyName: string,
     displayOrder?: number,
     client?: SupabaseClient
   ): Promise<string>
 
-  /**
-   * Remove a stock overlay from a keyword search
-   * Returns true if deleted, false if not found
-   */
+  getKeywordStockOverlays(
+    keywordSearchId: string,
+    client?: SupabaseClient
+  ): Promise<KeywordStockOverlay[]>
+
   removeStockOverlay(
     overlayId: string,
     client?: SupabaseClient
   ): Promise<boolean>
 
-  /**
-   * Get all stock overlays for a keyword search
-   */
-  getKeywordStockOverlays(
-    keywordSearchId: string,
+  // ============ overlay_chart_timeseries (오버레이 시계열 - 핵심) ============
+  insertOverlayChartTimeseries(
+    overlayId: string,
+    overlayData: Array<{
+      date: string
+      normalizedPrice: number
+      rawPrice: number
+    }>,
     client?: SupabaseClient
-  ): Promise<KeywordStockOverlay[]>
+  ): Promise<void>
+
+  getOverlayChartTimeseries(
+    overlayId: string,
+    client?: SupabaseClient
+  ): Promise<
+    Array<{
+      date: string
+      normalizedPrice: number
+      rawPrice: number
+    }>
+  >
 }
 
-/**
- * Helper function for Supabase upsert operation
- * user_id 기반 upsert (같은 ticker도 다른 user_id면 새로 생성)
- */
-async function performSupabaseUpsert(
-  record: SearchRecord,
-  client?: SupabaseClient
-): Promise<string> {
-  const supabase = client ?? getSupabaseClient()
+// ============================================================================
+// Supabase 구현
+// ============================================================================
 
-  // user_id 기반 ticker 조회 (RLS 적용됨)
-  const { data: existing, error: selectError } = await supabase
-    .from('searches')
-    .select('id')
-    .eq('ticker', record.ticker)
-    .eq('user_id', record.user_id || '') // user_id가 있는 경우만 매칭
-    .maybeSingle()
+class SupabaseDbAdapter implements DbAdapter {
+  // ============ searches ============
 
-  if (selectError && selectError.code !== 'PGRST116') throw selectError
-
-  if (existing) {
-    // UPDATE: 기존 레코드 업데이트
-    const { error: updateError } = await supabase
-      .from('searches')
-      .update({
-        company_name: record.company_name,
-        currency: record.currency,
-        current_price: record.current_price,
-        previous_close: record.previous_close,
-        ma13: record.ma13,
-        yoy_change: record.yoy_change,
-        week52_high: record.week52_high,
-        week52_low: record.week52_low,
-        price_data: record.price_data,
-        trends_data: record.trends_data,
-        last_updated_at: record.last_updated_at,
-        searched_at: record.searched_at,
-      })
-      .eq('id', existing.id)
-
-    if (updateError) throw updateError
-    return existing.id
-  } else {
-    // INSERT: 새 레코드 생성
-    const { data: insertedData, error: insertError } = await supabase
-      .from('searches')
-      .insert({
-        id: record.id,
-        ticker: record.ticker,
-        company_name: record.company_name,
-        currency: record.currency,
-        current_price: record.current_price,
-        previous_close: record.previous_close,
-        ma13: record.ma13,
-        yoy_change: record.yoy_change,
-        week52_high: record.week52_high,
-        week52_low: record.week52_low,
-        price_data: record.price_data,
-        trends_data: record.trends_data,
-        last_updated_at: record.last_updated_at,
-        searched_at: record.searched_at,
-        created_at: record.created_at,
-        user_id: record.user_id, // user_id 추가
-      })
-      .select('id')
-      .single()
-
-    if (insertError) throw insertError
-    return insertedData.id
-  }
-}
-
-/**
- * Supabase Adapter Implementation
- * Phase 6: Supabase 단일 기반 구현
- * Provides database operations using Supabase (PostgreSQL) as the provider.
- * Implements the DbAdapter interface with Supabase client methods.
- *
- * All operations are async and use Supabase's Postgres API.
- * Includes proper error handling and data transformation.
- */
-export const supabaseAdapter: DbAdapter = {
   async upsertSearch(
     record: SearchRecord,
     client?: SupabaseClient
   ): Promise<string> {
-    return await performSupabaseUpsert(record, client)
-  },
+    const supabase = client ?? getSupabaseClient()
+
+    const { data, error } = await supabase
+      .from('searches')
+      .upsert(
+        {
+          ticker: record.ticker.toUpperCase(),
+          company_name: record.company_name,
+          currency: record.currency || 'USD',
+          searched_at: record.searched_at,
+        },
+        { onConflict: 'user_id,ticker' }
+      )
+      .select('id')
+      .single()
+
+    if (error) throw error
+    return data.id
+  }
 
   async getSearch(
     searchId: string,
@@ -313,13 +177,25 @@ export const supabaseAdapter: DbAdapter = {
       .from('searches')
       .select('*')
       .eq('id', searchId)
-      .maybeSingle()
+      .single()
 
-    if (error && error.code !== 'PGRST116') throw error
-    if (!data) return null
+    if (error) return null
 
-    return parseSearchRecordRaw(data)
-  },
+    return {
+      id: data.id,
+      user_id: data.user_id,
+      ticker: data.ticker,
+      company_name: data.company_name,
+      currency: data.currency,
+      current_price: 0,
+      yoy_change: 0,
+      price_data: [],
+      trends_data: [],
+      last_updated_at: new Date().toISOString(),
+      searched_at: data.searched_at,
+      created_at: data.created_at,
+    }
+  }
 
   async getSearchByTicker(
     ticker: string,
@@ -330,14 +206,26 @@ export const supabaseAdapter: DbAdapter = {
     const { data, error } = await supabase
       .from('searches')
       .select('*')
-      .eq('ticker', ticker)
-      .maybeSingle()
+      .eq('ticker', ticker.toUpperCase())
+      .single()
 
-    if (error && error.code !== 'PGRST116') throw error
-    if (!data) return null
+    if (error) return null
 
-    return parseSearchRecordRaw(data)
-  },
+    return {
+      id: data.id,
+      user_id: data.user_id,
+      ticker: data.ticker,
+      company_name: data.company_name,
+      currency: data.currency,
+      current_price: 0,
+      yoy_change: 0,
+      price_data: [],
+      trends_data: [],
+      last_updated_at: new Date().toISOString(),
+      searched_at: data.searched_at,
+      created_at: data.created_at,
+    }
+  }
 
   async getAllSearches(client?: SupabaseClient): Promise<SearchRecord[]> {
     const supabase = client ?? getSupabaseClient()
@@ -349,8 +237,21 @@ export const supabaseAdapter: DbAdapter = {
 
     if (error) throw error
 
-    return (data || []).map(parseSearchRecordRaw)
-  },
+    return (data || []).map(row => ({
+      id: row.id,
+      user_id: row.user_id,
+      ticker: row.ticker,
+      company_name: row.company_name,
+      currency: row.currency,
+      current_price: 0,
+      yoy_change: 0,
+      price_data: [],
+      trends_data: [],
+      last_updated_at: new Date().toISOString(),
+      searched_at: row.searched_at,
+      created_at: row.created_at,
+    }))
+  }
 
   async deleteSearch(
     searchId: string,
@@ -358,55 +259,41 @@ export const supabaseAdapter: DbAdapter = {
   ): Promise<boolean> {
     const supabase = client ?? getSupabaseClient()
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('searches')
       .delete()
       .eq('id', searchId)
-      .select('id')
 
-    if (error) throw error
+    return !error
+  }
 
-    return (data && data.length > 0) || false
-  },
+  // ============ stock_price_data ============
 
   async insertPriceData(
     searchId: string,
     priceData: PriceDataPoint[],
     client?: SupabaseClient
   ): Promise<void> {
+    if (priceData.length === 0) return
+
     const supabase = client ?? getSupabaseClient()
 
-    // 빈 배열이면 기존 데이터 삭제만 수행
-    if (priceData.length === 0) {
-      const { error: deleteError } = await supabase
-        .from('price_data')
-        .delete()
-        .eq('search_id', searchId)
+    const records = priceData.map(p => ({
+      search_id: searchId,
+      date: p.date,
+      close: p.close,
+      open: p.open,
+      high: p.high,
+      low: p.low,
+      volume: p.volume,
+    }))
 
-      if (deleteError) throw deleteError
-      return
-    }
+    const { error } = await supabase
+      .from('stock_price_data')
+      .upsert(records, { onConflict: 'search_id,date' })
 
-    // 배치 UPSERT (100개씩)
-    // 주의: 부분 실패 시 이전 배치는 저장되고 이후 배치는 누락됨 (원자성 미보장)
-    for (let i = 0; i < priceData.length; i += 100) {
-      const batch = priceData.slice(i, i + 100)
-      const { error } = await supabase.from('price_data').upsert(
-        batch.map(p => ({
-          search_id: searchId,
-          date: p.date,
-          close: p.close,
-          open: p.open,
-          high: p.high,
-          low: p.low,
-          volume: p.volume,
-        })),
-        { onConflict: 'search_id,date' }
-      )
-
-      if (error) throw error
-    }
-  },
+    if (error) throw error
+  }
 
   async getPriceDataBySearchId(
     searchId: string,
@@ -415,7 +302,7 @@ export const supabaseAdapter: DbAdapter = {
     const supabase = client ?? getSupabaseClient()
 
     const { data, error } = await supabase
-      .from('price_data')
+      .from('stock_price_data')
       .select('*')
       .eq('search_id', searchId)
       .order('date', { ascending: true })
@@ -430,62 +317,9 @@ export const supabaseAdapter: DbAdapter = {
       low: row.low,
       volume: row.volume,
     }))
-  },
+  }
 
-  async insertTrendsData(
-    searchId: string,
-    trendsData: TrendsDataPoint[],
-    client?: SupabaseClient
-  ): Promise<void> {
-    const supabase = client ?? getSupabaseClient()
-
-    // 빈 배열이면 기존 데이터 삭제만 수행
-    if (trendsData.length === 0) {
-      const { error: deleteError } = await supabase
-        .from('trends_data')
-        .delete()
-        .eq('search_id', searchId)
-
-      if (deleteError) throw deleteError
-      return
-    }
-
-    // 배치 UPSERT (100개씩)
-    // 주의: 부분 실패 시 이전 배치는 저장되고 이후 배치는 누락됨 (원자성 미보장)
-    for (let i = 0; i < trendsData.length; i += 100) {
-      const batch = trendsData.slice(i, i + 100)
-      const { error } = await supabase.from('trends_data').upsert(
-        batch.map(t => ({
-          search_id: searchId,
-          date: t.date,
-          value: t.value,
-        })),
-        { onConflict: 'search_id,date' }
-      )
-
-      if (error) throw error
-    }
-  },
-
-  async getTrendsDataBySearchId(
-    searchId: string,
-    client?: SupabaseClient
-  ): Promise<TrendsDataPoint[]> {
-    const supabase = client ?? getSupabaseClient()
-
-    const { data, error } = await supabase
-      .from('trends_data')
-      .select('*')
-      .eq('search_id', searchId)
-      .order('date', { ascending: true })
-
-    if (error) throw error
-
-    return (data || []).map(row => ({
-      date: row.date,
-      value: row.value,
-    }))
-  },
+  // ============ keyword_searches ============
 
   async upsertKeywordSearch(
     record: KeywordSearchRecord,
@@ -493,52 +327,22 @@ export const supabaseAdapter: DbAdapter = {
   ): Promise<string> {
     const supabase = client ?? getSupabaseClient()
 
-    // user_id 기반 keyword 조회 (RLS 적용됨)
-    const { data: existing, error: selectError } = await supabase
+    const { data, error } = await supabase
       .from('keyword_searches')
-      .select('id')
-      .eq('keyword', record.keyword)
-      .eq('user_id', record.user_id)
-      .maybeSingle()
-
-    if (selectError && selectError.code !== 'PGRST116') throw selectError
-
-    if (existing) {
-      // UPDATE: 기존 레코드 업데이트
-      const { error: updateError } = await supabase
-        .from('keyword_searches')
-        .update({
-          ma13: record.ma13,
-          yoy_change: record.yoy_change,
-          trends_data: JSON.stringify(record.trends_data),
+      .upsert(
+        {
+          keyword: record.keyword,
           searched_at: record.searched_at,
           updated_at: new Date().toISOString(),
-        })
-        .eq('id', existing.id)
+        },
+        { onConflict: 'user_id,keyword' }
+      )
+      .select('id')
+      .single()
 
-      if (updateError) throw updateError
-      return existing.id
-    } else {
-      // INSERT: 새 레코드 생성
-      const { data: insertedData, error: insertError } = await supabase
-        .from('keyword_searches')
-        .insert({
-          id: record.id,
-          user_id: record.user_id,
-          keyword: record.keyword,
-          ma13: record.ma13,
-          yoy_change: record.yoy_change,
-          trends_data: JSON.stringify(record.trends_data),
-          searched_at: record.searched_at,
-          created_at: record.created_at,
-        })
-        .select('id')
-        .single()
-
-      if (insertError) throw insertError
-      return insertedData.id
-    }
-  },
+    if (error) throw error
+    return data.id
+  }
 
   async getKeywordSearch(
     keywordSearchId: string,
@@ -550,26 +354,21 @@ export const supabaseAdapter: DbAdapter = {
       .from('keyword_searches')
       .select('*')
       .eq('id', keywordSearchId)
-      .maybeSingle()
+      .single()
 
-    if (error && error.code !== 'PGRST116') throw error
-    if (!data) return null
+    if (error) return null
 
     return {
       id: data.id,
       user_id: data.user_id,
       keyword: data.keyword,
-      ma13: data.ma13,
-      yoy_change: data.yoy_change,
-      trends_data:
-        typeof data.trends_data === 'string'
-          ? JSON.parse(data.trends_data)
-          : data.trends_data,
+      trends_data: [],
       searched_at: data.searched_at,
       created_at: data.created_at,
       updated_at: data.updated_at,
+      last_viewed_at: data.last_viewed_at,
     }
-  },
+  }
 
   async getKeywordSearchByKeyword(
     keyword: string,
@@ -581,26 +380,21 @@ export const supabaseAdapter: DbAdapter = {
       .from('keyword_searches')
       .select('*')
       .eq('keyword', keyword)
-      .maybeSingle()
+      .single()
 
-    if (error && error.code !== 'PGRST116') throw error
-    if (!data) return null
+    if (error) return null
 
     return {
       id: data.id,
       user_id: data.user_id,
       keyword: data.keyword,
-      ma13: data.ma13,
-      yoy_change: data.yoy_change,
-      trends_data:
-        typeof data.trends_data === 'string'
-          ? JSON.parse(data.trends_data)
-          : data.trends_data,
+      trends_data: [],
       searched_at: data.searched_at,
       created_at: data.created_at,
       updated_at: data.updated_at,
+      last_viewed_at: data.last_viewed_at,
     }
-  },
+  }
 
   async getAllKeywordSearches(
     client?: SupabaseClient
@@ -618,17 +412,13 @@ export const supabaseAdapter: DbAdapter = {
       id: row.id,
       user_id: row.user_id,
       keyword: row.keyword,
-      ma13: row.ma13,
-      yoy_change: row.yoy_change,
-      trends_data:
-        typeof row.trends_data === 'string'
-          ? JSON.parse(row.trends_data)
-          : row.trends_data,
+      trends_data: [],
       searched_at: row.searched_at,
       created_at: row.created_at,
       updated_at: row.updated_at,
+      last_viewed_at: row.last_viewed_at,
     }))
-  },
+  }
 
   async deleteKeywordSearch(
     keywordSearchId: string,
@@ -636,37 +426,13 @@ export const supabaseAdapter: DbAdapter = {
   ): Promise<boolean> {
     const supabase = client ?? getSupabaseClient()
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('keyword_searches')
       .delete()
       .eq('id', keywordSearchId)
-      .select('id')
 
-    if (error) throw error
-
-    return (data && data.length > 0) || false
-  },
-
-  async renameKeywordSearch(
-    keywordSearchId: string,
-    newKeyword: string,
-    client?: SupabaseClient
-  ): Promise<boolean> {
-    const supabase = client ?? getSupabaseClient()
-
-    const { data, error } = await supabase
-      .from('keyword_searches')
-      .update({
-        keyword: newKeyword,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', keywordSearchId)
-      .select('id')
-
-    if (error) throw error
-
-    return (data && data.length > 0) || false
-  },
+    return !error
+  }
 
   async markKeywordAsViewed(
     keywordSearchId: string,
@@ -674,61 +440,63 @@ export const supabaseAdapter: DbAdapter = {
   ): Promise<boolean> {
     const supabase = client ?? getSupabaseClient()
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('keyword_searches')
-      .update({
-        last_viewed_at: new Date().toISOString(),
-      })
+      .update({ last_viewed_at: new Date().toISOString() })
       .eq('id', keywordSearchId)
-      .select('id')
 
-    if (error) throw error
+    return !error
+  }
 
-    return (data && data.length > 0) || false
-  },
+  // ============ keyword_chart_timeseries ============
 
-  async insertKeywordTrendsData(
+  async insertKeywordChartTimeseries(
     keywordSearchId: string,
-    trendsData: TrendsDataPoint[],
+    chartData: Array<{
+      weekIndex: number
+      date: string
+      trendsValue: number
+      ma13Value: number | null
+      yoyValue: number | null
+    }>,
     client?: SupabaseClient
   ): Promise<void> {
+    if (chartData.length === 0) return
+
     const supabase = client ?? getSupabaseClient()
 
-    // 빈 배열이면 기존 데이터 삭제만 수행
-    if (trendsData.length === 0) {
-      const { error: deleteError } = await supabase
-        .from('keyword_trends_data')
-        .delete()
-        .eq('keyword_search_id', keywordSearchId)
+    const records = chartData.map(row => ({
+      keyword_search_id: keywordSearchId,
+      week_index: row.weekIndex,
+      date: row.date,
+      trends_value: row.trendsValue,
+      ma13_value: row.ma13Value,
+      yoy_value: row.yoyValue,
+    }))
 
-      if (deleteError) throw deleteError
-      return
-    }
+    const { error } = await supabase
+      .from('keyword_chart_timeseries')
+      .insert(records)
 
-    // 배치 UPSERT (100개씩)
-    for (let i = 0; i < trendsData.length; i += 100) {
-      const batch = trendsData.slice(i, i + 100)
-      const { error } = await supabase.from('keyword_trends_data').upsert(
-        batch.map(t => ({
-          keyword_search_id: keywordSearchId,
-          date: t.date,
-          value: t.value,
-        })),
-        { onConflict: 'keyword_search_id,date' }
-      )
+    if (error) throw error
+  }
 
-      if (error) throw error
-    }
-  },
-
-  async getKeywordTrendsDataByKeywordSearchId(
+  async getKeywordChartTimeseries(
     keywordSearchId: string,
     client?: SupabaseClient
-  ): Promise<TrendsDataPoint[]> {
+  ): Promise<
+    Array<{
+      weekIndex: number
+      date: string
+      trendsValue: number
+      ma13Value: number | null
+      yoyValue: number | null
+    }>
+  > {
     const supabase = client ?? getSupabaseClient()
 
     const { data, error } = await supabase
-      .from('keyword_trends_data')
+      .from('keyword_chart_timeseries')
       .select('*')
       .eq('keyword_search_id', keywordSearchId)
       .order('date', { ascending: true })
@@ -736,14 +504,21 @@ export const supabaseAdapter: DbAdapter = {
     if (error) throw error
 
     return (data || []).map(row => ({
+      weekIndex: row.week_index,
       date: row.date,
-      value: row.value,
+      trendsValue: row.trends_value,
+      ma13Value: row.ma13_value,
+      yoyValue: row.yoy_value,
     }))
-  },
+  }
+
+  // ============ keyword_stock_overlays ============
 
   async addStockOverlay(
     keywordSearchId: string,
     searchId: string,
+    ticker: string,
+    companyName: string,
     displayOrder: number = 0,
     client?: SupabaseClient
   ): Promise<string> {
@@ -754,32 +529,16 @@ export const supabaseAdapter: DbAdapter = {
       .insert({
         keyword_search_id: keywordSearchId,
         search_id: searchId,
+        ticker,
+        company_name: companyName,
         display_order: displayOrder,
       })
       .select('id')
       .single()
 
     if (error) throw error
-
     return data.id
-  },
-
-  async removeStockOverlay(
-    overlayId: string,
-    client?: SupabaseClient
-  ): Promise<boolean> {
-    const supabase = client ?? getSupabaseClient()
-
-    const { data, error } = await supabase
-      .from('keyword_stock_overlays')
-      .delete()
-      .eq('id', overlayId)
-      .select('id')
-
-    if (error) throw error
-
-    return (data && data.length > 0) || false
-  },
+  }
 
   async getKeywordStockOverlays(
     keywordSearchId: string,
@@ -799,14 +558,83 @@ export const supabaseAdapter: DbAdapter = {
       id: row.id,
       keyword_search_id: row.keyword_search_id,
       search_id: row.search_id,
+      ticker: row.ticker,
+      company_name: row.company_name,
       display_order: row.display_order,
       created_at: row.created_at,
     }))
-  },
+  }
+
+  async removeStockOverlay(
+    overlayId: string,
+    client?: SupabaseClient
+  ): Promise<boolean> {
+    const supabase = client ?? getSupabaseClient()
+
+    const { error } = await supabase
+      .from('keyword_stock_overlays')
+      .delete()
+      .eq('id', overlayId)
+
+    return !error
+  }
+
+  // ============ overlay_chart_timeseries ============
+
+  async insertOverlayChartTimeseries(
+    overlayId: string,
+    overlayData: Array<{
+      date: string
+      normalizedPrice: number
+      rawPrice: number
+    }>,
+    client?: SupabaseClient
+  ): Promise<void> {
+    if (overlayData.length === 0) return
+
+    const supabase = client ?? getSupabaseClient()
+
+    const records = overlayData.map(row => ({
+      overlay_id: overlayId,
+      date: row.date,
+      normalized_price: row.normalizedPrice,
+      raw_price: row.rawPrice,
+    }))
+
+    const { error } = await supabase
+      .from('overlay_chart_timeseries')
+      .insert(records)
+
+    if (error) throw error
+  }
+
+  async getOverlayChartTimeseries(
+    overlayId: string,
+    client?: SupabaseClient
+  ): Promise<
+    Array<{
+      date: string
+      normalizedPrice: number
+      rawPrice: number
+    }>
+  > {
+    const supabase = client ?? getSupabaseClient()
+
+    const { data, error } = await supabase
+      .from('overlay_chart_timeseries')
+      .select('*')
+      .eq('overlay_id', overlayId)
+      .order('date', { ascending: true })
+
+    if (error) throw error
+
+    return (data || []).map(row => ({
+      date: row.date,
+      normalizedPrice: row.normalized_price,
+      rawPrice: row.raw_price,
+    }))
+  }
 }
 
-/**
- * Database Adapter Export
- * Phase 6: Supabase 단일 기반으로 통합되어 supabaseAdapter만 사용합니다.
- */
-export const db = supabaseAdapter
+// Export singleton instance
+export const db: DbAdapter = new SupabaseDbAdapter()
