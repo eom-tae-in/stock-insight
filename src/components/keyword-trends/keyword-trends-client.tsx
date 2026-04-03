@@ -406,10 +406,23 @@ export default function KeywordTrendsClient() {
 
       const createData = await res.json()
       const keywordSearchId = createData.data.id
+      console.log('[handleSaveCombo] Keyword saved with ID:', keywordSearchId)
+      console.log('[handleSaveCombo] Saving overlays:', {
+        overlayCount: state.selectedSearches.length,
+        searches: state.selectedSearches.map(s => ({
+          id: s.id,
+          ticker: s.ticker,
+        })),
+      })
 
       await Promise.all(
-        state.selectedSearches.map((search, i) =>
-          apiFetch(`/api/keyword-searches/${keywordSearchId}/overlays`, {
+        state.selectedSearches.map((search, i) => {
+          console.log(
+            `[handleSaveCombo] Posting overlay ${i}:`,
+            search.ticker,
+            search.id
+          )
+          return apiFetch(`/api/keyword-searches/${keywordSearchId}/overlays`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -419,8 +432,9 @@ export default function KeywordTrendsClient() {
           }).then(overlayRes => {
             if (!overlayRes.ok)
               throw new Error(`Failed to save overlay: ${search.ticker}`)
+            console.log(`[handleSaveCombo] Overlay ${i} saved successfully`)
           })
-        )
+        })
       )
 
       toast.success('키워드와 오버레이 조합을 저장했습니다')

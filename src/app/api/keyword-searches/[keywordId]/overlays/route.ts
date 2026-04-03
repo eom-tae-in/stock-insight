@@ -102,15 +102,22 @@ export async function POST(
     }
 
     // 오버레이 추가
+    console.log('[POST overlays] Adding overlay:', {
+      keywordId,
+      searchId,
+      displayOrder,
+    })
     const overlayId = await addStockOverlay(
       keywordId,
       searchId,
       displayOrder,
       supabase
     )
+    console.log('[POST overlays] Overlay created with ID:', overlayId)
 
     // 생성된 오버레이 조회 후 반환
     const overlays = await getKeywordStockOverlays(keywordId, supabase)
+    console.log('[POST overlays] Total overlays after insert:', overlays.length)
     const created = overlays.find(o => o.id === overlayId)
 
     if (!created) {
