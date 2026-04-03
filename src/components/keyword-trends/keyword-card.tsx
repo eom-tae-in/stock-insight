@@ -100,28 +100,21 @@ export function KeywordCard({
   // 일반 모드 (비관리 모드)
   if (!isManageMode) {
     return (
-      <div
-        className={cn(
-          'group border-border/50 from-card to-card/80 relative rounded-xl border bg-gradient-to-br p-4 transition-all duration-200',
-          'hover:border-primary/70 hover:shadow-primary/10 hover:shadow-md',
-          'cursor-pointer backdrop-blur-sm'
-        )}
-      >
-        {/* 오버레이 링크 (카드 전체 클릭 가능) */}
-        <Link
-          href={`/keywords/${keyword.id}`}
-          className="absolute inset-0 rounded-xl"
-        />
-
-        {/* 콘텐츠 및 인터랙티브 요소 (링크보다 위) */}
-        <div className="relative z-10">
+      <Link href={`/keywords/${keyword.id}`}>
+        <div
+          className={cn(
+            'group border-border/50 from-card to-card/80 relative rounded-xl border bg-gradient-to-br p-4 transition-all duration-200',
+            'hover:border-primary/70 hover:shadow-primary/10 hover:shadow-md',
+            'cursor-pointer backdrop-blur-sm'
+          )}
+        >
           {/* 삭제 버튼 - hover 시 표시 */}
           <Button
             type="button"
             variant="ghost"
             size="sm"
             className={cn(
-              'absolute top-2 right-2 h-7 w-7 p-0',
+              'absolute top-2 right-2 z-20 h-7 w-7 p-0',
               'text-destructive transition-all duration-200',
               'opacity-0 group-hover:opacity-100',
               'hover:bg-destructive/15'
@@ -174,7 +167,7 @@ export function KeywordCard({
             </p>
           </div>
         </div>
-      </div>
+      </Link>
     )
   }
 
