@@ -92,6 +92,7 @@ export default function OverlayManager({
   }
 
   const handleSelectSuggestion = (ticker: string) => {
+    if (selectedSearches.length >= 1) return
     setShowSuggestions(false)
     setSuggestions([])
 
@@ -132,7 +133,7 @@ export default function OverlayManager({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>종목 오버레이 추가 (최대 5개)</CardTitle>
+        <CardTitle>종목 오버레이 추가 (최대 1개)</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* F026: 종목 검색 필터 + 검색 제안 */}
@@ -148,6 +149,7 @@ export default function OverlayManager({
               }
             }}
             className="h-9"
+            disabled={selectedSearches.length >= 1}
           />
 
           {/* 자동완성 드롭다운 */}
@@ -184,7 +186,10 @@ export default function OverlayManager({
         </div>
 
         <div className="flex gap-2">
-          <Select onValueChange={onAddOverlay}>
+          <Select
+            onValueChange={onAddOverlay}
+            disabled={selectedSearches.length >= 1}
+          >
             <SelectTrigger>
               <SelectValue placeholder="저장된 종목 선택" />
             </SelectTrigger>
