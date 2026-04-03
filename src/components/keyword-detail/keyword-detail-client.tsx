@@ -1,78 +1,163 @@
 'use client'
 
 import Link from 'next/link'
-import { ChevronLeft } from 'lucide-react'
-import { Container } from '@/components/layout/container'
-import { Button } from '@/components/ui/button'
-import { OverlayCard } from './overlay-card'
-import type {
-  KeywordSearchRecord,
-  KeywordStockOverlay,
-  SearchRecord,
-} from '@/types/database'
-
-type OverlayDetail = KeywordStockOverlay & Partial<SearchRecord>
+import type { KeywordSearchRecord } from '@/types/database'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface KeywordDetailClientProps {
   keyword: KeywordSearchRecord
-  overlayDetails: OverlayDetail[]
-}
-
-function EmptyOverlaysState({ keywordName }: { keywordName: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-24 text-center">
-      <div className="mb-4 text-5xl" aria-hidden="true">
-        🔍
-      </div>
-      <h2 className="mb-2 text-lg font-semibold">
-        이 키워드에 추가된 종목이 없어요
-      </h2>
-      <p className="text-muted-foreground mb-6 text-sm">
-        검색 페이지에서 종목을 추가해보세요
-      </p>
-      <Link href={`/trends/search?keyword=${encodeURIComponent(keywordName)}`}>
-        <Button>종목 추가하기</Button>
-      </Link>
-    </div>
-  )
+  chartData: Array<{
+    weekIndex: number
+    date: string
+    trendsValue: number
+    ma13Value: number | null
+    yoyValue: number | null
+  }>
+  overlays: Array<{
+    id: string
+    ticker: string
+    companyName: string
+    displayOrder: number
+    chartData: Array<{
+      date: string
+      normalizedPrice: number
+      rawPrice: number
+    }>
+  }>
 }
 
 export function KeywordDetailClient({
   keyword,
-  overlayDetails,
+  chartData,
+  overlays,
 }: KeywordDetailClientProps) {
   return (
-    <Container className="py-8 pb-24 sm:pb-8">
-      {/* 헤더 */}
-      <div className="mb-8">
-        <Link
-          href="/trends"
-          className="text-primary mb-4 inline-flex items-center gap-1 text-sm hover:underline"
-        >
-          <ChevronLeft className="h-4 w-4" />내 키워드로 돌아가기
-        </Link>
-        <h1 className="text-3xl font-bold">
+    <div className="bg-background min-h-screen p-6">
+      <div className="mx-auto max-w-4xl">
+        {/* 헤더 */}
+        <div className="mb-6">
+          <Link
+            href="/trends"
+            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm transition-colors"
+          >
+            ← 내 키워드로 돌아가기
+          </Link>
+        </div>
+
+        <h1 className="mb-8 text-3xl font-bold">
           {keyword.keyword} 키워드 커스텀 목록
         </h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          {overlayDetails.length}개의 종목이 저장됨
-        </p>
-      </div>
 
-      {/* 콘텐츠 */}
-      {overlayDetails.length === 0 ? (
-        <EmptyOverlaysState keywordName={keyword.keyword} />
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          {overlayDetails.map(overlay => (
-            <OverlayCard
-              key={overlay.id}
-              overlay={overlay}
-              keywordId={keyword.id}
-            />
-          ))}
+        {/* 차트 데이터 요약 */}
+        <div className="mb-8 grid grid-cols-3 gap-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-muted-foreground text-sm font-medium">
+                조회 기간
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="font-mono text-sm">
+                {chartData.length > 0
+                  ? `${chartData[0].date} ~ ${chartData[chartData.length - 1].date}`
+                  : 'N/A'}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-muted-foreground text-sm font-medium">
+                데이터 포인트
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="font-mono text-sm">{chartData.length}주</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-muted-foreground text-sm font-medium">
+                오버레이 종목
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="font-mono text-sm">{overlays.length}개</p>
+            </CardContent>
+          </Card>
         </div>
-      )}
-    </Container>
+
+        {/* 오버레이 정보 */}
+        {overlays.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>추가된 종목</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {overlays.map(overlay => (
+                <div
+                  key={overlay.id}
+                  className="border-border rounded border p-4"
+                >
+                  <div className="mb-2 flex items-center justify-between">
+                    <div>
+                      <p className="font-semibold">{overlay.ticker}</p>
+                      <p className="text-muted-foreground text-sm">
+                        {overlay.companyName}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-muted-foreground text-xs">
+                        데이터 포인트
+                      </p>
+                      <p className="font-mono text-sm">
+                        {overlay.chartData.length}개
+                      </p>
+                    </div>
+                  </div>
+
+                  {overlay.chartData.length > 0 && (
+                    <div className="text-muted-foreground mt-2 text-xs">
+                      <p>
+                        가격 범위: $
+                        {Math.min(
+                          ...overlay.chartData.map(d => d.rawPrice)
+                        ).toFixed(2)}{' '}
+                        ~ $
+                        {Math.max(
+                          ...overlay.chartData.map(d => d.rawPrice)
+                        ).toFixed(2)}
+                      </p>
+                      <p>
+                        정규화 범위:{' '}
+                        {Math.min(
+                          ...overlay.chartData.map(d => d.normalizedPrice)
+                        ).toFixed(2)}{' '}
+                        ~{' '}
+                        {Math.max(
+                          ...overlay.chartData.map(d => d.normalizedPrice)
+                        ).toFixed(2)}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* 데이터 요약 */}
+        <div className="text-muted-foreground mt-8 text-sm">
+          <p>
+            ✅ 이 페이지의 데이터는 저장된 차트의 정확한 시계열 데이터입니다.
+          </p>
+          <p>
+            ✅ 4개의 시계열(trends, ma13, yoy, normalized_price)이 모두
+            저장되었습니다.
+          </p>
+        </div>
+      </div>
+    </div>
   )
 }

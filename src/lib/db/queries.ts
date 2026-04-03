@@ -1,27 +1,19 @@
 /**
- * DB CRUD 레이어 - Supabase 위임 레이어
+ * DB CRUD 레이어 - Supabase 위임 레이어 (재설계)
  *
- * Phase 6: Supabase 단일 기반 + Phase 7: 인증된 클라이언트 지원
- * 모든 DB 작업을 adapters/db.ts의 supabaseAdapter를 통해 수행합니다.
- *
- * 이 레이어는 호출부를 adapters/db.ts로부터 분리하는 추상화 계층입니다.
- * 모든 메서드는 async이며, Server Component와 API Route에서 호출됩니다.
- *
- * Optional client 파라미터: 인증된 Supabase 클라이언트를 전달 가능
- * (API Route에서 user_id 기반 RLS 적용을 위해 필요)
+ * 새 스키마에 맞춘 모든 쿼리 함수
  */
 
-import {
+import type {
   SearchRecord,
   PriceDataPoint,
-  TrendsDataPoint,
   KeywordSearchRecord,
   KeywordStockOverlay,
 } from '@/types/database'
 import { db } from '../adapters/db'
-import { SupabaseClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
-// searches 테이블 CRUD
+// ============ searches (종목) ============
 export const upsertSearch = async (
   record: SearchRecord,
   client?: SupabaseClient
@@ -46,7 +38,7 @@ export const deleteSearch = async (
   client?: SupabaseClient
 ): Promise<boolean> => db.deleteSearch(searchId, client)
 
-// price_data 테이블 CRUD
+// ============ stock_price_data (주가 시계열) ============
 export const insertPriceData = async (
   searchId: string,
   priceData: PriceDataPoint[],
@@ -58,40 +50,7 @@ export const getPriceDataBySearchId = async (
   client?: SupabaseClient
 ): Promise<PriceDataPoint[]> => db.getPriceDataBySearchId(searchId, client)
 
-// trends_data 테이블 CRUD
-export const insertTrendsData = async (
-  searchId: string,
-  trendsData: TrendsDataPoint[],
-  client?: SupabaseClient
-): Promise<void> => db.insertTrendsData(searchId, trendsData, client)
-
-export const getTrendsDataBySearchId = async (
-  searchId: string,
-  client?: SupabaseClient
-): Promise<TrendsDataPoint[]> => db.getTrendsDataBySearchId(searchId, client)
-
-/**
- * 종목 데이터 완전 교체 (주가 + 트렌드)
- *
- * Supabase 클라이언트는 분산 트랜잭션을 지원하지 않으므로,
- * 이 함수는 두 작업을 순차적으로 호출합니다.
- * insertPriceData/insertTrendsData 중 하나가 실패하면 부분 저장 상태가 될 수 있습니다.
- * 호출부(API 핸들러)에서 보상 로직을 구현하여 데이터 일관성을 유지합니다.
- */
-export async function replaceStockData(
-  searchId: string,
-  priceData: PriceDataPoint[],
-  trendsData: TrendsDataPoint[],
-  client?: SupabaseClient
-): Promise<void> {
-  await insertPriceData(searchId, priceData, client)
-  await insertTrendsData(searchId, trendsData, client)
-}
-
-// ============================================================================
-// keyword_searches 테이블 CRUD
-// ============================================================================
-
+// ============ keyword_searches (키워드) ============
 export const upsertKeywordSearch = async (
   record: KeywordSearchRecord,
   client?: SupabaseClient
@@ -118,65 +77,86 @@ export const deleteKeywordSearch = async (
   client?: SupabaseClient
 ): Promise<boolean> => db.deleteKeywordSearch(keywordSearchId, client)
 
-export const updateKeywordName = async (
-  keywordSearchId: string,
-  newKeyword: string,
-  client?: SupabaseClient
-): Promise<boolean> =>
-  db.renameKeywordSearch(keywordSearchId, newKeyword, client)
-
 export const markKeywordAsViewed = async (
   keywordSearchId: string,
   client?: SupabaseClient
 ): Promise<boolean> => db.markKeywordAsViewed(keywordSearchId, client)
 
-// ============================================================================
-// keyword_trends_data 테이블 CRUD
-// ============================================================================
-
-export const insertKeywordTrendsData = async (
+// ============ keyword_chart_timeseries (차트 전체 시계열) ============
+export const insertKeywordChartTimeseries = async (
   keywordSearchId: string,
-  trendsData: TrendsDataPoint[],
+  chartData: Array<{
+    weekIndex: number
+    date: string
+    trendsValue: number
+    ma13Value: number | null
+    yoyValue: number | null
+  }>,
   client?: SupabaseClient
 ): Promise<void> =>
-  db.insertKeywordTrendsData(keywordSearchId, trendsData, client)
+  db.insertKeywordChartTimeseries(keywordSearchId, chartData, client)
 
-export const getKeywordTrendsDataByKeywordSearchId = async (
+export const getKeywordChartTimeseries = async (
   keywordSearchId: string,
   client?: SupabaseClient
-): Promise<TrendsDataPoint[]> =>
-  db.getKeywordTrendsDataByKeywordSearchId(keywordSearchId, client)
+): Promise<
+  Array<{
+    weekIndex: number
+    date: string
+    trendsValue: number
+    ma13Value: number | null
+    yoyValue: number | null
+  }>
+> => db.getKeywordChartTimeseries(keywordSearchId, client)
 
-/**
- * 키워드 트렌드 데이터 완전 교체
- */
-export async function replaceKeywordTrendsData(
-  keywordSearchId: string,
-  trendsData: TrendsDataPoint[],
-  client?: SupabaseClient
-): Promise<void> {
-  await insertKeywordTrendsData(keywordSearchId, trendsData, client)
-}
-
-// ============================================================================
-// keyword_stock_overlays 테이블 CRUD
-// ============================================================================
-
+// ============ keyword_stock_overlays (오버레이) ============
 export const addStockOverlay = async (
   keywordSearchId: string,
   searchId: string,
+  ticker: string,
+  companyName: string,
   displayOrder?: number,
   client?: SupabaseClient
 ): Promise<string> =>
-  db.addStockOverlay(keywordSearchId, searchId, displayOrder, client)
-
-export const removeStockOverlay = async (
-  overlayId: string,
-  client?: SupabaseClient
-): Promise<boolean> => db.removeStockOverlay(overlayId, client)
+  db.addStockOverlay(
+    keywordSearchId,
+    searchId,
+    ticker,
+    companyName,
+    displayOrder,
+    client
+  )
 
 export const getKeywordStockOverlays = async (
   keywordSearchId: string,
   client?: SupabaseClient
 ): Promise<KeywordStockOverlay[]> =>
   db.getKeywordStockOverlays(keywordSearchId, client)
+
+export const removeStockOverlay = async (
+  overlayId: string,
+  client?: SupabaseClient
+): Promise<boolean> => db.removeStockOverlay(overlayId, client)
+
+// ============ overlay_chart_timeseries (오버레이 시계열) ============
+export const insertOverlayChartTimeseries = async (
+  overlayId: string,
+  overlayData: Array<{
+    date: string
+    normalizedPrice: number
+    rawPrice: number
+  }>,
+  client?: SupabaseClient
+): Promise<void> =>
+  db.insertOverlayChartTimeseries(overlayId, overlayData, client)
+
+export const getOverlayChartTimeseries = async (
+  overlayId: string,
+  client?: SupabaseClient
+): Promise<
+  Array<{
+    date: string
+    normalizedPrice: number
+    rawPrice: number
+  }>
+> => db.getOverlayChartTimeseries(overlayId, client)

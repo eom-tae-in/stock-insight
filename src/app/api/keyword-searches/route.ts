@@ -1,11 +1,15 @@
 /**
- * Task: 키워드 검색 API Route
+ * Task: 키워드 조합 저장 API Route (재설계)
  *
  * GET /api/keyword-searches
  * Response: ApiResponse<KeywordSearchRecord[]>
  *
  * POST /api/keyword-searches
- * Body: { keyword: string, trendsData: TrendsDataPoint[], ma13: number, yoy_change: number }
+ * Body: {
+ *   keyword: string,
+ *   chartData: Array<{date, trendsValue, ma13Value, yoyValue}>,
+ *   overlays: Array<{ticker, companyName, overlayData: Array<{date, normalizedPrice, rawPrice}>}>
+ * }
  * Response: ApiResponse<KeywordSearchRecord>
  *
  * DELETE /api/keyword-searches?id={id}
@@ -18,10 +22,12 @@ import {
   getAllKeywordSearches,
   upsertKeywordSearch,
   deleteKeywordSearch,
-  insertKeywordTrendsData,
+  insertKeywordChartTimeseries,
+  addStockOverlay,
+  insertOverlayChartTimeseries,
 } from '@/lib/db/queries'
 import { createErrorResponse } from '@/lib/api-helpers'
-import type { ApiResponse, KeywordSearchRecord, TrendsDataPoint } from '@/types'
+import type { ApiResponse, KeywordSearchRecord } from '@/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -74,34 +80,46 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const {
       keyword,
-      trendsData,
-      ma13,
-      yoy_change,
+      chartData,
+      overlays,
     }: {
       keyword: string
-      trendsData: TrendsDataPoint[]
-      ma13?: number
-      yoy_change?: number
+      chartData: Array<{
+        weekIndex: number
+        date: string
+        trendsValue: number
+        ma13Value: number | null
+        yoyValue: number | null
+      }>
+      overlays?: Array<{
+        searchId: string
+        ticker: string
+        companyName: string
+        overlayData: Array<{
+          date: string
+          normalizedPrice: number
+          rawPrice: number
+        }>
+      }>
     } = body
 
     // 유효성 검사
-    if (!keyword || !Array.isArray(trendsData)) {
+    if (!keyword || !Array.isArray(chartData)) {
       return createErrorResponse(
         'INVALID_INPUT',
-        '키워드와 트렌드 데이터가 필요합니다.',
+        '키워드와 차트 데이터가 필요합니다.',
         400
       )
     }
 
-    // 키워드 저장
+    // 1. 키워드 저장
+    console.log('[POST keyword-searches] Saving keyword:', keyword)
     const keywordSearchId = await upsertKeywordSearch(
       {
-        id: '', // 새로 생성됨
+        id: '',
         user_id: user.id,
         keyword,
-        ma13,
-        yoy_change,
-        trends_data: trendsData,
+        trends_data: [],
         searched_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -109,13 +127,58 @@ export async function POST(request: NextRequest) {
       },
       supabase
     )
+    console.log(
+      '[POST keyword-searches] Keyword saved with ID:',
+      keywordSearchId
+    )
 
-    // 트렌드 데이터 저장
-    if (trendsData.length > 0) {
-      await insertKeywordTrendsData(keywordSearchId, trendsData, supabase)
+    // 2. 차트 시계열 데이터 저장
+    if (chartData.length > 0) {
+      console.log(
+        '[POST keyword-searches] Saving chart timeseries:',
+        chartData.length
+      )
+      await insertKeywordChartTimeseries(keywordSearchId, chartData, supabase)
     }
 
-    // 성공 응답 (조회를 통해 생성된 데이터 반환)
+    // 3. 오버레이 저장
+    if (overlays && overlays.length > 0) {
+      console.log('[POST keyword-searches] Saving overlays:', overlays.length)
+      for (let i = 0; i < overlays.length; i++) {
+        const overlay = overlays[i]
+        console.log(
+          `[POST keyword-searches] Overlay ${i}:`,
+          overlay.ticker,
+          overlay.searchId
+        )
+
+        // 오버레이 메타데이터 저장
+        const overlayId = await addStockOverlay(
+          keywordSearchId,
+          overlay.searchId,
+          overlay.ticker,
+          overlay.companyName,
+          i,
+          supabase
+        )
+        console.log(
+          '[POST keyword-searches] Overlay created with ID:',
+          overlayId
+        )
+
+        // 오버레이 시계열 데이터 저장
+        if (overlay.overlayData && overlay.overlayData.length > 0) {
+          await insertOverlayChartTimeseries(
+            overlayId,
+            overlay.overlayData,
+            supabase
+          )
+          console.log('[POST keyword-searches] Overlay timeseries saved')
+        }
+      }
+    }
+
+    // 4. 성공 응답
     const savedKeyword = await getAllKeywordSearches(supabase)
     const created = savedKeyword.find(k => k.id === keywordSearchId)
 

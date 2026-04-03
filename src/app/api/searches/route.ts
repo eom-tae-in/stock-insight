@@ -18,7 +18,7 @@ import { TickerInputSchema } from '@/lib/validation'
 import {
   getAllSearches,
   upsertSearch,
-  replaceStockData,
+  insertPriceData,
   deleteSearch,
 } from '@/lib/db/queries'
 import { createSuccessResponse, createErrorResponse } from '@/lib/api-helpers'
@@ -141,10 +141,10 @@ export async function POST(request: NextRequest) {
     // 인증된 클라이언트로 저장 (RLS 적용)
     const id = await upsertSearch(searchRecord, supabase)
 
-    // Phase 6: Supabase 단일 기반 - 가격 및 트렌드 데이터 저장
-    // 원자성 보장: replaceStockData 실패 시 search 레코드를 롤백하여 데이터 불일치 방지
+    // 가격 데이터 저장 (stock_price_data 테이블)
+    // 원자성 보장: insertPriceData 실패 시 search 레코드를 롤백하여 데이터 불일치 방지
     try {
-      await replaceStockData(id, stockData.priceData, trendsData, supabase)
+      await insertPriceData(id, stockData.priceData, supabase)
     } catch (error) {
       // 보상 로직: 이미 저장된 search 레코드 삭제
       await deleteSearch(id, supabase)
