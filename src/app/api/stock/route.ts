@@ -10,22 +10,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { upsertSearch, getSearchByTicker } from '@/lib/db/queries'
-import { createErrorResponse } from '@/lib/api-helpers'
-import type { ApiResponse, SearchRecord } from '@/types'
+import {
+  createErrorResponse,
+  validateApiAuth,
+  createSuccessResponse,
+} from '@/lib/api-helpers'
+import type { SearchRecord } from '@/types'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   try {
-    // 인증 확인
+    // 인증 검증 (중앙화된 헬퍼 사용)
     const supabase = await createSupabaseServerClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-    if (!user || authError) {
-      return createErrorResponse('UNAUTHORIZED', '로그인이 필요합니다.', 401)
+    const authResult = await validateApiAuth(supabase)
+    if (authResult instanceof NextResponse) {
+      return authResult // 에러 응답
     }
+    const { userId } = authResult
 
     // 쿼리 파라미터에서 ticker 추출
     const { searchParams } = new URL(request.url)
@@ -42,21 +44,16 @@ export async function GET(request: NextRequest) {
     }
 
     // 이미 저장된 종목인지 확인 (userId 전달하여 RLS 검증)
-    const existing = await getSearchByTicker(ticker, user.id, supabase)
+    const existing = await getSearchByTicker(ticker, userId, supabase)
     if (existing) {
-      const response: ApiResponse<SearchRecord> = {
-        success: true,
-        data: existing,
-        timestamp: new Date().toISOString(),
-      }
-      return NextResponse.json(response, { status: 200 })
+      return createSuccessResponse(existing, 200)
     }
 
     // 새 SearchRecord 생성 및 저장
     // (실제 가격 데이터는 나중에 백그라운드 작업으로 추가)
     const searchRecord: SearchRecord = {
       id: '', // upsertSearch에서 생성
-      user_id: user.id,
+      user_id: userId,
       ticker: ticker.toUpperCase(),
       company_name: companyName,
       currency: 'USD',
@@ -77,14 +74,7 @@ export async function GET(request: NextRequest) {
     const searchId = await upsertSearch(searchRecord, supabase)
     searchRecord.id = searchId
 
-    // 성공 응답
-    const response: ApiResponse<SearchRecord> = {
-      success: true,
-      data: searchRecord,
-      timestamp: new Date().toISOString(),
-    }
-
-    return NextResponse.json(response, { status: 201 })
+    return createSuccessResponse(searchRecord, 201)
   } catch (error) {
     console.error('Error creating stock record:', error)
     return createErrorResponse(

@@ -9,7 +9,7 @@
  * Response: ApiResponse<{ id: string; ticker: string }>
  */
 
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { fetchStockData } from '@/lib/services/stock-service'
 import { fetchTrendsData } from '@/lib/services/trends-service'
@@ -21,7 +21,11 @@ import {
   insertPriceData,
   deleteSearch,
 } from '@/lib/db/queries'
-import { createSuccessResponse, createErrorResponse } from '@/lib/api-helpers'
+import {
+  createSuccessResponse,
+  createErrorResponse,
+  validateApiAuth,
+} from '@/lib/api-helpers'
 import type { SearchRecord, TrendsDataPoint } from '@/types'
 import crypto from 'crypto'
 
@@ -29,19 +33,17 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
-    // 인증 확인
     const supabase = await createSupabaseServerClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-    if (!user || authError) {
-      return createErrorResponse('UNAUTHORIZED', '로그인이 필요합니다.', 401)
+
+    // 인증 검증 (중앙화된 헬퍼 사용)
+    const authResult = await validateApiAuth(supabase)
+    if (authResult instanceof NextResponse) {
+      return authResult // 에러 응답
     }
+    const { userId } = authResult
 
     // 인증된 클라이언트로 DB에서 자신의 저장된 종목 조회 (RLS 적용)
-    // userId를 반드시 전달 (RLS 검증)
-    const records = await getAllSearches(user.id, supabase)
+    const records = await getAllSearches(userId, supabase)
 
     return createSuccessResponse(records, 200)
   } catch (error) {

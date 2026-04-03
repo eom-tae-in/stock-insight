@@ -48,3 +48,13 @@ next-env.d.ts
 
 # Shrimp Task Manager data
 /shrimp_data/
+
+# Python virtual environment
+/venv/
+/venv_*/
+*.pyc
+__pycache__/
+
+# Playwright test artifacts
+/.playwright-mcp/
+.playwright-mcp/
