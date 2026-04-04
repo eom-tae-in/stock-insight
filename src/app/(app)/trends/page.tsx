@@ -7,7 +7,6 @@
  */
 
 import { redirect } from 'next/navigation'
-import { Header } from '@/components/layout/header'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getAllKeywordSearches } from '@/lib/db/queries'
 import { MyKeywordsClient } from '@/components/keyword-trends/my-keywords-client'
@@ -32,11 +31,8 @@ export default async function TrendsPage() {
   const initialKeywords = await getAllKeywordSearches(supabase)
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <Header />
-      <main className="flex-1">
-        <MyKeywordsClient initialKeywords={initialKeywords} />
-      </main>
-    </div>
+    <main className="flex-1">
+      <MyKeywordsClient initialKeywords={initialKeywords} />
+    </main>
   )
 }

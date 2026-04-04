@@ -98,8 +98,8 @@ class handler(BaseHTTPRequestHandler):
         except KeyError as e:
             self.send_error(400, f'Missing required field: {e}')
         except Exception as e:
-            print(f'Error in trends API: {str(e)}')
-            self.send_error(500, f'Internal server error: {str(e)}')
+            print(f'Error in trends API: {str(e)}', flush=True)
+            self.send_error(500, 'Internal server error')
 
     def send_json_response(self, data):
         """JSON 응답 전송"""
