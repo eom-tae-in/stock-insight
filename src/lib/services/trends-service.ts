@@ -38,6 +38,9 @@ export async function callPyTrendsAPI(
   // 환경 변수에서 API URL 가져오기
   const apiUrl = process.env.TRENDS_API_URL
 
+  console.log('[callPyTrendsAPI] apiUrl:', apiUrl)
+  console.log('[callPyTrendsAPI] keyword:', keyword)
+
   if (!apiUrl) {
     throw new Error('TRENDS_API_URL environment variable is not configured')
   }
@@ -51,6 +54,7 @@ export async function callPyTrendsAPI(
   const timeoutId = setTimeout(() => controller.abort(), timeout)
 
   try {
+    console.log('[callPyTrendsAPI] Sending POST request to Flask...')
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -64,6 +68,7 @@ export async function callPyTrendsAPI(
       }),
       signal: controller.signal,
     })
+    console.log('[callPyTrendsAPI] Response status:', response.status)
 
     clearTimeout(timeoutId)
 
@@ -115,6 +120,8 @@ export async function callPyTrendsAPI(
       const point: TrendsDataPoint = {
         date: dateStr,
         value,
+        ma13Value: null, // /api/trends에서 계산
+        yoyValue: null, // /api/trends에서 계산
       }
 
       if (existingIndex >= 0) {

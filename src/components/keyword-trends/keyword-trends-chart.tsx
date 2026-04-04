@@ -74,21 +74,29 @@ export default function KeywordTrendsChart({
   // Google Trends(주 단위) ↔ Yahoo Finance(일 단위) 날짜 매칭
   const overlayMaps = useMemo(
     () =>
-      overlays.map(search => {
+      overlays.map((search, searchIdx) => {
         const prices = search.price_data?.map(p => p.close) ?? []
-        if (prices.length === 0) return new Map<string, number>()
+        console.log(
+          `[overlayMaps] 종목 ${searchIdx} (${search.ticker}): price_data 길이=${search.price_data?.length || 0}`
+        )
+        if (prices.length === 0) {
+          console.warn(
+            `[overlayMaps] 경고: ${search.ticker}에 price_data가 없습니다!`
+          )
+          return new Map<string, number>()
+        }
 
         const minPrice = Math.min(...prices)
         const maxPrice = Math.max(...prices)
         const range = maxPrice - minPrice
 
         // 연도-주차별 주가 데이터 그룹화 (Google Trends와 일치 시키기)
+        // ⚠️ stock-service에서 이미 정규화한 날짜(ISO week start)를 사용하므로, 그대로 사용
         const weeklyPrices = new Map<string, number[]>()
         search.price_data?.forEach(p => {
-          const date = parseISO(p.date)
-          const year = date.getFullYear()
-          const weekNum = Math.ceil((date.getDate() + date.getDay()) / 7)
-          const weekKey = `${year}-W${String(weekNum).padStart(2, '0')}`
+          // price_data의 date는 이미 ISO week start로 정규화됨
+          // 따라서 date를 그대로 weekKey로 사용 가능
+          const weekKey = p.date
 
           if (!weeklyPrices.has(weekKey)) {
             weeklyPrices.set(weekKey, [])
@@ -105,6 +113,19 @@ export default function KeywordTrendsChart({
             range === 0 ? 50 : ((avgPrice - minPrice) / range) * 100
           map.set(weekKey, Math.round(normalized * 100) / 100)
         })
+
+        console.log(
+          `[overlayMaps] ${search.ticker} weeklyPrices Map 크기: ${map.size}`
+        )
+        if (map.size === 0) {
+          console.warn(
+            `[overlayMaps] 경고: ${search.ticker}의 weeklyPrices Map이 비어있습니다!`
+          )
+          console.log(
+            `[overlayMaps] price_data 샘플:`,
+            search.price_data?.slice(0, 3)
+          )
+        }
 
         return map
       }),
@@ -128,34 +149,35 @@ export default function KeywordTrendsChart({
   )
 
   // 차트 데이터 구성
-  const chartData: ChartDataPoint[] = useMemo(
-    () =>
-      trendsData.map((point, idx) => {
-        const date = parseISO(point.date)
-        const year = date.getFullYear()
-        const weekNum = Math.ceil((date.getDate() + date.getDay()) / 7)
-        const weekKey = `${year}-W${String(weekNum).padStart(2, '0')}`
+  const chartData: ChartDataPoint[] = useMemo(() => {
+    const data = trendsData.map((point, idx) => {
+      const date = parseISO(point.date)
 
-        const row: ChartDataPoint = {
-          date: format(date, 'MMM dd'),
-          fullDate: point.date,
-          trendsValue: point.value,
-          ma13: ma13Values[idx] ?? null,
-          yoyValue: yoyValuesArray?.[idx] ?? null,
+      // ✅ trends 데이터의 date는 이미 ISO week start로 정규화됨
+      // 따라서 point.date를 그대로 weekKey로 사용
+      const weekKey = point.date
+
+      const row: ChartDataPoint = {
+        date: format(date, 'MMM dd'),
+        fullDate: point.date,
+        trendsValue: point.value,
+        ma13: ma13Values[idx] ?? null,
+        yoyValue: yoyValuesArray?.[idx] ?? null,
+      }
+
+      // 오버레이 주식 데이터 추가 (Map 기반 O(1) 조회 - 날짜 정확 매칭)
+      overlays.forEach((search, overlayIdx) => {
+        const normalized = overlayMaps[overlayIdx].get(weekKey)
+        if (normalized !== undefined) {
+          row[`overlay${overlayIdx}`] = normalized
         }
+      })
 
-        // 오버레이 주식 데이터 추가 (Map 기반 O(1) 조회 - 주차별 일치)
-        overlays.forEach((_, overlayIdx) => {
-          const normalized = overlayMaps[overlayIdx].get(weekKey)
-          if (normalized !== undefined) {
-            row[`overlay${overlayIdx}`] = normalized
-          }
-        })
+      return row
+    })
 
-        return row
-      }),
-    [trendsData, ma13Values, overlays, overlayMaps, yoyValuesArray]
-  )
+    return data
+  }, [trendsData, ma13Values, overlays, overlayMaps, yoyValuesArray])
 
   return (
     <Card>

@@ -46,7 +46,7 @@ function EmptyKeywordsState() {
       <p className="text-muted-foreground mb-6 text-sm">
         관심 있는 키워드를 검색하고 저장해보세요
       </p>
-      <Link href="/trends/search">
+      <Link href="/keywords/search">
         <Button>검색하기</Button>
       </Link>
     </div>
@@ -341,7 +341,7 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
           <Settings className="mr-2 h-4 w-4" />
           {isManageMode ? '완료' : '관리'}
         </Button>
-        <Link href="/trends/search">
+        <Link href="/keywords/search">
           <Button>
             <Search className="mr-2 h-4 w-4" />새 키워드 검색
           </Button>

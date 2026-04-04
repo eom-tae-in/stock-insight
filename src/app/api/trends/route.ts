@@ -1,11 +1,15 @@
 /**
  * Google Trends 데이터 수집 API Route
  * GET /api/trends?keyword=...
+ *
+ * ma13Value, yoyValue 계산을 서버에서 수행하여 응답에 포함
  */
 
 import { NextRequest } from 'next/server'
 import { callPyTrendsAPI } from '@/lib/services/trends-service'
+import { calculateTrendsMA13 } from '@/lib/indicators'
 import { createErrorResponse, createSuccessResponse } from '@/lib/api-helpers'
+import type { TrendsDataPoint } from '@/types/database'
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,12 +32,36 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-      const trendsData = await callPyTrendsAPI(
+      const rawTrendsData = await callPyTrendsAPI(
         trimmedKeyword,
         geo,
         timeframe,
         gprop
       )
+
+      // 13주 이동평균 계산
+      const ma13Values = calculateTrendsMA13(rawTrendsData)
+
+      // 각 포인트별 52주 YoY 계산
+      const weeksInYear = 52
+      const yoyValuesArray = rawTrendsData.map((point, idx) => {
+        if (idx < weeksInYear) return null
+        const currentValue = point.value
+        const previousYearValue = rawTrendsData[idx - weeksInYear].value
+        if (previousYearValue === 0) return null
+        const yoy =
+          ((currentValue - previousYearValue) / previousYearValue) * 100
+        return Math.round(yoy * 100) / 100
+      })
+
+      // 최종 응답 데이터 (ma13Value, yoyValue 포함)
+      const trendsData: TrendsDataPoint[] = rawTrendsData.map((point, idx) => ({
+        date: point.date,
+        value: point.value,
+        ma13Value: ma13Values[idx] ?? null,
+        yoyValue: yoyValuesArray[idx] ?? null,
+      }))
+
       return createSuccessResponse(
         {
           trendsData,

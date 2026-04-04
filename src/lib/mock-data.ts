@@ -5,6 +5,7 @@ import type {
   SearchRecord,
   Metrics,
 } from '@/types'
+import { calculateTrendsMA13 } from '@/lib/indicators'
 
 /**
  * 5년(260주) 전의 월요일 시작 날짜부터 오늘까지의 주간 데이터 생성
@@ -40,7 +41,7 @@ export function generatePriceData(): PriceDataPoint[] {
 }
 
 export function generateTrendsData(): TrendsDataPoint[] {
-  const data: TrendsDataPoint[] = []
+  const rawData: Omit<TrendsDataPoint, 'ma13Value' | 'yoyValue'>[] = []
   const startDate = getStartDate()
   let currentValue = 50
 
@@ -51,11 +52,33 @@ export function generateTrendsData(): TrendsDataPoint[] {
     const change = (Math.random() - 0.5) * 20
     currentValue = Math.max(10, Math.min(90, currentValue + change))
 
-    data.push({
+    rawData.push({
       date: format(date, 'yyyy-MM-dd'),
       value: Math.round(currentValue),
     })
   }
+
+  // ma13Value 계산
+  const ma13Values = calculateTrendsMA13(rawData as TrendsDataPoint[])
+
+  // yoyValue 계산 (각 포인트별 52주 YoY)
+  const weeksInYear = 52
+  const yoyValuesArray = rawData.map((point, idx) => {
+    if (idx < weeksInYear) return null
+    const currentVal = point.value
+    const previousYearValue = rawData[idx - weeksInYear].value
+    if (previousYearValue === 0) return null
+    const yoy = ((currentVal - previousYearValue) / previousYearValue) * 100
+    return Math.round(yoy * 100) / 100
+  })
+
+  // 최종 데이터 (ma13Value, yoyValue 포함)
+  const data: TrendsDataPoint[] = rawData.map((point, idx) => ({
+    date: point.date,
+    value: point.value,
+    ma13Value: ma13Values[idx] ?? null,
+    yoyValue: yoyValuesArray[idx] ?? null,
+  }))
 
   return data
 }

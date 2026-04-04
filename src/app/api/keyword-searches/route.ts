@@ -7,10 +7,12 @@
  * POST /api/keyword-searches
  * Body: {
  *   keyword: string,
- *   chartData: Array<{date, trendsValue, ma13Value, yoyValue}>,
- *   overlays: Array<{ticker, companyName, overlayData: Array<{date, normalizedPrice, rawPrice}>}>
+ *   geo?: string (선택사항),
+ *   gprop?: string (선택사항),
+ *   chartData?: Array<{date, trendsValue, ma13Value, yoyValue}> (선택사항),
+ *   overlays?: Array<{ticker, companyName, overlayData: Array<{date, normalizedPrice, rawPrice}>}>
  * }
- * Response: ApiResponse<KeywordSearchRecord>
+ * Response: ApiResponse<{ id: string; keyword: string }>
  *
  * DELETE /api/keyword-searches?id={id}
  * Response: ApiResponse<{ id: string }>
@@ -71,11 +73,15 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const {
       keyword,
-      chartData,
+      geo = '',
+      gprop = '',
+      chartData = [],
       overlays,
     }: {
       keyword: string
-      chartData: Array<{
+      geo?: string
+      gprop?: string
+      chartData?: Array<{
         weekIndex: number
         date: string
         trendsValue: number
@@ -94,13 +100,9 @@ export async function POST(request: NextRequest) {
       }>
     } = body
 
-    // 유효성 검사
-    if (!keyword || !Array.isArray(chartData)) {
-      return createErrorResponse(
-        'INVALID_INPUT',
-        '키워드와 차트 데이터가 필요합니다.',
-        400
-      )
+    // 유효성 검사 (keyword만 필수)
+    if (!keyword || keyword.trim().length === 0) {
+      return createErrorResponse('INVALID_INPUT', '키워드가 필요합니다.', 400)
     }
 
     // 1. 키워드 저장
@@ -170,14 +172,13 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. 성공 응답
-    const savedKeyword = await getAllKeywordSearches(supabase)
-    const created = savedKeyword.find(k => k.id === keywordSearchId)
-
-    if (!created) {
-      throw new Error('Failed to retrieve created keyword')
-    }
-
-    return createSuccessResponse(created, 201)
+    return createSuccessResponse(
+      {
+        id: keywordSearchId,
+        keyword,
+      },
+      201
+    )
   } catch (error) {
     console.error('Error creating keyword search:', error)
     return createErrorResponse(
