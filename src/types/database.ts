@@ -22,6 +22,8 @@ export interface PriceDataPoint {
 export interface TrendsDataPoint {
   date: string // ISO 8601 (YYYY-MM-DD)
   value: number // 0-100
+  ma13Value: number | null // 13주 이동평균 (0-100)
+  yoyValue: number | null // 52주 YoY 변화율 (%)
 }
 
 /**

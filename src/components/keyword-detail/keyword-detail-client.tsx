@@ -33,6 +33,7 @@ import { CSS } from '@dnd-kit/utilities'
 import type { KeywordSearchRecord } from '@/types/database'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { KeywordStandaloneChart } from './keyword-standalone-chart'
 
 interface KeywordDetailClientProps {
   keyword: KeywordSearchRecord
@@ -196,7 +197,7 @@ function SortableOverlayCard({
                     dot={false}
                     name="52주 YoY"
                   />
-                  {/* 라인3: 종목 주가 (초록색) */}
+                  {/* 라인3: 종목 주가 (초록색) - ticker 포함 */}
                   <Line
                     type="monotone"
                     dataKey="normalizedPrice"
@@ -204,7 +205,7 @@ function SortableOverlayCard({
                     strokeWidth={2}
                     isAnimationActive={false}
                     dot={false}
-                    name="종목 주가"
+                    name={`${overlay.ticker} 주가`}
                   />
                   {/* 라인4: 트렌드 지수 (파란색) */}
                   <Line
@@ -344,79 +345,102 @@ export function KeywordDetailClient({
           </Link>
         </div>
 
-        <h1 className="mb-2 text-3xl font-bold">
-          {keyword.keyword} 키워드 커스텀 목록
-        </h1>
-        <p className="text-muted-foreground mb-8 text-sm">
-          {chartData.length > 0
-            ? `${chartData[0].date} ~ ${chartData[chartData.length - 1].date} (${chartData.length}주)`
-            : '데이터 없음'}
-          • 오버레이 {overlays.length}개
-        </p>
+        {/* 섹션1: 현재 키워드 차트(단독) */}
+        <div className="mb-12">
+          <KeywordStandaloneChart
+            keyword={keyword.keyword}
+            chartData={chartData}
+            formattedDate={formattedDate}
+          />
+        </div>
 
-        {/* 오버레이 그리드 */}
-        {overlays.length > 0 ? (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={overlays.map(o => o.id)}
-              strategy={verticalListSortingStrategy}
+        {/* 구분선 */}
+        <div className="border-border my-12 border-t" />
+
+        {/* 섹션2: 해당 키워드 커스텀 차트 목록 */}
+        <div>
+          <h1 className="mb-2 text-3xl font-bold">
+            {keyword.keyword} 키워드 커스텀 목록
+          </h1>
+          <p className="text-muted-foreground mb-8 text-sm">
+            {chartData.length > 0
+              ? `${chartData[0].date} ~ ${chartData[chartData.length - 1].date} (${chartData.length}주)`
+              : '데이터 없음'}
+            • 오버레이 {overlays.length}개
+          </p>
+
+          {/* 오버레이 그리드 */}
+          {overlays.length > 0 ? (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
             >
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {overlays.map(overlay => (
-                  <SortableOverlayCard
-                    key={overlay.id}
-                    overlay={overlay}
-                    chartData={chartData}
-                    mergeChartData={mergeChartData}
-                    deletingId={deletingId}
-                    onDelete={handleDelete}
-                    formattedDate={formattedDate}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
-        ) : (
-          <Card>
-            <CardContent className="flex items-center justify-center py-12">
-              <p className="text-muted-foreground text-sm">
-                추가된 종목이 없습니다
-              </p>
-            </CardContent>
-          </Card>
-        )}
+              <SortableContext
+                items={overlays.map(o => o.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {overlays.map(overlay => (
+                    <SortableOverlayCard
+                      key={overlay.id}
+                      overlay={overlay}
+                      chartData={chartData}
+                      mergeChartData={mergeChartData}
+                      deletingId={deletingId}
+                      onDelete={handleDelete}
+                      formattedDate={formattedDate}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          ) : (
+            <Card>
+              <CardContent className="flex items-center justify-center py-12">
+                <p className="text-muted-foreground text-sm">
+                  추가된 종목이 없습니다
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
-        {/* 데이터 정보 */}
-        <div className="mt-12 rounded-lg border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-6 dark:border-amber-800 dark:from-amber-950/20 dark:to-orange-950/20">
-          <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-amber-900 dark:text-amber-100">
-            <span className="text-lg">📊</span>이 페이지의 데이터
-          </h3>
-          <ul className="space-y-2 text-xs text-amber-800 dark:text-amber-200">
-            <li className="flex items-start gap-2">
-              <span className="mt-0.5 font-bold text-green-500">✓</span>
-              <span>
-                저장된 차트의 정확한 시계열 데이터입니다 (1년치 = 52주)
-              </span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="mt-0.5 font-bold text-green-500">✓</span>
-              <span>
-                각 카드는 4개 라인으로 구성:{' '}
-                <span className="font-medium">13주 이동평균</span>(주황색),{' '}
-                <span className="font-medium">52주 YoY</span>(분홍색),{' '}
-                <span className="font-medium">종목 주가</span>(초록색),{' '}
-                <span className="font-medium">트렌드 지수</span>(파란색)
-              </span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="mt-0.5 font-bold text-green-500">✓</span>
-              <span>드래그로 카드 순서를 변경할 수 있습니다</span>
-            </li>
-          </ul>
+          {/* 데이터 정보 */}
+          <div className="mt-12 rounded-lg border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-6 dark:border-amber-800 dark:from-amber-950/20 dark:to-orange-950/20">
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-amber-900 dark:text-amber-100">
+              <span className="text-lg">📊</span>이 페이지의 데이터
+            </h3>
+            <ul className="space-y-2 text-xs text-amber-800 dark:text-amber-200">
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 font-bold text-green-500">✓</span>
+                <span>
+                  상단 차트는 키워드의 트렌드 데이터만 표시합니다 (5년 전체)
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 font-bold text-green-500">✓</span>
+                <span>
+                  하단 카드는 키워드 + 종목 조합의 정확한 시계열 데이터입니다
+                  (1년치 = 52주)
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 font-bold text-green-500">✓</span>
+                <span>
+                  각 카드는 4개 라인으로 구성:{' '}
+                  <span className="font-medium">13주 이동평균</span>(주황색),{' '}
+                  <span className="font-medium">52주 YoY</span>(분홍색),{' '}
+                  <span className="font-medium">AAPL/TSLA 등 종목 주가</span>
+                  (초록색), <span className="font-medium">트렌드 지수</span>
+                  (파란색)
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 font-bold text-green-500">✓</span>
+                <span>드래그로 카드 순서를 변경할 수 있습니다</span>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>

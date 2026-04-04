@@ -14,7 +14,6 @@ import { calculateTrendsMA13, calculateTrendsYoY } from '@/lib/indicators'
 import { apiFetch, apiFetchJson } from '@/lib/fetch-client'
 import { filterTrendsForTimeframe } from '@/lib/trends-filter'
 import KeywordTrendsChart from './keyword-trends-chart'
-import KeywordSearchForm from './keyword-search-form'
 import OverlayManager from './overlay-manager'
 import {
   TIMEFRAMES,
@@ -69,7 +68,7 @@ export default function KeywordTrendsClient() {
   const [customWeeks, setCustomWeeks] = useState(26)
   const [customWeeksInput, setCustomWeeksInput] = useState('26')
 
-  // URL 파라미터에서 초기 상태 파싱 (F033: URL 파라미터 기반 상태 관리)
+  // URL 파라미터에서 초기 상태 파싱 및 자동 검색 (F033: URL 파라미터 기반 상태 관리)
   useEffect(() => {
     const keyword = searchParams.get('keyword') || ''
     const geo = searchParams.get('geo') || ''
@@ -88,8 +87,14 @@ export default function KeywordTrendsClient() {
         gprop,
       }))
       setTimeframe(tf)
+
+      // 자동 검색 트리거 (이미 데이터가 있으면 스킵)
+      if (!state.fullTrendsData.length && !state.isLoading) {
+        performSearch(keyword, geo, gprop)
+      }
     }
-  }, [searchParams])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams.get('keyword')])
 
   // keywordId 파라미터로 저장된 키워드 복원
   useEffect(() => {
@@ -273,6 +278,200 @@ export default function KeywordTrendsClient() {
   }
 
   // 키워드로 트렌드 조회 — 아키텍처 변경: 5y 단일 fetch
+  // URL 파라미터에서 받은 값으로 검색 수행 (자동 검색용)
+  const performSearch = async (keyword: string, geo: string, gprop: string) => {
+    const trimmedKeyword = keyword.trim()
+    if (!trimmedKeyword) return
+
+    setState(prev => ({ ...prev, isLoading: true }))
+
+    try {
+      console.log(`[performSearch] 검색 시작: ${trimmedKeyword}`)
+
+      const params = new URLSearchParams({
+        keyword: trimmedKeyword,
+        geo,
+        timeframe: '5y', // 최대 기간만 한 번에 조회
+        gprop,
+      })
+
+      const res = await apiFetch(`/api/trends?${params.toString()}`)
+      if (!res.ok) {
+        throw new Error(`API 응답 오류: ${res.status}`)
+      }
+
+      const data = await res.json()
+      console.log(`[performSearch] API 응답:`, data)
+
+      const raw = data?.data?.trendsData
+      if (!Array.isArray(raw)) {
+        throw new Error('Invalid response format: trendsData is not an array')
+      }
+
+      console.log(`[performSearch] 데이터 설정: ${raw.length}개 포인트`)
+
+      setState(prev => ({
+        ...prev,
+        fullTrendsData: raw as TrendsDataPoint[],
+        selectedSearches: [],
+        isLoading: false,
+      }))
+
+      toast.success('트렌드 데이터를 가져왔습니다')
+    } catch (error) {
+      console.error('[performSearch] 에러:', error)
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : '트렌드 데이터를 가져오지 못했습니다'
+      )
+      setState(prev => ({ ...prev, isLoading: false }))
+    }
+  }
+
+  // 키워드 단독 저장 (차트 데이터 포함)
+  const handleSaveKeyword = async () => {
+    const trimmedKeyword = state.keyword.trim()
+    if (!trimmedKeyword) {
+      toast.error('키워드를 입력하세요')
+      return
+    }
+
+    if (state.fullTrendsData.length === 0) {
+      toast.error('먼저 키워드를 검색해주세요')
+      return
+    }
+
+    setState(prev => ({ ...prev, isLoading: true }))
+
+    try {
+      console.log(`[handleSaveKeyword] 저장 시작: ${trimmedKeyword}`)
+
+      // chartData 형식으로 변환 (fullTrendsData → chartData)
+      // API에서 이미 계산된 ma13Value, yoyValue 사용
+      const chartData = state.fullTrendsData.map((point, idx) => ({
+        weekIndex: idx,
+        date: point.date,
+        trendsValue: point.value,
+        ma13Value: point.ma13Value,
+        yoyValue: point.yoyValue,
+      }))
+
+      const res = await apiFetchJson('/api/keyword-searches', {
+        method: 'POST',
+        body: JSON.stringify({
+          keyword: trimmedKeyword,
+          geo: state.geo,
+          gprop: state.gprop,
+          chartData, // 차트 데이터 포함
+        }),
+      })
+
+      console.log(`[handleSaveKeyword] 저장 완료:`, res)
+      toast.success(`"${trimmedKeyword}" 키워드가 저장되었습니다`)
+
+      // 저장된 키워드 목록 새로고침
+      await fetchSavedKeywords()
+    } catch (error) {
+      console.error('[handleSaveKeyword] 에러:', error)
+      toast.error(
+        error instanceof Error ? error.message : '키워드 저장에 실패했습니다'
+      )
+    } finally {
+      setState(prev => ({ ...prev, isLoading: false }))
+    }
+  }
+
+  // 키워드 + 종목 조합 저장 (차트 데이터 포함)
+  const handleSaveCustomChart = async () => {
+    const trimmedKeyword = state.keyword.trim()
+    if (!trimmedKeyword) {
+      toast.error('키워드를 입력하세요')
+      return
+    }
+
+    if (state.fullTrendsData.length === 0) {
+      toast.error('먼저 키워드를 검색해주세요')
+      return
+    }
+
+    if (state.selectedSearches.length === 0) {
+      toast.error('저장할 종목을 추가하세요')
+      return
+    }
+
+    setState(prev => ({ ...prev, isLoading: true }))
+
+    try {
+      console.log(
+        `[handleSaveCustomChart] 저장 시작: ${trimmedKeyword} + ${state.selectedSearches.length}개 종목`
+      )
+
+      // chartData 형식으로 변환
+      // API에서 이미 계산된 ma13Value, yoyValue 사용
+      const chartData = state.fullTrendsData.map((point, idx) => ({
+        weekIndex: idx,
+        date: point.date,
+        trendsValue: point.value,
+        ma13Value: point.ma13Value,
+        yoyValue: point.yoyValue,
+      }))
+
+      // 1단계: 키워드 + 차트 데이터 저장
+      const keywordRes = (await apiFetchJson('/api/keyword-searches', {
+        method: 'POST',
+        body: JSON.stringify({
+          keyword: trimmedKeyword,
+          geo: state.geo,
+          gprop: state.gprop,
+          chartData, // 차트 데이터 포함
+        }),
+      })) as { data: { id: string } }
+
+      const keywordId = keywordRes.data.id
+      console.log(`[handleSaveCustomChart] 키워드 저장 완료: ${keywordId}`)
+
+      // 2단계: 각 종목을 오버레이로 추가
+      for (const search of state.selectedSearches) {
+        try {
+          const overlayRes = await apiFetchJson(
+            `/api/keyword-searches/${keywordId}/overlays`,
+            {
+              method: 'POST',
+              body: JSON.stringify({
+                ticker: search.ticker,
+                company_name: search.company_name,
+              }),
+            }
+          )
+          console.log(
+            `[handleSaveCustomChart] 오버레이 추가 완료: ${search.ticker}`
+          )
+        } catch (error) {
+          console.error(
+            `[handleSaveCustomChart] 오버레이 추가 실패: ${search.ticker}`,
+            error
+          )
+          throw error
+        }
+      }
+
+      toast.success('커스텀 차트가 저장되었습니다')
+
+      // 저장된 키워드 목록 새로고침
+      await fetchSavedKeywords()
+    } catch (error) {
+      console.error('[handleSaveCustomChart] 에러:', error)
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : '커스텀 차트 저장에 실패했습니다'
+      )
+    } finally {
+      setState(prev => ({ ...prev, isLoading: false }))
+    }
+  }
+
   const handleSearchKeyword = async () => {
     const trimmedKeyword = state.keyword.trim()
     if (!trimmedKeyword) {
@@ -358,6 +557,7 @@ export default function KeywordTrendsClient() {
   }
 
   // 새로운 종목 추가 (ticker-search에서 선택된 종목)
+  // ⚠️ "내 종목" 페이지에는 추가하지 않고, 차트 오버레이로만 추가
   const handleAddTickerOverlay = async (
     ticker: string,
     companyName?: string
@@ -371,14 +571,44 @@ export default function KeywordTrendsClient() {
       if (!response.ok) throw new Error('종목 데이터를 가져오지 못했습니다')
 
       const data = await response.json()
-      const search = data.data as SearchRecord
+      // /api/stock은 StockDataResult를 반환 (조회용)
+      const stockData = data.data
 
-      // availableSearches 업데이트
-      setAvailableSearches(prev => [...prev, search])
+      // StockDataResult → 임시 SearchRecord로 변환 (오버레이용)
+      // 실제 DB 저장은 handleSaveToMyStocks에서 /api/stock/save 호출
+      const search: SearchRecord = {
+        id: `overlay_${Math.random().toString(36).substr(2, 9)}`, // 임시 ID
+        user_id: '', // 오버레이용 (DB 미저장)
+        ticker: ticker.toUpperCase(),
+        company_name: stockData.companyName,
+        currency: stockData.currency,
+        current_price: stockData.currentPrice,
+        previous_close: stockData.previousClose,
+        price_data: stockData.priceData,
+        trends_data: [], // 오버레이용이므로 trends_data 불필요
+        searched_at: new Date().toISOString(),
+      }
 
-      // 오버레이 추가
-      handleAddOverlay(search.id)
-      toast.success(`${ticker} 종목을 추가했습니다`)
+      // 검증: 이미 추가된 종목인지 확인 (ticker로 비교)
+      if (state.selectedSearches.some(s => s.ticker === search.ticker)) {
+        toast.error('이미 추가된 종목입니다')
+        return
+      }
+
+      // 최대 1개까지만 추가 가능
+      if (state.selectedSearches.length >= 1) {
+        toast.error('최대 1개까지만 추가할 수 있습니다')
+        return
+      }
+
+      // ✅ selectedSearches에만 추가 (오버레이 임시 데이터)
+      // DB 저장은 별도의 "My Stocks에 저장" 버튼에서 /api/stock/save 호출
+      setState(prev => ({
+        ...prev,
+        selectedSearches: [...prev.selectedSearches, search],
+      }))
+
+      toast.success(`${ticker} 종목을 차트에 추가했습니다`)
     } catch (error) {
       console.error('Error adding ticker overlay:', error)
       toast.error('종목을 추가하지 못했습니다')
@@ -738,38 +968,61 @@ export default function KeywordTrendsClient() {
   return (
     <div className="bg-background min-h-screen p-6">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-2">
-          <a
-            href="/trends"
-            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm transition-colors"
-          >
-            ← 내 키워드로 돌아가기
-          </a>
+        {/* 헤더 - 뒤로가기 + 제목 + 버튼들 */}
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <a
+              href="/trends"
+              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm transition-colors"
+            >
+              ← 내 키워드로 돌아가기
+            </a>
+            <h1 className="mt-3 text-3xl font-bold">키워드 트렌드 분석</h1>
+            {state.keyword && (
+              <div className="mt-4 flex items-baseline gap-2">
+                <span className="text-muted-foreground text-sm font-medium">
+                  검색 키워드:
+                </span>
+                <span className="text-foreground text-2xl font-bold">
+                  {state.keyword}
+                </span>
+              </div>
+            )}
+          </div>
+          {/* 버튼 그룹 */}
+          <div className="flex gap-2">
+            <Button
+              onClick={handleSaveKeyword}
+              disabled={!state.keyword || state.isLoading}
+              className="h-10"
+            >
+              {state.isLoading ? '저장중...' : '키워드 저장'}
+            </Button>
+            <Button
+              onClick={handleSaveCustomChart}
+              disabled={
+                !state.keyword ||
+                state.selectedSearches.length === 0 ||
+                state.isLoading
+              }
+              className="h-10"
+              variant={
+                state.selectedSearches.length > 0 ? 'default' : 'outline'
+              }
+            >
+              {state.isLoading ? '저장중...' : '커스텀 차트 저장'}
+            </Button>
+            <Button
+              onClick={() => router.push('/keywords/search')}
+              className="h-10"
+              variant="outline"
+            >
+              키워드 검색하기
+            </Button>
+          </div>
         </div>
-        <h1 className="mb-8 text-3xl font-bold">키워드 트렌드 분석</h1>
 
         <div className="space-y-6">
-          {/* 입력 섹션 */}
-          <KeywordSearchForm
-            keyword={state.keyword}
-            geo={state.geo}
-            timeframe={timeframe}
-            gprop={state.gprop}
-            isLoading={state.isLoading}
-            onKeywordChange={keyword =>
-              setState(prev => ({ ...prev, keyword }))
-            }
-            onGeoChange={geo => setState(prev => ({ ...prev, geo }))}
-            onTimeframeChange={tf => {
-              const validTimeframe = TIMEFRAMES.includes(tf as Timeframe)
-                ? (tf as Timeframe)
-                : DEFAULT_TIMEFRAME
-              handleTimeframeChange(validTimeframe)
-            }}
-            onGpropChange={gprop => setState(prev => ({ ...prev, gprop }))}
-            onSearch={handleSearchKeyword}
-          />
-
           {/* 지표 요약 */}
           {trendsData.length > 0 && (
             <div className="grid grid-cols-2 gap-4">
