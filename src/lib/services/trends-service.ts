@@ -21,28 +21,13 @@ interface PyTrendsDataPoint {
   value: number
 }
 
-/**
- * API URL 결정 헬퍼
- * - 로컬 개발: http://localhost:3000/api/trends-internal (Node.js Route)
- * - Vercel 배포: https://{VERCEL_URL}/api/trends (Python Serverless Function)
- */
-function getApiUrl(): string {
-  const vercelUrl = process.env.VERCEL_URL
-  const isVercelEnv = !!vercelUrl
-
-  // Vercel 배포 환경 → Python Serverless Function 사용
-  if (isVercelEnv) {
-    return `https://${vercelUrl}/api/trends`
-  }
-
-  // 로컬 개발 환경 → Node.js API Route 사용 (절대 URL 필요)
-  return 'http://localhost:3000/api/trends-internal'
-}
 
 /**
- * Vercel Python Serverless Function 호출 (F023: geo, timeframe, gprop 파라미터 지원)
- * - 로컬: http://localhost:3000/api/trends
- * - Vercel: https://{project-name}.vercel.app/api/trends
+ * Python Trends API 호출
+ * - 로컬: http://localhost:5000/api/trends (Flask)
+ * - Vercel: https://{project}.vercel.app/api/trends (Serverless Function)
+ *
+ * API URL과 타임아웃은 환경 변수에서 관리
  */
 export async function callPyTrendsAPI(
   keyword: string,
@@ -50,12 +35,20 @@ export async function callPyTrendsAPI(
   timeframe: string = '5y',
   gprop: string = ''
 ): Promise<TrendsDataPoint[]> {
-  // API 엔드포인트 결정
-  const apiUrl = getApiUrl()
+  // 환경 변수에서 API URL 가져오기
+  const apiUrl = process.env.TRENDS_API_URL
 
-  // 타임아웃 설정 (30초)
+  if (!apiUrl) {
+    throw new Error('TRENDS_API_URL environment variable is not configured')
+  }
+
+  // 타임아웃 설정 (환경 변수에서, 기본값 30초)
+  const timeout = process.env.TRENDS_API_TIMEOUT
+    ? parseInt(process.env.TRENDS_API_TIMEOUT, 10)
+    : 30_000
+
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 30_000)
+  const timeoutId = setTimeout(() => controller.abort(), timeout)
 
   try {
     const response = await fetch(apiUrl, {
@@ -63,7 +56,6 @@ export async function callPyTrendsAPI(
       headers: {
         'Content-Type': 'application/json',
       },
-      credentials: 'include',
       body: JSON.stringify({
         keyword,
         geo,
@@ -76,24 +68,39 @@ export async function callPyTrendsAPI(
     clearTimeout(timeoutId)
 
     if (!response.ok) {
-      throw new Error(`API returned ${response.status}`)
+      throw new Error(`Trends API returned ${response.status}`)
     }
 
-    const pyData: PyTrendsDataPoint[] = await response.json()
+    // 응답 형식: { success: boolean, data?: [...], error?: string, code?: string }
+    const jsonResponse = await response.json()
 
-    // 빈 배열도 정상 응답으로 처리
-    if (!Array.isArray(pyData)) {
-      throw new Error('Invalid trends data format')
+    if (typeof jsonResponse !== 'object' || jsonResponse === null) {
+      throw new Error('Invalid API response format')
     }
 
-    if (pyData.length === 0) {
+    const { success, data, error } = jsonResponse
+
+    if (!success) {
+      throw new Error(error || 'Trends API request failed')
+    }
+
+    if (!Array.isArray(data)) {
+      throw new Error('Invalid trends data format: data is not an array')
+    }
+
+    if (data.length === 0) {
       return []
     }
 
     // 데이터 정규화 및 변환
     const trendsData: TrendsDataPoint[] = []
 
-    for (const item of pyData) {
+    for (const item of data) {
+      if (typeof item.date !== 'string' || typeof item.value !== 'number') {
+        console.warn('Skipping invalid data point:', item)
+        continue
+      }
+
       // 문자열 날짜를 Date 객체로 변환
       const date = new Date(item.date)
       const normalizedDate = startOfISOWeek(date)
@@ -121,18 +128,21 @@ export async function callPyTrendsAPI(
     trendsData.sort((a, b) => a.date.localeCompare(b.date))
 
     if (trendsData.length === 0) {
-      throw new Error('No valid trends data points')
+      throw new Error('No valid trends data points after normalization')
     }
 
     return trendsData
   } catch (error) {
     clearTimeout(timeoutId)
 
-    if (error instanceof SyntaxError) {
-      throw new Error(`Failed to parse API response: ${error.message}`)
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        throw new Error(`Trends API timeout (${timeout}ms exceeded)`)
+      }
+      throw error
     }
 
-    throw error
+    throw new Error('Unknown error in trends API call')
   }
 }
 
