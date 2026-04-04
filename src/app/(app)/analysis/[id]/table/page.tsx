@@ -1,6 +1,5 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { Header } from '@/components/layout/header'
 import { Container } from '@/components/layout/container'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/data-table'
@@ -57,47 +56,44 @@ export default async function TablePage({ params }: TablePageProps) {
   }))
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <Header />
-      <main className="flex-1">
-        <Container className="py-8">
-          {/* 뒤로가기 버튼 */}
-          <div className="mb-6">
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/analysis/${id}`}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                차트로 보기
-              </Link>
-            </Button>
-          </div>
+    <main className="flex-1">
+      <Container className="py-8">
+        {/* 뒤로가기 버튼 */}
+        <div className="mb-6">
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/analysis/${id}`}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              차트로 보기
+            </Link>
+          </Button>
+        </div>
 
-          {/* 제목 및 Excel 다운로드 */}
-          <TableHeader
+        {/* 제목 및 Excel 다운로드 */}
+        <TableHeader
+          ticker={record.ticker}
+          companyName={record.company_name}
+          tableData={tableData}
+        />
+
+        {/* 마지막 업데이트 */}
+        <p className="text-muted-foreground mb-8 text-sm">
+          마지막 업데이트:{' '}
+          {new Date(
+            record.last_updated_at ?? record.searched_at
+          ).toLocaleDateString('ko-KR')}
+        </p>
+
+        {/* 데이터 테이블 */}
+        <section>
+          <DataTable
             ticker={record.ticker}
-            companyName={record.company_name}
-            tableData={tableData}
+            currency={record.currency}
+            priceData={record.price_data}
+            trendsData={record.trends_data}
+            ma13Values={ma13Values}
           />
-
-          {/* 마지막 업데이트 */}
-          <p className="text-muted-foreground mb-8 text-sm">
-            마지막 업데이트:{' '}
-            {new Date(
-              record.last_updated_at ?? record.searched_at
-            ).toLocaleDateString('ko-KR')}
-          </p>
-
-          {/* 데이터 테이블 */}
-          <section>
-            <DataTable
-              ticker={record.ticker}
-              currency={record.currency}
-              priceData={record.price_data}
-              trendsData={record.trends_data}
-              ma13Values={ma13Values}
-            />
-          </section>
-        </Container>
-      </main>
-    </div>
+        </section>
+      </Container>
+    </main>
   )
 }

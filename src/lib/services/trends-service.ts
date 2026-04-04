@@ -23,8 +23,8 @@ interface PyTrendsDataPoint {
 
 /**
  * API URL 결정 헬퍼
- * - 로컬 개발: /api/trends-internal (Node.js Route)
- * - Vercel 배포: /api/trends (Python Serverless Function)
+ * - 로컬 개발: http://localhost:3000/api/trends-internal (Node.js Route)
+ * - Vercel 배포: https://{VERCEL_URL}/api/trends (Python Serverless Function)
  */
 function getApiUrl(): string {
   const vercelUrl = process.env.VERCEL_URL
@@ -32,11 +32,11 @@ function getApiUrl(): string {
 
   // Vercel 배포 환경 → Python Serverless Function 사용
   if (isVercelEnv) {
-    return '/api/trends'
+    return `https://${vercelUrl}/api/trends`
   }
 
-  // 로컬 개발 환경 → Node.js API Route 사용
-  return '/api/trends-internal'
+  // 로컬 개발 환경 → Node.js API Route 사용 (절대 URL 필요)
+  return 'http://localhost:3000/api/trends-internal'
 }
 
 /**
@@ -63,6 +63,7 @@ export async function callPyTrendsAPI(
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include',
       body: JSON.stringify({
         keyword,
         geo,
@@ -80,8 +81,13 @@ export async function callPyTrendsAPI(
 
     const pyData: PyTrendsDataPoint[] = await response.json()
 
-    if (!pyData || pyData.length === 0) {
-      throw new Error('No trends data available')
+    // 빈 배열도 정상 응답으로 처리
+    if (!Array.isArray(pyData)) {
+      throw new Error('Invalid trends data format')
+    }
+
+    if (pyData.length === 0) {
+      return []
     }
 
     // 데이터 정규화 및 변환

@@ -1,9 +1,7 @@
 /**
  * 로컬 개발용 Google Trends API Route
- * (배포 시에는 /api/trends Python Function 사용)
- *
+ * GET /api/trends-internal?keyword=...
  * POST /api/trends-internal
- * Body: { keyword, geo, timeframe, gprop }
  * Response: [{ date, value }, ...]
  */
 
@@ -13,6 +11,74 @@ import { promisify } from 'util'
 import path from 'path'
 
 const execFileAsync = promisify(execFile)
+
+/**
+ * Python 스크립트 실행
+ */
+async function getTrendsData(
+  keyword: string,
+  geo: string,
+  timeframe: string,
+  gprop: string
+) {
+  try {
+    const pythonPath = 'python3'
+    const scriptPath = path.join(process.cwd(), 'src', 'lib', 'get_trends.py')
+
+    const { stdout, stderr } = await execFileAsync(pythonPath, [
+      scriptPath,
+      keyword,
+      geo,
+      timeframe,
+      gprop,
+    ])
+
+    // stderr 확인
+    if (stderr) {
+      console.warn(`Python stderr: ${stderr}`)
+    }
+
+    // stdout 파싱
+    try {
+      const trendsData = JSON.parse(stdout)
+      return NextResponse.json(trendsData, { status: 200 })
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError)
+      console.error('stdout content:', stdout)
+      return NextResponse.json([], { status: 200 })
+    }
+  } catch (pythonError) {
+    console.error(
+      `Python execution failed: ${pythonError instanceof Error ? pythonError.message : 'Unknown error'}`
+    )
+    if (pythonError instanceof Error && 'stderr' in pythonError) {
+      const errorWithStderr = pythonError as Error & { stderr?: string }
+      console.error('stderr:', errorWithStderr.stderr)
+    }
+    return NextResponse.json([], { status: 200 })
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const keyword = request.nextUrl.searchParams.get('keyword') || ''
+    const geo = request.nextUrl.searchParams.get('geo') || ''
+    const timeframe = request.nextUrl.searchParams.get('timeframe') || '5y'
+    const gprop = request.nextUrl.searchParams.get('gprop') || ''
+
+    if (!keyword || keyword.trim().length === 0) {
+      return NextResponse.json(
+        { error: 'Keyword is required' },
+        { status: 400 }
+      )
+    }
+
+    return await getTrendsData(keyword, geo, timeframe, gprop)
+  } catch (error) {
+    console.error('trends-internal GET error:', error)
+    return NextResponse.json([], { status: 200 })
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,42 +92,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 로컬 개발: Python 스크립트 호출
-    try {
-      const pythonPath = 'python3'
-      const scriptPath = path.join(process.cwd(), 'src', 'lib', 'get_trends.py')
-
-      const { stdout } = await execFileAsync(pythonPath, [
-        scriptPath,
-        keyword,
-        geo,
-        timeframe,
-        gprop,
-      ])
-
-      const trendsData = JSON.parse(stdout)
-      return NextResponse.json(trendsData, { status: 200 })
-    } catch (pythonError) {
-      // Python/pytrends 실패 시 경고 로그만 출력하고 빈 배열 반환
-      // (로컬 개발에서 pytrends 미설치 시 우아한 실패 처리)
-      console.warn(
-        `Trends data not available (Python error): ${pythonError instanceof Error ? pythonError.message : 'Unknown error'}`
-      )
-
-      // 빈 배열로 조회 계속 진행 (부분 성공)
-      return NextResponse.json([], { status: 200 })
-    }
+    return await getTrendsData(keyword, geo, timeframe, gprop)
   } catch (error) {
-    console.error('Error in trends-internal API:', error)
-
-    if (error instanceof SyntaxError) {
-      return NextResponse.json(
-        { error: 'Failed to parse response' },
-        { status: 500 }
-      )
-    }
-
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    console.error('trends-internal POST error:', error)
+    return NextResponse.json([], { status: 200 })
   }
 }
