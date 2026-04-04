@@ -25,44 +25,45 @@ export interface StockDataResult {
  * Yahoo Finance에서 주가 데이터 수집
  */
 export async function fetchStockData(ticker: string): Promise<StockDataResult> {
-  // 1. 회사명, 현재가, 통화 조회 (Yahoo Finance)
+  // 1. 회사명, 현재가, 통화, 전일 종가 조회 (Yahoo Finance)
   let companyName = ticker
   let currentPrice = 0
   let previousClose = 0
   let currency: string | undefined
 
   try {
-    const quoteData = await yf.quote(ticker)
+    const summary = await yf.quoteSummary(ticker, {
+      modules: ['price', 'summaryDetail'],
+    })
 
-    if (quoteData) {
+    if (summary.price) {
+      const priceData = summary.price
+
       // 현재가
-      if (quoteData.regularMarketPrice && quoteData.regularMarketPrice > 0) {
-        currentPrice = quoteData.regularMarketPrice
-      }
-
-      // 전일 종가
-      if (
-        quoteData.regularMarketPreviousClose &&
-        quoteData.regularMarketPreviousClose > 0
-      ) {
-        previousClose = quoteData.regularMarketPreviousClose
+      if (priceData.regularMarketPrice && priceData.regularMarketPrice > 0) {
+        currentPrice = priceData.regularMarketPrice
       }
 
       // 회사명
-      if (quoteData.longName) {
-        companyName = quoteData.longName
-      } else if (quoteData.shortName) {
-        companyName = quoteData.shortName
+      if (priceData.longName) {
+        companyName = priceData.longName
+      } else if (priceData.shortName) {
+        companyName = priceData.shortName
       }
 
       // 통화 (ISO 코드: 'USD', 'KRW', 'EUR' 등)
-      if (quoteData.currency) {
-        currency = quoteData.currency
+      if (priceData.currency) {
+        currency = priceData.currency
       }
     }
+
+    // 전일 종가 (summaryDetail 모듈에서만 제공)
+    if (summary.summaryDetail?.previousClose && summary.summaryDetail.previousClose > 0) {
+      previousClose = summary.summaryDetail.previousClose
+    }
   } catch (error) {
-    // Yahoo Finance quote 실패 시에도 historical로 진행
-    console.warn(`Failed to fetch quote data for ${ticker}:`, error)
+    // Yahoo Finance 요청 실패 시에도 historical로 진행
+    console.warn(`Failed to fetch summary data for ${ticker}:`, error)
   }
 
   // 2. 5년 주간 종가 데이터 수집

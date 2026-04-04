@@ -3,7 +3,9 @@
   "version": "1.0.1",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "concurrently \"next dev --turbopack\" \".venv/bin/python -m flask --app api.trends run --port 5000\"",
+    "dev:node": "next dev --turbopack",
+    "dev:trends": ".venv/bin/python -m flask --app api.trends run --port 5000",
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint .",
@@ -56,6 +58,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^9.2.1",
     "eslint": "^9",
     "eslint-config-next": "15.5.3",
     "eslint-config-prettier": "^10.1.8",
