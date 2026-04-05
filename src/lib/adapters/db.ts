@@ -113,6 +113,12 @@ export interface DbAdapter {
     client?: SupabaseClient
   ): Promise<KeywordStockOverlay[]>
 
+  getKeywordTemporaryOverlay(
+    keywordSearchId: string,
+    overlayId: string,
+    client?: SupabaseClient
+  ): Promise<{ id: string; ticker: string; company_name: string; price_data: Array<{ date: string; price: number }> } | null>
+
   removeStockOverlay(
     overlayId: string,
     client?: SupabaseClient
@@ -595,6 +601,32 @@ class SupabaseDbAdapter implements DbAdapter {
       display_order: row.display_order,
       created_at: row.created_at,
     }))
+  }
+
+  // 임시 오버레이 조회 (keyword_temporary_overlays)
+  async getKeywordTemporaryOverlay(
+    keywordSearchId: string,
+    overlayId: string,
+    client?: SupabaseClient
+  ): Promise<{ id: string; ticker: string; company_name: string; price_data: Array<{ date: string; price: number }> } | null> {
+    const supabase = client ?? getSupabaseClient()
+
+    const { data, error } = await supabase
+      .from('keyword_temporary_overlays')
+      .select('*')
+      .eq('keyword_search_id', keywordSearchId)
+      .eq('id', overlayId)
+      .single()
+
+    if (error && error.code !== 'PGRST116') throw error
+    if (!data) return null
+
+    return {
+      id: data.id,
+      ticker: data.ticker,
+      company_name: data.company_name,
+      price_data: data.price_data || [],
+    }
   }
 
   async removeStockOverlay(
