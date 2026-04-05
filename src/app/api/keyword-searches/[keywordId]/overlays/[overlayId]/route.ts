@@ -5,7 +5,6 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { removeStockOverlay } from '@/lib/db/queries'
 import {
   createErrorResponse,
   validateApiAuth,
@@ -32,9 +31,14 @@ export async function DELETE(
       return createErrorResponse('INVALID_ID', '유효하지 않은 ID입니다.', 400)
     }
 
-    // 오버레이 삭제
-    const success = await removeStockOverlay(overlayId, supabase)
-    if (!success) {
+    // 임시 오버레이 삭제
+    const { error: deleteError } = await supabase
+      .from('keyword_temporary_overlays')
+      .delete()
+      .eq('id', overlayId)
+
+    if (deleteError) {
+      console.error('Delete error:', deleteError)
       return createErrorResponse(
         'DELETE_FAILED',
         '오버레이를 삭제하지 못했습니다.',

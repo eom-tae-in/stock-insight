@@ -65,6 +65,7 @@ function SortableOverlayCard({
   deletingId,
   onDelete,
   formattedDate,
+  keywordId,
 }: {
   overlay: KeywordDetailClientProps['overlays'][0]
   chartData: KeywordDetailClientProps['chartData']
@@ -81,6 +82,7 @@ function SortableOverlayCard({
   deletingId: string | null
   onDelete: (id: string) => void
   formattedDate: string
+  keywordId: string
 }) {
   const {
     attributes,
@@ -100,7 +102,10 @@ function SortableOverlayCard({
   const mergedData = mergeChartData(chartData, overlay.chartData)
 
   return (
-    <Link href={`/keywords/${overlay.id}/overlay`} className="group relative">
+    <Link
+      href={`/keywords/${keywordId}/overlays/${overlay.id}`}
+      className="group relative"
+    >
       <Card
         ref={setNodeRef}
         style={style}
@@ -244,6 +249,30 @@ export function KeywordDetailClient({
 }: KeywordDetailClientProps) {
   const [overlays, setOverlays] = useState(initialOverlays)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [selectedStock, setSelectedStock] = useState<{
+    ticker: string
+    companyName: string
+    priceData: Array<{
+      date: string
+      price: number
+    }>
+  } | null>(null)
+  const [stockSearchInput, setStockSearchInput] = useState('')
+  const [isSavingCustomChart, setIsSavingCustomChart] = useState(false)
+  const [autocompleteResults, setAutocompleteResults] = useState<
+    Array<{ ticker: string; companyName: string }>
+  >([])
+  const [selectedAutocompleteIndex, setSelectedAutocompleteIndex] = useState(-1)
+  const [showAutocomplete, setShowAutocomplete] = useState(false)
+  const [visibleLines, setVisibleLines] = useState({
+    trendsValue: true,
+    ma13Value: true,
+    yoyValue: true,
+    stockPrice: true,
+  })
+  const [timeframeType, setTimeframeType] = useState<'weeks' | 'years'>('years')
+  const [timeframeValue, setTimeframeValue] = useState(5)
+  const [timeframeInput, setTimeframeInput] = useState('5')
 
   // 드래그 센서 설정
   const sensors = useSensors(
@@ -323,6 +352,234 @@ export function KeywordDetailClient({
     }
   }
 
+  // 라인 토글
+  const handleToggleLine = (lineKey: keyof typeof visibleLines) => {
+    setVisibleLines(prev => ({
+      ...prev,
+      [lineKey]: !prev[lineKey],
+    }))
+  }
+
+  // 기간 적용 (입력값은 이미 범위 내로 강제됨)
+  const handleApplyTimeframe = () => {
+    const value = parseInt(timeframeInput)
+
+    if (isNaN(value) || value < 0) {
+      toast.error('유효한 값을 입력하세요')
+      return
+    }
+
+    setTimeframeValue(value)
+    setTimeframeInput(value.toString())
+    toast.success(
+      `${value}${timeframeType === 'weeks' ? '주' : '년'} 기간으로 설정했습니다`
+    )
+  }
+
+  // 기간 표시 텍스트
+  const getTimeframeDisplayText = () => {
+    if (timeframeType === 'weeks') {
+      return `${timeframeValue}주 분석`
+    } else {
+      return `${timeframeValue}년 분석`
+    }
+  }
+
+  // 차트 데이터 필터링 (기간별)
+  const getFilteredChartData = () => {
+    if (timeframeType === 'weeks') {
+      const weeksToShow = Math.round(timeframeValue)
+      return chartData.slice(-weeksToShow)
+    } else {
+      // 년 단위는 대략 52주 = 1년
+      const weeksToShow = Math.round(timeframeValue * 52)
+      return chartData.slice(-weeksToShow)
+    }
+  }
+
+  const filteredChartData = getFilteredChartData()
+
+  // 자동완성 검색
+  const handleStockSearch = async (query: string) => {
+    if (query.length < 1) {
+      setAutocompleteResults([])
+      setShowAutocomplete(false)
+      setSelectedAutocompleteIndex(-1)
+      return
+    }
+
+    try {
+      const res = await fetch(`/api/stocks/search?q=${query.toUpperCase()}`)
+      if (!res.ok) throw new Error('Search failed')
+
+      const data = await res.json()
+      setAutocompleteResults(data.data || [])
+      setShowAutocomplete(true)
+      setSelectedAutocompleteIndex(-1)
+    } catch (error) {
+      console.error('Stock search error:', error)
+      setAutocompleteResults([])
+    }
+  }
+
+  // 자동완성 항목 선택 (클릭 시)
+  const handleSelectAutocomplete = (ticker: string, companyName: string) => {
+    setStockSearchInput(ticker)
+    setShowAutocomplete(false)
+    setAutocompleteResults([])
+    setSelectedAutocompleteIndex(-1)
+  }
+
+  // 자동완성 항목 선택 후 즉시 검색 (Enter 시)
+  const handleSelectAndSearch = async (ticker: string, companyName: string) => {
+    setStockSearchInput(ticker)
+    setShowAutocomplete(false)
+    setAutocompleteResults([])
+    setSelectedAutocompleteIndex(-1)
+
+    // 즉시 종목 데이터 가져오기 (임시 조회, DB 저장 안 함)
+    try {
+      const res = await fetch(`/api/stock-data?ticker=${ticker}`)
+
+      if (!res.ok) {
+        if (res.status === 404) {
+          toast.error('종목을 찾을 수 없습니다')
+        } else {
+          throw new Error('Failed to fetch stock data')
+        }
+        return
+      }
+
+      const data = await res.json()
+      setSelectedStock(data.data)
+      toast.success(`${ticker} 종목이 추가되었습니다`)
+    } catch (error) {
+      console.error('Stock data error:', error)
+      toast.error('종목 데이터를 불러오지 못했습니다')
+    }
+  }
+
+  // 자동완성 키보드 네비게이션
+  const handleStockInputKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>
+  ) => {
+    if (!showAutocomplete || autocompleteResults.length === 0) {
+      if (e.key === 'Enter' && stockSearchInput.trim()) {
+        e.preventDefault()
+        handleAddStock()
+      }
+      return
+    }
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setSelectedAutocompleteIndex(prev =>
+          prev < autocompleteResults.length - 1 ? prev + 1 : prev
+        )
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setSelectedAutocompleteIndex(prev => (prev > 0 ? prev - 1 : -1))
+        break
+      case 'Enter':
+        e.preventDefault()
+        if (selectedAutocompleteIndex >= 0) {
+          const selected = autocompleteResults[selectedAutocompleteIndex]
+          // Enter로 자동완성 선택 → 즉시 검색
+          handleSelectAndSearch(selected.ticker, selected.companyName)
+        } else if (stockSearchInput.trim()) {
+          handleAddStock()
+        }
+        break
+      case 'Escape':
+        e.preventDefault()
+        setShowAutocomplete(false)
+        break
+      default:
+        break
+    }
+  }
+
+  const handleAddStock = async () => {
+    if (!stockSearchInput.trim()) {
+      toast.error('종목 심볼을 입력하세요')
+      return
+    }
+
+    try {
+      // API에서 종목 데이터 조회 (임시 조회, DB 저장 안 함)
+      const res = await fetch(`/api/stock-data?ticker=${stockSearchInput}`)
+
+      if (!res.ok) {
+        if (res.status === 404) {
+          toast.error('종목을 찾을 수 없습니다')
+        } else {
+          throw new Error('Failed to fetch stock data')
+        }
+        return
+      }
+
+      const data = await res.json()
+      setSelectedStock(data.data)
+      toast.success(`${stockSearchInput} 종목이 추가되었습니다`)
+    } catch (error) {
+      console.error('Stock data error:', error)
+      toast.error('종목 데이터를 불러오지 못했습니다')
+    }
+  }
+
+  const handleSaveCustomChart = async () => {
+    if (!selectedStock) {
+      toast.error('종목을 선택하세요')
+      return
+    }
+
+    setIsSavingCustomChart(true)
+    try {
+      const res = await fetch(`/api/keyword-searches/${keyword.id}/overlays`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ticker: selectedStock.ticker,
+          companyName: selectedStock.companyName,
+          priceData: selectedStock.priceData,
+        }),
+      })
+
+      const data = await res.json()
+
+      // 409 DUPLICATE도 오버레이 목록 새로고침 필요
+      if (res.ok || res.status === 409) {
+        if (res.status === 409) {
+          toast.info('이미 추가된 종목입니다')
+        } else {
+          toast.success('커스텀 차트가 저장되었습니다')
+        }
+
+        // 상태 초기화
+        setSelectedStock(null)
+        setStockSearchInput('')
+
+        // 오버레이 목록 새로고침
+        const overlaysRes = await fetch(
+          `/api/keyword-searches/${keyword.id}/overlays`
+        )
+        if (overlaysRes.ok) {
+          const overlaysData = await overlaysRes.json()
+          setOverlays(overlaysData.data || [])
+        }
+      } else {
+        throw new Error('Failed to save custom chart')
+      }
+    } catch (error) {
+      console.error('Save error:', error)
+      toast.error('저장에 실패했습니다')
+    } finally {
+      setIsSavingCustomChart(false)
+    }
+  }
+
   const formattedDate = new Date(keyword.searched_at).toLocaleDateString(
     'ko-KR',
     {
@@ -336,22 +593,201 @@ export function KeywordDetailClient({
     <div className="bg-background min-h-screen p-6">
       <div className="mx-auto max-w-7xl">
         {/* 헤더 */}
-        <div className="mb-6">
+        <div className="mb-8">
           <Link
             href="/trends"
             className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm transition-colors"
           >
             ← 내 키워드로 돌아가기
           </Link>
+          <div className="mt-6 space-y-1">
+            <h1 className="text-5xl font-extrabold tracking-tight">
+              <span className="text-blue-600 dark:text-blue-400">
+                {keyword.keyword}
+              </span>
+              <span className="text-foreground"> 키워드 분석</span>
+            </h1>
+            <p className="text-muted-foreground text-sm">
+              Google Trends 데이터 기반 5년 트렌드 분석
+            </p>
+          </div>
         </div>
 
-        {/* 섹션1: 현재 키워드 차트(단독) */}
-        <div className="mb-12">
+        {/* 섹션1: 현재 키워드 차트(단독) + 종목 오버레이 */}
+        <div className="mb-12 space-y-4">
+          {/* 종목 선택 섹션 */}
+          <div className="relative">
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  placeholder="종목 심볼 입력 (예: AAPL, TSLA)"
+                  value={stockSearchInput}
+                  onChange={e => {
+                    const newValue = e.target.value.toUpperCase()
+                    setStockSearchInput(newValue)
+                    handleStockSearch(newValue)
+                  }}
+                  onKeyDown={handleStockInputKeyDown}
+                  onBlur={() =>
+                    setTimeout(() => setShowAutocomplete(false), 200)
+                  }
+                  className="border-input bg-background w-full rounded border px-3 py-2 text-sm"
+                />
+
+                {/* 자동완성 드롭다운 */}
+                {showAutocomplete && autocompleteResults.length > 0 && (
+                  <div className="absolute top-full right-0 left-0 z-50 mt-1 max-h-48 overflow-y-auto rounded border border-gray-300 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                    {autocompleteResults.map((result, index) => (
+                      <div
+                        key={result.ticker}
+                        onClick={() =>
+                          handleSelectAutocomplete(
+                            result.ticker,
+                            result.companyName
+                          )
+                        }
+                        className={`cursor-pointer px-3 py-2 text-sm transition-colors ${
+                          index === selectedAutocompleteIndex
+                            ? 'bg-blue-500 text-white'
+                            : 'hover:bg-gray-100 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        <div className="font-semibold">{result.ticker}</div>
+                        <div className="text-xs text-gray-600 dark:text-gray-400">
+                          {result.companyName}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <Button
+                onClick={() => handleAddStock()}
+                disabled={!stockSearchInput || !!selectedStock}
+              >
+                종목 추가
+              </Button>
+              <Button
+                onClick={() => {
+                  setSelectedStock(null)
+                  setStockSearchInput('')
+                  setShowAutocomplete(false)
+                }}
+                variant="outline"
+                disabled={!selectedStock}
+              >
+                종목 제거
+              </Button>
+            </div>
+          </div>
+
+          {/* 기간 설정 */}
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={timeframeInput}
+              onChange={e => {
+                let value = e.target.value
+
+                // 숫자만 추출
+                value = value.replace(/[^\d]/g, '')
+
+                if (timeframeType === 'weeks') {
+                  // 주 단위: 1~260 범위 강제
+                  const intValue = parseInt(value)
+                  if (!isNaN(intValue)) {
+                    if (intValue < 1) {
+                      value = '1'
+                    } else if (intValue > 260) {
+                      value = '260'
+                    } else {
+                      value = intValue.toString()
+                    }
+                  }
+                } else {
+                  // 년 단위: 정수만, 1~5 범위 강제
+                  const intValue = parseInt(value)
+                  if (!isNaN(intValue)) {
+                    if (intValue < 1) {
+                      value = '1'
+                    } else if (intValue > 5) {
+                      value = '5'
+                    } else {
+                      value = intValue.toString()
+                    }
+                  }
+                }
+
+                setTimeframeInput(value)
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  handleApplyTimeframe()
+                }
+              }}
+              className="border-input bg-background w-20 rounded border px-3 py-2 text-sm"
+              placeholder={timeframeType === 'weeks' ? '1-260' : '1-5'}
+            />
+            <select
+              value={timeframeType}
+              onChange={e => {
+                const newType = e.target.value as 'weeks' | 'years'
+                setTimeframeType(newType)
+
+                if (newType === 'weeks') {
+                  // 년에서 주로 변경: 현재 값을 주 단위로 변환
+                  const currentValue = parseInt(timeframeInput)
+                  if (!isNaN(currentValue) && currentValue > 0) {
+                    const weeks = currentValue * 52
+                    setTimeframeInput(
+                      Math.max(1, Math.min(weeks, 260)).toString()
+                    )
+                  } else {
+                    setTimeframeInput('52')
+                  }
+                } else {
+                  // 주에서 년으로 변경: 기본값 '1'로 초기화
+                  setTimeframeInput('1')
+                }
+              }}
+              className="border-input bg-background rounded border px-3 py-2 text-sm"
+            >
+              <option value="weeks">주</option>
+              <option value="years">년</option>
+            </select>
+            <Button onClick={handleApplyTimeframe} variant="outline" size="sm">
+              적용
+            </Button>
+            <span className="text-muted-foreground text-sm">
+              {getTimeframeDisplayText()}
+            </span>
+          </div>
+
+          {/* 차트 */}
           <KeywordStandaloneChart
             keyword={keyword.keyword}
-            chartData={chartData}
+            chartData={filteredChartData}
             formattedDate={formattedDate}
+            overlayStock={selectedStock || undefined}
+            visibleLines={visibleLines}
+            onToggleLine={handleToggleLine}
           />
+
+          {/* 커스텀 차트 저장 버튼 */}
+          {selectedStock && (
+            <div className="flex justify-end">
+              <Button
+                onClick={handleSaveCustomChart}
+                disabled={isSavingCustomChart}
+                className="h-10"
+              >
+                {isSavingCustomChart ? '저장 중...' : '커스텀 차트 저장'}
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* 구분선 */}
@@ -390,6 +826,7 @@ export function KeywordDetailClient({
                       deletingId={deletingId}
                       onDelete={handleDelete}
                       formattedDate={formattedDate}
+                      keywordId={keyword.id}
                     />
                   ))}
                 </div>
