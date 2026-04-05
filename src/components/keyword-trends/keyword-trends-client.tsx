@@ -14,7 +14,6 @@ import { calculateTrendsMA13, calculateTrendsYoY } from '@/lib/indicators'
 import { apiFetch, apiFetchJson } from '@/lib/fetch-client'
 import { filterTrendsForTimeframe } from '@/lib/trends-filter'
 import KeywordTrendsChart from './keyword-trends-chart'
-import OverlayManager from './overlay-manager'
 import {
   TIMEFRAMES,
   TIMEFRAME_LABELS,
@@ -999,20 +998,6 @@ export default function KeywordTrendsClient() {
               {state.isLoading ? '저장중...' : '키워드 저장'}
             </Button>
             <Button
-              onClick={handleSaveCustomChart}
-              disabled={
-                !state.keyword ||
-                state.selectedSearches.length === 0 ||
-                state.isLoading
-              }
-              className="h-10"
-              variant={
-                state.selectedSearches.length > 0 ? 'default' : 'outline'
-              }
-            >
-              {state.isLoading ? '저장중...' : '커스텀 차트 저장'}
-            </Button>
-            <Button
               onClick={() => router.push('/keywords/search')}
               className="h-10"
               variant="outline"
@@ -1124,27 +1109,6 @@ export default function KeywordTrendsClient() {
                     ? `${customWeeks}주 트렌드 분석`
                     : `${TIMEFRAME_LABELS[timeframe]} 트렌드 분석`}
                 </h3>
-                <div className="flex gap-2">
-                  {state.keyword && state.selectedSearches.length > 0 && (
-                    <Button
-                      onClick={handleSaveCombo}
-                      disabled={isSaving}
-                      size="sm"
-                    >
-                      {isSaving ? '저장 중...' : '조합 저장'}
-                    </Button>
-                  )}
-                  <Button
-                    onClick={() => handleDownloadPNG(timeframe)}
-                    disabled={downloadingTimeframes.has(timeframe)}
-                    variant="outline"
-                    size="sm"
-                  >
-                    {downloadingTimeframes.has(timeframe)
-                      ? 'PNG 다운로드 중...'
-                      : 'PNG 다운로드'}
-                  </Button>
-                </div>
               </div>
 
               <div
@@ -1159,33 +1123,6 @@ export default function KeywordTrendsClient() {
                   yoyValuesArray={yoyValuesArray}
                 />
               </div>
-
-              {/* 오버레이 추가 */}
-              <OverlayManager
-                selectedSearches={state.selectedSearches}
-                availableSearches={availableSearches}
-                searchFilter={searchFilter}
-                onAddOverlay={handleAddOverlay}
-                onRemoveOverlay={handleRemoveOverlay}
-                onSearchFilterChange={setSearchFilter}
-                onAddTickerOverlay={handleAddTickerOverlay}
-              />
-
-              {/* F024, F025: Excel 다운로드 섹션 */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>데이터 다운로드</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Button
-                    onClick={handleDownloadExcel}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    Excel 다운로드
-                  </Button>
-                </CardContent>
-              </Card>
             </>
           )}
 
