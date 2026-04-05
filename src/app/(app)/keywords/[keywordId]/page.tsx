@@ -9,9 +9,7 @@ import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import {
   getKeywordSearchById,
-  getKeywordStockOverlays,
   getKeywordChartTimeseries,
-  getOverlayChartTimeseries,
 } from '@/lib/db/queries'
 import { KeywordDetailClient } from '@/components/keyword-detail/keyword-detail-client'
 
@@ -57,8 +55,9 @@ export default async function KeywordDetailPage({
     console.error('Failed to fetch chart timeseries:', error)
   }
 
-  // 3. 오버레이 정보 조회
-  let overlays: Array<{
+  // 3. 오버레이 정보 조회 (클라이언트 컴포넌트에서 GET 요청으로 가져옴)
+  // keyword_temporary_overlays는 임시 데이터이므로 초기값은 빈 배열
+  const overlays: Array<{
     id: string
     ticker: string
     companyName: string
@@ -69,28 +68,6 @@ export default async function KeywordDetailPage({
       rawPrice: number
     }>
   }> = []
-
-  try {
-    const overlayRecords = await getKeywordStockOverlays(keywordId, supabase)
-
-    overlays = await Promise.all(
-      overlayRecords.map(async overlay => {
-        const overlayData = await getOverlayChartTimeseries(
-          overlay.id,
-          supabase
-        )
-        return {
-          id: overlay.id,
-          ticker: overlay.ticker,
-          companyName: overlay.company_name,
-          displayOrder: overlay.display_order,
-          chartData: overlayData,
-        }
-      })
-    )
-  } catch (error) {
-    console.error('Failed to fetch overlays:', error)
-  }
 
   return (
     <KeywordDetailClient
