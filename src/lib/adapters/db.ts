@@ -72,6 +72,17 @@ export interface DbAdapter {
     client?: SupabaseClient
   ): Promise<boolean>
 
+  updateKeywordSearchTrendsData(
+    keywordSearchId: string,
+    trendsData: Array<{
+      date: string
+      value: number
+      ma13Value: number | null
+      yoyValue: number | null
+    }>,
+    client?: SupabaseClient
+  ): Promise<boolean>
+
   // ============ keyword_chart_timeseries (차트 시계열 - 핵심) ============
   insertKeywordChartTimeseries(
     keywordSearchId: string,
@@ -134,6 +145,17 @@ export interface DbAdapter {
 
   removeStockOverlay(
     overlayId: string,
+    client?: SupabaseClient
+  ): Promise<boolean>
+
+  removeStockOverlaysBatch(
+    overlayIds: string[],
+    client?: SupabaseClient
+  ): Promise<boolean>
+
+  updateStockOverlayOrder(
+    overlayId: string,
+    newDisplayOrder: number,
     client?: SupabaseClient
   ): Promise<boolean>
 
@@ -499,6 +521,28 @@ class SupabaseDbAdapter implements DbAdapter {
     return !error
   }
 
+  async updateKeywordSearchTrendsData(
+    keywordSearchId: string,
+    trendsData: Array<{
+      date: string
+      value: number
+      ma13Value: number | null
+      yoyValue: number | null
+    }>,
+    client?: SupabaseClient
+  ): Promise<boolean> {
+    const supabase = client ?? getSupabaseClient()
+
+    const { error } = await supabase
+      .from('keyword_searches')
+      .update({
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', keywordSearchId)
+
+    return !error
+  }
+
   // ============ keyword_chart_timeseries ============
 
   async insertKeywordChartTimeseries(
@@ -689,6 +733,37 @@ class SupabaseDbAdapter implements DbAdapter {
     const { error } = await supabase
       .from('keyword_stock_overlays')
       .delete()
+      .eq('id', overlayId)
+
+    return !error
+  }
+
+  async removeStockOverlaysBatch(
+    overlayIds: string[],
+    client?: SupabaseClient
+  ): Promise<boolean> {
+    if (overlayIds.length === 0) return true
+
+    const supabase = client ?? getSupabaseClient()
+
+    const { error } = await supabase
+      .from('keyword_stock_overlays')
+      .delete()
+      .in('id', overlayIds)
+
+    return !error
+  }
+
+  async updateStockOverlayOrder(
+    overlayId: string,
+    newDisplayOrder: number,
+    client?: SupabaseClient
+  ): Promise<boolean> {
+    const supabase = client ?? getSupabaseClient()
+
+    const { error } = await supabase
+      .from('keyword_stock_overlays')
+      .update({ display_order: newDisplayOrder })
       .eq('id', overlayId)
 
     return !error

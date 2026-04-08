@@ -85,6 +85,17 @@ export const markKeywordAsViewed = async (
   client?: SupabaseClient
 ): Promise<boolean> => db.markKeywordAsViewed(keywordSearchId, client)
 
+export const updateKeywordSearchTrendsData = async (
+  keywordSearchId: string,
+  trendsData: Array<{
+    date: string
+    value: number
+    ma13Value: number | null
+    yoyValue: number | null
+  }>,
+  client?: SupabaseClient
+): Promise<boolean> => db.updateKeywordSearchTrendsData(keywordSearchId, trendsData, client)
+
 // ============ keyword_chart_timeseries (차트 전체 시계열) ============
 export const insertKeywordChartTimeseries = async (
   keywordSearchId: string,
@@ -160,6 +171,17 @@ export const removeStockOverlay = async (
   overlayId: string,
   client?: SupabaseClient
 ): Promise<boolean> => db.removeStockOverlay(overlayId, client)
+
+export const removeStockOverlaysBatch = async (
+  overlayIds: string[],
+  client?: SupabaseClient
+): Promise<boolean> => db.removeStockOverlaysBatch(overlayIds, client)
+
+export const updateStockOverlayOrder = async (
+  overlayId: string,
+  newDisplayOrder: number,
+  client?: SupabaseClient
+): Promise<boolean> => db.updateStockOverlayOrder(overlayId, newDisplayOrder, client)
 
 // ============ overlay_chart_timeseries (오버레이 시계열) ============
 export const insertOverlayChartTimeseries = async (

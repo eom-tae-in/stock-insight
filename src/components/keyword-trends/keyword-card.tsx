@@ -90,7 +90,7 @@ export function KeywordCard({
     day: '2-digit',
   })
 
-  const isPositiveYoY = keyword.yoy_change != null && keyword.yoy_change >= 0
+  // 최신 트렌드 데이터 추출
 
   // 미조회 여부 판별 (last_viewed_at이 null이거나 searched_at보다 이전)
   const isUnviewed =
@@ -131,40 +131,8 @@ export function KeywordCard({
               {keyword.keyword}
             </h3>
 
-            {/* 지표 영역 */}
-            <div className="space-y-2">
-              {/* MA13 */}
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground text-xs">13주 MA</span>
-                <span className="font-mono text-sm font-semibold">
-                  {keyword.ma13 != null ? keyword.ma13.toFixed(1) : '—'}
-                </span>
-              </div>
-
-              {/* YoY */}
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground text-xs">YoY</span>
-                <span
-                  className={cn(
-                    'font-mono text-sm font-semibold',
-                    keyword.yoy_change == null
-                      ? 'text-muted-foreground'
-                      : isPositiveYoY
-                        ? 'text-green-600 dark:text-green-400'
-                        : 'text-red-600 dark:text-red-400'
-                  )}
-                >
-                  {keyword.yoy_change != null
-                    ? `${keyword.yoy_change >= 0 ? '+' : ''}${keyword.yoy_change.toFixed(1)}%`
-                    : '—'}
-                </span>
-              </div>
-            </div>
-
-            {/* 저장 날짜 */}
-            <p className="text-muted-foreground pt-1 text-xs">
-              {formattedDate}
-            </p>
+            {/* 기준 날짜 */}
+            <p className="text-muted-foreground text-xs">{formattedDate}</p>
           </div>
         </div>
       </Link>
@@ -251,38 +219,8 @@ export function KeywordCard({
           {keyword.keyword}
         </h3>
 
-        {/* 지표 영역 */}
-        <div className="space-y-2">
-          {/* MA13 */}
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground text-xs">13주 MA</span>
-            <span className="font-mono text-sm font-semibold">
-              {keyword.ma13 != null ? keyword.ma13.toFixed(1) : '—'}
-            </span>
-          </div>
-
-          {/* YoY */}
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground text-xs">YoY</span>
-            <span
-              className={cn(
-                'font-mono text-sm font-semibold',
-                keyword.yoy_change == null
-                  ? 'text-muted-foreground'
-                  : isPositiveYoY
-                    ? 'text-green-600 dark:text-green-400'
-                    : 'text-red-600 dark:text-red-400'
-              )}
-            >
-              {keyword.yoy_change != null
-                ? `${keyword.yoy_change >= 0 ? '+' : ''}${keyword.yoy_change.toFixed(1)}%`
-                : '—'}
-            </span>
-          </div>
-        </div>
-
-        {/* 저장 날짜 */}
-        <p className="text-muted-foreground pt-1 text-xs">{formattedDate}</p>
+        {/* 기준 날짜 */}
+        <p className="text-muted-foreground text-xs">{formattedDate}</p>
       </div>
 
       {/* 우상단: 수정/삭제 버튼 */}
