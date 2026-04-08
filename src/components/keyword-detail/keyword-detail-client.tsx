@@ -12,7 +12,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
-import { Trash2, RefreshCw, GripVertical } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import {
   DndContext,
   closestCenter,
@@ -21,18 +21,30 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  useDndContext,
 } from '@dnd-kit/core'
 import {
-  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
+  arrayMove,
 } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
-import type { KeywordSearchRecord } from '@/types/database'
+import { DragOverlay } from '@dnd-kit/core'
+import type { KeywordSearchRecord, PriceDataPoint } from '@/types/database'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { KeywordStandaloneChart } from './keyword-standalone-chart'
 
 interface KeywordDetailClientProps {
@@ -57,17 +69,14 @@ interface KeywordDetailClientProps {
   }>
 }
 
-// 드래그 가능한 카드 컴포넌트
-function SortableOverlayCard({
-  overlay,
+// DragOverlay에서 표시할 컴포넌트
+function DragOverlayComponent({
+  overlays,
   chartData,
   mergeChartData,
-  deletingId,
-  onDelete,
   formattedDate,
-  keywordId,
 }: {
-  overlay: KeywordDetailClientProps['overlays'][0]
+  overlays: KeywordDetailClientProps['overlays']
   chartData: KeywordDetailClientProps['chartData']
   mergeChartData: (
     a: KeywordDetailClientProps['chartData'],
@@ -79,74 +88,26 @@ function SortableOverlayCard({
     normalizedPrice: number
     yoyValue: number | null
   }>
-  deletingId: string | null
-  onDelete: (id: string) => void
   formattedDate: string
-  keywordId: string
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: overlay.id })
+  const { active } = useDndContext()
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  }
+  if (!active) return null
 
-  const mergedData = mergeChartData(chartData, overlay.chartData)
+  const draggedOverlay = overlays.find(o => o.id === active.id)
+  if (!draggedOverlay) return null
+
+  const mergedData = mergeChartData(chartData, draggedOverlay.chartData)
 
   return (
-    <Link
-      href={`/keywords/${keywordId}/overlays/${overlay.id}`}
-      className="group relative"
-    >
-      <Card
-        ref={setNodeRef}
-        style={style}
-        className="flex h-full cursor-pointer flex-col transition-all hover:shadow-lg"
-      >
-        {/* 드래그 핸들 */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground hover:bg-muted absolute top-2 left-2 z-20 h-7 w-7 p-0 opacity-0 group-hover:opacity-100"
-          {...attributes}
-          {...listeners}
-          aria-label="드래그"
-        >
-          <GripVertical className="h-4 w-4" />
-        </Button>
-
-        {/* 호버 시 삭제 버튼 */}
-        <div className="absolute top-2 right-2 z-20 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-destructive hover:bg-destructive/15 h-7 w-7 p-0"
-            onClick={() => onDelete(overlay.id)}
-            disabled={deletingId === overlay.id}
-            aria-label="삭제"
-          >
-            {deletingId === overlay.id ? (
-              <RefreshCw className="h-4 w-4 animate-spin" />
-            ) : (
-              <Trash2 className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
-
+    <DragOverlay>
+      <Card className="flex h-96 w-96 flex-col bg-blue-100 shadow-2xl transition-all duration-300 ease-in-out dark:bg-blue-900/30">
         <CardHeader className="pb-3 pl-8">
           <CardTitle className="flex items-center justify-between">
             <div>
-              <p className="text-lg font-semibold">{overlay.ticker}</p>
+              <p className="text-lg font-semibold">{draggedOverlay.ticker}</p>
               <p className="text-muted-foreground text-xs font-normal">
-                {overlay.companyName}
+                {draggedOverlay.companyName}
               </p>
             </div>
           </CardTitle>
@@ -210,7 +171,7 @@ function SortableOverlayCard({
                     strokeWidth={2}
                     isAnimationActive={false}
                     dot={false}
-                    name={`${overlay.ticker} 주가`}
+                    name={`${draggedOverlay.ticker} 주가`}
                   />
                   {/* 라인4: 트렌드 지수 (파란색) */}
                   <Line
@@ -238,8 +199,208 @@ function SortableOverlayCard({
           </div>
         </CardContent>
       </Card>
-    </Link>
+    </DragOverlay>
   )
+}
+
+// 드래그 가능한 카드 컴포넌트
+function SortableOverlayCard({
+  overlay,
+  chartData,
+  mergeChartData,
+  formattedDate,
+  keywordId,
+  mode,
+  isSelected,
+  onToggleSelect,
+}: {
+  overlay: KeywordDetailClientProps['overlays'][0]
+  chartData: KeywordDetailClientProps['chartData']
+  mergeChartData: (
+    a: KeywordDetailClientProps['chartData'],
+    b: KeywordDetailClientProps['overlays'][0]['chartData']
+  ) => Array<{
+    date: string
+    trendsValue: number | null
+    ma13Value: number | null
+    normalizedPrice: number
+    yoyValue: number | null
+  }>
+  formattedDate: string
+  keywordId: string
+  mode: 'normal' | 'delete' | 'reorder'
+  isSelected: boolean
+  onToggleSelect: (id: string) => void
+}) {
+  const { attributes, listeners, setNodeRef, isDragging, isOver } = useSortable(
+    {
+      id: overlay.id,
+      animateLayoutChanges: () => false,
+    }
+  )
+
+  const isDraggingCard = isDragging && mode === 'reorder'
+  const style = {
+    transform: undefined,
+    opacity: mode === 'delete' ? 1 : isDraggingCard ? 0.3 : 1,
+    zIndex: isDraggingCard ? 9999 : 'auto',
+  }
+
+  const mergedData = mergeChartData(chartData, overlay.chartData)
+
+  // delete 모드에서는 Link 제거
+  const cardElement = (
+    <Card
+      ref={setNodeRef}
+      style={style}
+      onClick={mode === 'delete' ? () => onToggleSelect(overlay.id) : undefined}
+      className={cn(
+        'flex h-full flex-col transition-all',
+        mode === 'normal' && 'cursor-pointer hover:shadow-lg',
+        mode === 'delete' && 'cursor-pointer hover:shadow-lg',
+        mode === 'delete' &&
+          isSelected &&
+          'border-2 border-cyan-400 bg-cyan-50 dark:bg-cyan-950/20',
+        mode === 'reorder' && 'cursor-grab hover:cursor-grab',
+        mode === 'reorder' &&
+          isDraggingCard &&
+          'cursor-grabbing border-2 border-blue-500 bg-blue-100 shadow-2xl dark:bg-blue-900/30',
+        mode === 'reorder' &&
+          !isDraggingCard &&
+          isOver &&
+          'border-2 border-orange-300 bg-orange-100 dark:bg-orange-900/30'
+      )}
+      {...(mode === 'reorder' ? { ...attributes, ...listeners } : {})}
+    >
+      {/* delete 모드: 토글 스위치 (카드 클릭으로도 토글 가능) */}
+      {mode === 'delete' && (
+        <div
+          className="absolute top-4 left-4 z-20"
+          onClick={e => e.stopPropagation()}
+        >
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={() => onToggleSelect(overlay.id)}
+            aria-label={`${overlay.ticker} 선택`}
+          />
+        </div>
+      )}
+
+      {/* reorder 모드: 드래그 핸들 제거 (카드 전체가 드래그 가능) */}
+
+      <CardHeader className="pb-3 pl-8">
+        <CardTitle className="flex items-center justify-between">
+          <div>
+            <p className="text-lg font-semibold">{overlay.ticker}</p>
+            <p className="text-muted-foreground text-xs font-normal">
+              {overlay.companyName}
+            </p>
+          </div>
+        </CardTitle>
+      </CardHeader>
+
+      <CardContent className="flex flex-1 flex-col">
+        {/* 4개 라인 차트 */}
+        {mergedData.length > 0 ? (
+          <div className="mb-4 flex-1">
+            <ResponsiveContainer width="100%" height={180}>
+              <LineChart
+                data={mergedData}
+                margin={{ top: 5, right: 10, left: -20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  tick={false}
+                  axisLine={false}
+                  height={0}
+                />
+                <YAxis
+                  domain={[0, 100]}
+                  tick={false}
+                  axisLine={false}
+                  width={30}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'var(--background)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '6px',
+                    padding: '6px 8px',
+                  }}
+                />
+                {/* 라인1: 13주 이동평균 (주황색) */}
+                <Line
+                  type="monotone"
+                  dataKey="ma13Value"
+                  stroke="hsl(38 92% 50%)"
+                  strokeWidth={2}
+                  isAnimationActive={false}
+                  dot={false}
+                  name="13주 이동평균"
+                />
+                {/* 라인2: 52주 YoY (분홍색) */}
+                <Line
+                  type="monotone"
+                  dataKey="yoyValue"
+                  stroke="hsl(289 100% 58%)"
+                  strokeWidth={2}
+                  isAnimationActive={false}
+                  dot={false}
+                  name="52주 YoY"
+                />
+                {/* 라인3: 종목 주가 (초록색) - ticker 포함 */}
+                <Line
+                  type="monotone"
+                  dataKey="normalizedPrice"
+                  stroke="hsl(142 72% 29%)"
+                  strokeWidth={2}
+                  isAnimationActive={false}
+                  dot={false}
+                  name={`${overlay.ticker} 주가`}
+                />
+                {/* 라인4: 트렌드 지수 (파란색) */}
+                <Line
+                  type="monotone"
+                  dataKey="trendsValue"
+                  stroke="hsl(211 100% 50%)"
+                  strokeWidth={2}
+                  isAnimationActive={false}
+                  dot={false}
+                  name="트렌드 지수"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="text-muted-foreground bg-muted flex items-center justify-center rounded py-8 text-sm">
+            데이터 없음
+          </div>
+        )}
+
+        {/* 메타정보: 좌하 + 우하 */}
+        <div className="text-muted-foreground flex items-center justify-between border-t pt-3 text-xs">
+          <span>1년치 차트</span>
+          <span>{formattedDate}</span>
+        </div>
+      </CardContent>
+    </Card>
+  )
+
+  // normal 모드에서만 Link로 감싸기
+  if (mode === 'normal') {
+    return (
+      <Link
+        href={`/keywords/${keywordId}/overlays/${overlay.id}`}
+        className="group relative"
+      >
+        {cardElement}
+      </Link>
+    )
+  }
+
+  // delete, reorder 모드에서는 Link 없이
+  return <div className="group relative">{cardElement}</div>
 }
 
 export function KeywordDetailClient({
@@ -274,6 +435,15 @@ export function KeywordDetailClient({
   const [timeframeValue, setTimeframeValue] = useState(5)
   const [timeframeInput, setTimeframeInput] = useState('5')
 
+  // 카드 관리 모드 (normal: 기본, delete: 선택 삭제, reorder: 위치 변경)
+  const [mode, setMode] = useState<'normal' | 'delete' | 'reorder'>('normal')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [reorderBackup, setReorderBackup] = useState<
+    typeof initialOverlays | null
+  >(null)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+
   // 드래그 센서 설정
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -299,6 +469,7 @@ export function KeywordDetailClient({
     return merged.slice(Math.max(0, merged.length - 52))
   }
 
+  // 개별 삭제 (일반 모드에서만)
   const handleDelete = async (overlayId: string) => {
     setDeletingId(overlayId)
     try {
@@ -319,36 +490,204 @@ export function KeywordDetailClient({
     }
   }
 
-  const handleDragEnd = async (event: DragEndEvent) => {
+  // 모드 전환
+  const handleModeChange = (newMode: 'normal' | 'delete' | 'reorder') => {
+    if (newMode === 'reorder') {
+      // 위치 변경 모드로 진입할 때 현재 상태 백업
+      setReorderBackup(overlays)
+    }
+    setMode(newMode)
+    setSelectedIds(new Set())
+  }
+
+  // 선택 삭제: 카드 토글
+  const handleToggleSelect = (overlayId: string) => {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(overlayId)) {
+        newSet.delete(overlayId)
+      } else {
+        newSet.add(overlayId)
+      }
+      return newSet
+    })
+  }
+
+  // 선택 삭제: 전체 선택/해제
+  const handleToggleSelectAll = () => {
+    if (selectedIds.size === overlays.length) {
+      // 모두 선택된 상태 → 전체 해제
+      setSelectedIds(new Set())
+    } else {
+      // 일부만 선택 또는 미선택 → 전체 선택
+      setSelectedIds(new Set(overlays.map(o => o.id)))
+    }
+  }
+
+  // 선택 삭제: 확인 dialog 열기
+  const handleOpenDeleteConfirm = () => {
+    if (selectedIds.size === 0) {
+      toast.error('삭제할 종목을 선택하세요')
+      return
+    }
+    setDeleteConfirmOpen(true)
+  }
+
+  // 선택 삭제: 배치 삭제 API 호출
+  const handleBatchDelete = async () => {
+    const selectedArray = Array.from(selectedIds)
+    setDeletingId('batch')
+
+    try {
+      const res = await fetch(
+        `/api/keyword-searches/${keyword.id}/overlays/batch-delete`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ overlayIds: selectedArray }),
+        }
+      )
+
+      if (!res.ok) throw new Error('Batch delete failed')
+
+      setOverlays(prev => prev.filter(o => !selectedIds.has(o.id)))
+      setSelectedIds(new Set())
+      setMode('normal')
+      toast.success(`${selectedArray.length}개 종목이 삭제되었습니다`)
+    } catch (error) {
+      console.error('Batch delete error:', error)
+      toast.error('삭제에 실패했습니다')
+    } finally {
+      setDeletingId(null)
+      setDeleteConfirmOpen(false)
+    }
+  }
+
+  // 위치 변경 취소
+  const handleCancelReorder = () => {
+    if (reorderBackup) {
+      setOverlays(reorderBackup)
+    }
+    setMode('normal')
+    setReorderBackup(null)
+  }
+
+  // 위치 변경 확인
+  const handleConfirmReorder = async () => {
+    try {
+      // overlays가 변경되지 않았으므로, reorderBackup이 있으면 사용하고
+      // 없으면 현재 overlays 사용
+      const finalOrder = overlays.length > 0 ? overlays : reorderBackup || []
+
+      const res = await fetch(`/api/keyword-searches/${keyword.id}/overlays`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderedIds: finalOrder.map(o => o.id),
+        }),
+      })
+
+      if (!res.ok) throw new Error('Order update failed')
+
+      setMode('normal')
+      setReorderBackup(null)
+      toast.success('순서가 저장되었습니다')
+    } catch (error) {
+      console.error('Order update error:', error)
+      toast.error('순서 저장에 실패했습니다')
+      if (reorderBackup) {
+        setOverlays(reorderBackup)
+      }
+    }
+  }
+
+  // 전체 최신화
+  const handleRefreshAll = async () => {
+    if (overlays.length === 0) {
+      toast.error('최신화할 종목이 없습니다')
+      return
+    }
+
+    setIsRefreshing(true)
+
+    try {
+      const symbols = overlays.map(o => o.ticker)
+      const res = await fetch('/api/keyword-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          keywordId: keyword.id,
+          symbols,
+        }),
+      })
+
+      if (!res.ok) throw new Error('Batch refresh failed')
+
+      const data = await res.json()
+
+      // 주가 데이터로 overlays 업데이트
+      setOverlays(prev =>
+        prev.map(overlay => {
+          const updatedStock = data.data.stocks[overlay.ticker]
+          if (
+            updatedStock &&
+            updatedStock.priceData &&
+            updatedStock.priceData.length > 0
+          ) {
+            // priceData에서 최고가와 최저가 찾기
+            const prices = updatedStock.priceData.map(
+              (p: PriceDataPoint) => p.close
+            )
+            const minPrice = Math.min(...prices)
+            const maxPrice = Math.max(...prices)
+            const priceRange = maxPrice - minPrice
+
+            // chartData 정규화
+            const newChartData = updatedStock.priceData.map(
+              (pricePoint: PriceDataPoint) => {
+                const normalizedPrice =
+                  priceRange > 0
+                    ? ((pricePoint.close - minPrice) / priceRange) * 100
+                    : 50
+
+                return {
+                  date: pricePoint.date,
+                  normalizedPrice: Math.max(0, Math.min(100, normalizedPrice)),
+                  rawPrice: pricePoint.close,
+                }
+              }
+            )
+
+            return {
+              ...overlay,
+              chartData: newChartData,
+            }
+          }
+          return overlay
+        })
+      )
+
+      toast.success(`${overlays.length}개 종목 데이터가 최신화되었습니다`)
+    } catch (error) {
+      console.error('Refresh error:', error)
+      toast.error('최신화에 실패했습니다')
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
+
+  const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
 
-    if (over && active.id !== over.id) {
-      const oldIndex = overlays.findIndex(o => o.id === active.id)
-      const newIndex = overlays.findIndex(o => o.id === over.id)
+    // 위치 변경 모드에서만 드래그 반응
+    if (mode !== 'reorder' || !over || active.id === over.id) return
 
+    const oldIndex = overlays.findIndex(o => o.id === active.id)
+    const newIndex = overlays.findIndex(o => o.id === over.id)
+
+    if (oldIndex !== -1 && newIndex !== -1) {
       const newOrder = arrayMove(overlays, oldIndex, newIndex)
       setOverlays(newOrder)
-
-      // API 호출로 순서 저장
-      try {
-        const res = await fetch(
-          `/api/keyword-searches/${keyword.id}/overlays`,
-          {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              orderedIds: newOrder.map(o => o.id),
-            }),
-          }
-        )
-
-        if (!res.ok) throw new Error('Order update failed')
-        toast.success('순서가 저장되었습니다')
-      } catch (error) {
-        console.error('Order update error:', error)
-        toast.error('순서 저장에 실패했습니다')
-        setOverlays(initialOverlays)
-      }
     }
   }
 
@@ -795,15 +1134,79 @@ export function KeywordDetailClient({
 
         {/* 섹션2: 해당 키워드 커스텀 차트 목록 */}
         <div>
-          <h1 className="mb-2 text-3xl font-bold">
-            {keyword.keyword} 키워드 커스텀 목록
-          </h1>
-          <p className="text-muted-foreground mb-8 text-sm">
-            {chartData.length > 0
-              ? `${chartData[0].date} ~ ${chartData[chartData.length - 1].date} (${chartData.length}주)`
-              : '데이터 없음'}
-            • 오버레이 {overlays.length}개
-          </p>
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h1 className="mb-2 text-3xl font-bold">
+                {keyword.keyword} 키워드 커스텀 목록
+              </h1>
+              <p className="text-muted-foreground text-sm">
+                {chartData.length > 0
+                  ? `${chartData[0].date} ~ ${chartData[chartData.length - 1].date} (${chartData.length}주)`
+                  : '데이터 없음'}
+                • 오버레이 {overlays.length}개
+              </p>
+            </div>
+          </div>
+
+          {/* 모드별 버튼 UI */}
+          {overlays.length > 0 && (
+            <div className="mb-6 flex justify-end gap-2">
+              {mode === 'normal' && (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => handleModeChange('delete')}
+                  >
+                    선택 삭제
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => handleModeChange('reorder')}
+                  >
+                    위치 변경
+                  </Button>
+                </>
+              )}
+
+              {mode === 'delete' && (
+                <>
+                  <Button variant="outline" onClick={handleToggleSelectAll}>
+                    {selectedIds.size === overlays.length
+                      ? '전체 해제'
+                      : '전체 선택'}
+                  </Button>
+                  <span className="text-muted-foreground flex items-center">
+                    {selectedIds.size}개 선택됨
+                  </span>
+                  <Button
+                    disabled={selectedIds.size === 0}
+                    onClick={handleOpenDeleteConfirm}
+                    variant="destructive"
+                  >
+                    {deletingId === 'batch' ? '삭제 중...' : '확인'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setMode('normal')
+                      setSelectedIds(new Set())
+                    }}
+                  >
+                    취소
+                  </Button>
+                </>
+              )}
+
+              {mode === 'reorder' && (
+                <>
+                  <Button onClick={handleConfirmReorder}>확인</Button>
+                  <Button variant="outline" onClick={handleCancelReorder}>
+                    취소
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
 
           {/* 오버레이 그리드 */}
           {overlays.length > 0 ? (
@@ -823,14 +1226,21 @@ export function KeywordDetailClient({
                       overlay={overlay}
                       chartData={chartData}
                       mergeChartData={mergeChartData}
-                      deletingId={deletingId}
-                      onDelete={handleDelete}
                       formattedDate={formattedDate}
                       keywordId={keyword.id}
+                      mode={mode}
+                      isSelected={selectedIds.has(overlay.id)}
+                      onToggleSelect={handleToggleSelect}
                     />
                   ))}
                 </div>
               </SortableContext>
+              <DragOverlayComponent
+                overlays={overlays}
+                chartData={chartData}
+                mergeChartData={mergeChartData}
+                formattedDate={formattedDate}
+              />
             </DndContext>
           ) : (
             <Card>
@@ -879,6 +1289,31 @@ export function KeywordDetailClient({
             </ul>
           </div>
         </div>
+
+        {/* 삭제 확인 Dialog */}
+        <AlertDialog
+          open={deleteConfirmOpen}
+          onOpenChange={setDeleteConfirmOpen}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>종목 삭제</AlertDialogTitle>
+              <AlertDialogDescription>
+                선택된 {selectedIds.size}개의 종목을 삭제하시겠습니까?
+                <br />이 작업은 되돌릴 수 없습니다.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>취소</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleBatchDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                삭제
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   )

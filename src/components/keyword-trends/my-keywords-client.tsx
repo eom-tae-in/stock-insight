@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { Search, RefreshCw, Settings } from 'lucide-react'
+import { Search, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -320,18 +320,6 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
         </p>
       </div>
       <div className="flex gap-2">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={async () => {
-            await fetchKeywords()
-            toast.success('키워드를 새로고침했습니다')
-          }}
-          disabled={isLoading}
-          aria-label="새로고침"
-        >
-          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-        </Button>
         <Button
           variant={isManageMode ? 'default' : 'outline'}
           onClick={handleToggleManageMode}

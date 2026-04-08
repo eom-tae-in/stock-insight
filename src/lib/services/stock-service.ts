@@ -25,6 +25,11 @@ export interface StockDataResult {
  * Yahoo Finance에서 주가 데이터 수집
  */
 export async function fetchStockData(ticker: string): Promise<StockDataResult> {
+  // 한국 주식 (.KS) 감지
+  if (ticker.includes('.KS')) {
+    throw new Error('한국 주식은 현재 지원하지 않습니다. 미국/글로벌 주식을 검색해주세요.')
+  }
+
   // 1. 회사명, 현재가, 통화, 전일 종가 조회 (Yahoo Finance)
   let companyName = ticker
   let currentPrice = 0
