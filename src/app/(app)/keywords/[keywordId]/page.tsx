@@ -10,7 +10,6 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import {
   getKeywordSearchById,
   getKeywordChartTimeseries,
-  getKeywordTemporaryOverlays,
 } from '@/lib/db/queries'
 import { KeywordDetailClient } from '@/components/keyword-detail/keyword-detail-client'
 import type { Region, Period, SearchType } from '@/types/database'
@@ -64,25 +63,6 @@ export default async function KeywordDetailPage({
     console.error('Failed to fetch chart timeseries:', error)
   }
 
-  // 3. 임시 오버레이 목록 조회 (초기값용)
-  let overlays: Array<{
-    id: string
-    ticker: string
-    companyName: string
-    displayOrder: number
-    chartData: Array<{
-      date: string
-      normalizedPrice: number
-      rawPrice: number
-    }>
-  }> = []
-
-  try {
-    overlays = await getKeywordTemporaryOverlays(keywordId, supabase)
-  } catch (error) {
-    console.error('Failed to fetch temporary overlays:', error)
-  }
-
   // 쿼리 파라미터에서 필터 추출 (유효성 검사)
   const regionParam = (resolvedSearchParams.region as string) || 'GLOBAL'
   const periodParam = (resolvedSearchParams.period as string) || '5Y'
@@ -105,7 +85,6 @@ export default async function KeywordDetailPage({
       keywordId={keywordId}
       keyword={keyword}
       chartData={chartTimeseries}
-      overlays={overlays}
       initialSearchParams={{
         region,
         period,
