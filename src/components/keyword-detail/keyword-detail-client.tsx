@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import {
@@ -62,6 +62,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { generateKeywordAnalysisExcelFile } from '@/lib/export/excel'
+import { captureChartAsPng } from '@/lib/export/image'
 import { KeywordStandaloneChart } from './keyword-standalone-chart'
 
 // Overlay 타입 정의
@@ -634,6 +635,9 @@ export function KeywordDetailClient({
   const [reorderBackup, setReorderBackup] = useState<OverlayItem[] | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
 
+  // 차트 ref (PNG 다운로드)
+  const chartRef = useRef<HTMLDivElement>(null)
+
   // 드래그 센서 설정
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -960,6 +964,25 @@ export function KeywordDetailClient({
     }
   }
 
+  // PNG 다운로드
+  const handleDownloadPNG = async () => {
+    if (!chartRef.current) {
+      toast.error('차트를 찾을 수 없습니다')
+      return
+    }
+
+    try {
+      await captureChartAsPng(chartRef.current, {
+        ticker: keyword.keyword,
+        chartName: `trends_${region}_${period}_${searchType}`,
+      })
+      toast.success('차트 이미지가 다운로드되었습니다')
+    } catch (error) {
+      console.error('PNG 다운로드 오류:', error)
+      toast.error('차트 저장에 실패했습니다')
+    }
+  }
+
   // 기간 표시 텍스트
   const getTimeframeDisplayText = () => {
     if (timeframeType === 'weeks') {
@@ -1272,6 +1295,14 @@ export function KeywordDetailClient({
             >
               📊 Excel 다운로드
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadPNG}
+              disabled={!currentAnalysis || isLoadingAnalysis}
+            >
+              🖼️ 차트 PNG 저장
+            </Button>
           </div>
         </div>
 
@@ -1461,14 +1492,16 @@ export function KeywordDetailClient({
               </div>
 
               {/* 차트 */}
-              <KeywordStandaloneChart
-                keyword={keyword.keyword}
-                chartData={filteredChartData}
-                formattedDate={formattedDate}
-                overlayStock={selectedStock || undefined}
-                visibleLines={visibleLines}
-                onToggleLine={handleToggleLine}
-              />
+              <div ref={chartRef}>
+                <KeywordStandaloneChart
+                  keyword={keyword.keyword}
+                  chartData={filteredChartData}
+                  formattedDate={formattedDate}
+                  overlayStock={selectedStock || undefined}
+                  visibleLines={visibleLines}
+                  onToggleLine={handleToggleLine}
+                />
+              </div>
 
               {/* 커스텀 차트 저장 버튼 */}
               {selectedStock && (
