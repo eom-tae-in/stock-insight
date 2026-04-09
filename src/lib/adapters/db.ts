@@ -15,6 +15,12 @@ import type {
   PriceDataPoint,
   KeywordSearchRecord,
   KeywordStockOverlay,
+  KeywordAnalysis,
+  KeywordAnalysisRaw,
+  Region,
+  Period,
+  SearchType,
+  TrendsDataPoint,
 } from '@/types/database'
 import { getSupabaseClient } from '@/lib/supabase'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -49,7 +55,7 @@ export interface DbAdapter {
     client?: SupabaseClient
   ): Promise<PriceDataPoint[]>
 
-  // ============ keyword_searches (키워드) ============
+  // ============ keyword_searches (키워드 - 기존 호환성) ============
   upsertKeywordSearch(
     record: KeywordSearchRecord,
     client?: SupabaseClient
@@ -80,6 +86,37 @@ export interface DbAdapter {
       ma13Value: number | null
       yoyValue: number | null
     }>,
+    client?: SupabaseClient
+  ): Promise<boolean>
+
+  // ============ keywords & keyword_analysis (조건 조합 기반) ============
+  getKeywordAnalysisByFilters(
+    keywordId: string,
+    region: Region,
+    period: Period,
+    searchType: SearchType,
+    userId?: string,
+    client?: SupabaseClient
+  ): Promise<KeywordAnalysis | null>
+
+  getAllKeywordAnalyses(
+    userId: string,
+    client?: SupabaseClient
+  ): Promise<KeywordAnalysis[]>
+
+  createKeywordAnalysis(
+    data: Omit<KeywordAnalysis, 'id' | 'created_at' | 'updated_at'>,
+    client?: SupabaseClient
+  ): Promise<string>
+
+  updateKeywordAnalysis(
+    id: string,
+    data: Partial<Omit<KeywordAnalysis, 'id' | 'keyword_id' | 'region' | 'period' | 'search_type' | 'created_at'>>,
+    client?: SupabaseClient
+  ): Promise<boolean>
+
+  deleteKeywordAnalysis(
+    id: string,
     client?: SupabaseClient
   ): Promise<boolean>
 
@@ -823,6 +860,131 @@ class SupabaseDbAdapter implements DbAdapter {
       normalizedPrice: row.normalized_price,
       rawPrice: row.raw_price,
     }))
+  }
+
+  // ============ keyword_analysis (조건 조합 기반) ============
+
+  async getKeywordAnalysisByFilters(
+    keywordId: string,
+    region: Region,
+    period: Period,
+    searchType: SearchType,
+    userId?: string,
+    client?: SupabaseClient
+  ): Promise<KeywordAnalysis | null> {
+    const supabase = client ?? getSupabaseClient()
+
+    const { data, error } = await supabase
+      .from('keyword_analysis')
+      .select('*')
+      .eq('keyword_id', keywordId)
+      .eq('region', region)
+      .eq('period', period)
+      .eq('search_type', searchType)
+      .single()
+
+    if (error && error.code !== 'PGRST116') throw error
+    if (!data) return null
+
+    return {
+      id: data.id,
+      keyword_id: data.keyword_id,
+      region: data.region as Region,
+      period: data.period as Period,
+      search_type: data.search_type as SearchType,
+      trends_data: data.trends_data as TrendsDataPoint[],
+      ma13_data: data.ma13_data,
+      yoy_data: data.yoy_data,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+    }
+  }
+
+  async getAllKeywordAnalyses(
+    userId: string,
+    client?: SupabaseClient
+  ): Promise<KeywordAnalysis[]> {
+    const supabase = client ?? getSupabaseClient()
+
+    const { data, error } = await supabase
+      .from('keyword_analysis')
+      .select('*, keywords(user_id)')
+      .eq('keywords.user_id', userId)
+
+    if (error) throw error
+
+    return (data || []).map((row) => ({
+      id: row.id,
+      keyword_id: row.keyword_id,
+      region: row.region as Region,
+      period: row.period as Period,
+      search_type: row.search_type as SearchType,
+      trends_data: row.trends_data as TrendsDataPoint[],
+      ma13_data: row.ma13_data,
+      yoy_data: row.yoy_data,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    }))
+  }
+
+  async createKeywordAnalysis(
+    data: Omit<KeywordAnalysis, 'id' | 'created_at' | 'updated_at'>,
+    client?: SupabaseClient
+  ): Promise<string> {
+    const supabase = client ?? getSupabaseClient()
+
+    const { data: result, error } = await supabase
+      .from('keyword_analysis')
+      .insert({
+        keyword_id: data.keyword_id,
+        region: data.region,
+        period: data.period,
+        search_type: data.search_type,
+        trends_data: data.trends_data || [],
+        ma13_data: data.ma13_data,
+        yoy_data: data.yoy_data,
+      })
+      .select('id')
+      .single()
+
+    if (error) throw error
+    return result.id
+  }
+
+  async updateKeywordAnalysis(
+    id: string,
+    data: Partial<Omit<KeywordAnalysis, 'id' | 'keyword_id' | 'region' | 'period' | 'search_type' | 'created_at'>>,
+    client?: SupabaseClient
+  ): Promise<boolean> {
+    const supabase = client ?? getSupabaseClient()
+
+    const updateData: Partial<KeywordAnalysisRaw> = {}
+    if (data.trends_data !== undefined) updateData.trends_data = JSON.stringify(data.trends_data)
+    if (data.ma13_data !== undefined) updateData.ma13_data = data.ma13_data
+    if (data.yoy_data !== undefined) updateData.yoy_data = data.yoy_data
+
+    const { error } = await supabase
+      .from('keyword_analysis')
+      .update(updateData)
+      .eq('id', id)
+
+    if (error) throw error
+    return true
+  }
+
+  async deleteKeywordAnalysis(
+    id: string,
+    client?: SupabaseClient
+  ): Promise<boolean> {
+    const supabase = client ?? getSupabaseClient()
+
+    const { error } = await supabase
+      .from('keyword_analysis')
+      .delete()
+      .eq('id', id)
+
+    if (error) throw error
+    return true
   }
 }
 

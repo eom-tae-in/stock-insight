@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   LineChart,
@@ -31,10 +32,25 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { DragOverlay } from '@dnd-kit/core'
-import type { KeywordSearchRecord, PriceDataPoint } from '@/types/database'
+import type {
+  KeywordSearchRecord,
+  PriceDataPoint,
+  KeywordAnalysis,
+  Region,
+  Period,
+  SearchType,
+  TrendsDataPoint,
+} from '@/types/database'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,6 +64,7 @@ import {
 import { KeywordStandaloneChart } from './keyword-standalone-chart'
 
 interface KeywordDetailClientProps {
+  keywordId: string
   keyword: KeywordSearchRecord
   chartData: Array<{
     weekIndex: number
@@ -67,6 +84,11 @@ interface KeywordDetailClientProps {
       rawPrice: number
     }>
   }>
+  initialSearchParams: {
+    region: Region
+    period: Period
+    searchType: SearchType
+  }
 }
 
 // DragOverlay에서 표시할 컴포넌트
@@ -404,12 +426,107 @@ function SortableOverlayCard({
 }
 
 export function KeywordDetailClient({
+  keywordId,
   keyword,
-  chartData,
+  chartData: initialChartData,
   overlays: initialOverlays,
+  initialSearchParams,
 }: KeywordDetailClientProps) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // 필터 상태 (URL 동기화)
+  const [region, setRegion] = useState<Region>(initialSearchParams.region)
+  const [period, setPeriod] = useState<Period>(initialSearchParams.period)
+  const [searchType, setSearchType] = useState<SearchType>(
+    initialSearchParams.searchType
+  )
+
+  // 데이터 상태
+  const [chartData, setChartData] = useState(initialChartData)
   const [overlays, setOverlays] = useState(initialOverlays)
+  const [currentAnalysis, setCurrentAnalysis] =
+    useState<KeywordAnalysis | null>(null)
+  const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false)
+  const [analysisNotFound, setAnalysisNotFound] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  // 필터 변경 시 URL 동기화 + 데이터 로드
+  useEffect(() => {
+    const newUrl = `/keywords/${keywordId}?region=${region}&period=${period}&searchType=${searchType}`
+    window.history.replaceState(null, '', newUrl)
+
+    // Analysis 조회
+    loadAnalysis()
+  }, [region, period, searchType, keywordId])
+
+  const loadAnalysis = async () => {
+    setIsLoadingAnalysis(true)
+    setAnalysisNotFound(false)
+    try {
+      const response = await fetch(
+        `/api/keyword-analysis?keywordId=${keywordId}&region=${region}&period=${period}&searchType=${searchType}`
+      )
+      if (!response.ok) throw new Error('Analysis not found')
+
+      const analysis = await response.json()
+
+      if (!analysis) {
+        // Analysis가 없는 경우
+        setAnalysisNotFound(true)
+        setCurrentAnalysis(null)
+        setChartData([])
+        setOverlays([])
+        return
+      }
+
+      setCurrentAnalysis(analysis)
+
+      // chartData는 analysis의 trends_data 사용
+      if (analysis.trends_data && Array.isArray(analysis.trends_data)) {
+        setChartData(
+          analysis.trends_data.map((point: TrendsDataPoint) => ({
+            weekIndex: 0, // trends_data는 이미 처리된 데이터
+            date: point.date,
+            trendsValue: point.value,
+            ma13Value: point.ma13Value,
+            yoyValue: point.yoyValue,
+          }))
+        )
+      } else {
+        setChartData([])
+      }
+
+      // overlays는 analysis_id 기준으로 조회
+      await loadOverlays(analysis.id)
+    } catch (error) {
+      console.error('Failed to load analysis:', error)
+      setAnalysisNotFound(true)
+      setCurrentAnalysis(null)
+      setChartData([])
+      setOverlays([])
+    } finally {
+      setIsLoadingAnalysis(false)
+    }
+  }
+
+  const loadOverlays = async (analysisId: string) => {
+    try {
+      const response = await fetch(
+        `/api/keyword-analysis/${analysisId}/overlays`
+      )
+      if (!response.ok) throw new Error('Failed to load overlays')
+
+      const overlayList = await response.json()
+      // overlayList는 KeywordAnalysisOverlay[] 이므로
+      // 추가 데이터(priceData)를 fetch해야 함 (현재는 미지원 - Phase 6에서)
+      // 일단 기존 overlays 유지
+      setOverlays(initialOverlays)
+    } catch (error) {
+      console.error('Failed to load overlays:', error)
+      setOverlays([])
+    }
+  }
   const [selectedStock, setSelectedStock] = useState<{
     ticker: string
     companyName: string
@@ -471,10 +588,15 @@ export function KeywordDetailClient({
 
   // 개별 삭제 (일반 모드에서만)
   const handleDelete = async (overlayId: string) => {
+    if (!currentAnalysis) {
+      toast.error('분석 데이터를 먼저 로드해주세요')
+      return
+    }
+
     setDeletingId(overlayId)
     try {
       const res = await fetch(
-        `/api/keyword-searches/${keyword.id}/overlays/${overlayId}`,
+        `/api/keyword-analysis/${currentAnalysis.id}/overlays/${overlayId}`,
         { method: 'DELETE' }
       )
 
@@ -535,20 +657,30 @@ export function KeywordDetailClient({
 
   // 선택 삭제: 배치 삭제 API 호출
   const handleBatchDelete = async () => {
+    if (!currentAnalysis) {
+      toast.error('분석 데이터를 먼저 로드해주세요')
+      return
+    }
+
     const selectedArray = Array.from(selectedIds)
     setDeletingId('batch')
 
     try {
-      const res = await fetch(
-        `/api/keyword-searches/${keyword.id}/overlays/batch-delete`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ overlayIds: selectedArray }),
-        }
+      // Phase 5-B: 개별 삭제를 병렬로 실행
+      // (새로운 batch-delete API는 Phase 6에서 추가 예정)
+      const deletePromises = selectedArray.map(overlayId =>
+        fetch(
+          `/api/keyword-analysis/${currentAnalysis.id}/overlays/${overlayId}`,
+          {
+            method: 'DELETE',
+          }
+        )
       )
 
-      if (!res.ok) throw new Error('Batch delete failed')
+      const results = await Promise.all(deletePromises)
+      const allSuccess = results.every(res => res.ok)
+
+      if (!allSuccess) throw new Error('Some deletions failed')
 
       setOverlays(prev => prev.filter(o => !selectedIds.has(o.id)))
       setSelectedIds(new Set())
@@ -574,11 +706,18 @@ export function KeywordDetailClient({
 
   // 위치 변경 확인
   const handleConfirmReorder = async () => {
+    if (!currentAnalysis) {
+      toast.error('분석 데이터를 먼저 로드해주세요')
+      return
+    }
+
     try {
       // overlays가 변경되지 않았으므로, reorderBackup이 있으면 사용하고
       // 없으면 현재 overlays 사용
       const finalOrder = overlays.length > 0 ? overlays : reorderBackup || []
 
+      // Phase 5-B: 기존 API 유지 (새로운 analysis 기준 API는 Phase 6에서)
+      // TODO: /api/keyword-analysis/{id}/overlays PATCH 구현 필요
       const res = await fetch(`/api/keyword-searches/${keyword.id}/overlays`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -607,6 +746,9 @@ export function KeywordDetailClient({
       toast.error('최신화할 종목이 없습니다')
       return
     }
+
+    // Phase 5-B: 기존 keyword 기준 유지 (분석과 독립적인 배치 작업)
+    // TODO: Phase 6에서 analysis 기준 배치 API로 변경
 
     setIsRefreshing(true)
 
@@ -952,343 +1094,445 @@ export function KeywordDetailClient({
           </div>
         </div>
 
-        {/* 섹션1: 현재 키워드 차트(단독) + 종목 오버레이 */}
-        <div className="mb-12 space-y-4">
-          {/* 종목 선택 섹션 */}
-          <div className="relative">
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  placeholder="종목 심볼 입력 (예: AAPL, TSLA)"
-                  value={stockSearchInput}
-                  onChange={e => {
-                    const newValue = e.target.value.toUpperCase()
-                    setStockSearchInput(newValue)
-                    handleStockSearch(newValue)
-                  }}
-                  onKeyDown={handleStockInputKeyDown}
-                  onBlur={() =>
-                    setTimeout(() => setShowAutocomplete(false), 200)
-                  }
-                  className="border-input bg-background w-full rounded border px-3 py-2 text-sm"
-                />
+        {/* 필터 섹션 */}
+        <div className="bg-card mb-8 rounded-lg border p-6">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold">분석 조건</h3>
+            <p className="text-muted-foreground text-xs">
+              필터를 변경하면 해당 분석의 차트와 종목이 함께 전환됩니다
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {/* 지역 필터 */}
+            <div>
+              <label className="text-xs font-medium">지역</label>
+              <Select
+                value={region}
+                onValueChange={value => setRegion(value as Region)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="GLOBAL">전세계</SelectItem>
+                  <SelectItem value="US">미국</SelectItem>
+                  <SelectItem value="KR">한국</SelectItem>
+                  <SelectItem value="JP">일본</SelectItem>
+                  <SelectItem value="CN">중국</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-                {/* 자동완성 드롭다운 */}
-                {showAutocomplete && autocompleteResults.length > 0 && (
-                  <div className="absolute top-full right-0 left-0 z-50 mt-1 max-h-48 overflow-y-auto rounded border border-gray-300 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
-                    {autocompleteResults.map((result, index) => (
-                      <div
-                        key={result.ticker}
-                        onClick={() =>
-                          handleSelectAutocomplete(
-                            result.ticker,
-                            result.companyName
-                          )
-                        }
-                        className={`cursor-pointer px-3 py-2 text-sm transition-colors ${
-                          index === selectedAutocompleteIndex
-                            ? 'bg-blue-500 text-white'
-                            : 'hover:bg-gray-100 dark:hover:bg-slate-800'
-                        }`}
-                      >
-                        <div className="font-semibold">{result.ticker}</div>
-                        <div className="text-xs text-gray-600 dark:text-gray-400">
-                          {result.companyName}
-                        </div>
+            {/* 기간 필터 */}
+            <div>
+              <label className="text-xs font-medium">기간</label>
+              <Select
+                value={period}
+                onValueChange={value => setPeriod(value as Period)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1Y">1년</SelectItem>
+                  <SelectItem value="3Y">3년</SelectItem>
+                  <SelectItem value="5Y">5년</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* 검색 타입 필터 */}
+            <div>
+              <label className="text-xs font-medium">검색 타입</label>
+              <Select
+                value={searchType}
+                onValueChange={value => setSearchType(value as SearchType)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="WEB">웹 검색</SelectItem>
+                  <SelectItem value="YOUTUBE">유튜브</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        {/* 분석 데이터 부재 시 Empty State */}
+        {analysisNotFound && !isLoadingAnalysis && (
+          <div className="bg-muted/50 mb-12 rounded-lg border border-dashed p-8 text-center">
+            <p className="text-muted-foreground mb-4">
+              이 조건으로 저장된 분석이 없습니다
+            </p>
+            <p className="text-muted-foreground mb-4 text-sm">
+              지역: {region === 'GLOBAL' ? '전세계' : region} | 기간:{' '}
+              {period === '1Y' ? '1년' : period === '3Y' ? '3년' : '5년'} |
+              검색: {searchType === 'WEB' ? '웹' : '유튜브'}
+            </p>
+            <Button variant="outline" asChild>
+              <Link href="/keywords/search">새로운 분석 검색</Link>
+            </Button>
+          </div>
+        )}
+
+        {/* 로딩 중 */}
+        {isLoadingAnalysis && (
+          <div className="bg-muted/50 mb-12 rounded-lg border border-dashed p-8 text-center">
+            <p className="text-muted-foreground">
+              분석 데이터를 로드하는 중...
+            </p>
+          </div>
+        )}
+
+        {/* 섹션1: 현재 키워드 차트(단독) + 종목 오버레이 */}
+        {!analysisNotFound && !isLoadingAnalysis && (
+          <>
+            <div className="mb-12 space-y-4">
+              {/* 종목 선택 섹션 */}
+              <div className="relative">
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      placeholder="종목 심볼 입력 (예: AAPL, TSLA)"
+                      value={stockSearchInput}
+                      onChange={e => {
+                        const newValue = e.target.value.toUpperCase()
+                        setStockSearchInput(newValue)
+                        handleStockSearch(newValue)
+                      }}
+                      onKeyDown={handleStockInputKeyDown}
+                      onBlur={() =>
+                        setTimeout(() => setShowAutocomplete(false), 200)
+                      }
+                      className="border-input bg-background w-full rounded border px-3 py-2 text-sm"
+                    />
+
+                    {/* 자동완성 드롭다운 */}
+                    {showAutocomplete && autocompleteResults.length > 0 && (
+                      <div className="absolute top-full right-0 left-0 z-50 mt-1 max-h-48 overflow-y-auto rounded border border-gray-300 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                        {autocompleteResults.map((result, index) => (
+                          <div
+                            key={result.ticker}
+                            onClick={() =>
+                              handleSelectAutocomplete(
+                                result.ticker,
+                                result.companyName
+                              )
+                            }
+                            className={`cursor-pointer px-3 py-2 text-sm transition-colors ${
+                              index === selectedAutocompleteIndex
+                                ? 'bg-blue-500 text-white'
+                                : 'hover:bg-gray-100 dark:hover:bg-slate-800'
+                            }`}
+                          >
+                            <div className="font-semibold">{result.ticker}</div>
+                            <div className="text-xs text-gray-600 dark:text-gray-400">
+                              {result.companyName}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
-                )}
+
+                  <Button
+                    onClick={() => handleAddStock()}
+                    disabled={!stockSearchInput || !!selectedStock}
+                  >
+                    종목 추가
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setSelectedStock(null)
+                      setStockSearchInput('')
+                      setShowAutocomplete(false)
+                    }}
+                    variant="outline"
+                    disabled={!selectedStock}
+                  >
+                    종목 제거
+                  </Button>
+                </div>
               </div>
 
-              <Button
-                onClick={() => handleAddStock()}
-                disabled={!stockSearchInput || !!selectedStock}
-              >
-                종목 추가
-              </Button>
-              <Button
-                onClick={() => {
-                  setSelectedStock(null)
-                  setStockSearchInput('')
-                  setShowAutocomplete(false)
-                }}
-                variant="outline"
-                disabled={!selectedStock}
-              >
-                종목 제거
-              </Button>
-            </div>
-          </div>
+              {/* 기간 설정 */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={timeframeInput}
+                  onChange={e => {
+                    let value = e.target.value
 
-          {/* 기간 설정 */}
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              inputMode="numeric"
-              value={timeframeInput}
-              onChange={e => {
-                let value = e.target.value
+                    // 숫자만 추출
+                    value = value.replace(/[^\d]/g, '')
 
-                // 숫자만 추출
-                value = value.replace(/[^\d]/g, '')
-
-                if (timeframeType === 'weeks') {
-                  // 주 단위: 1~260 범위 강제
-                  const intValue = parseInt(value)
-                  if (!isNaN(intValue)) {
-                    if (intValue < 1) {
-                      value = '1'
-                    } else if (intValue > 260) {
-                      value = '260'
+                    if (timeframeType === 'weeks') {
+                      // 주 단위: 1~260 범위 강제
+                      const intValue = parseInt(value)
+                      if (!isNaN(intValue)) {
+                        if (intValue < 1) {
+                          value = '1'
+                        } else if (intValue > 260) {
+                          value = '260'
+                        } else {
+                          value = intValue.toString()
+                        }
+                      }
                     } else {
-                      value = intValue.toString()
+                      // 년 단위: 정수만, 1~5 범위 강제
+                      const intValue = parseInt(value)
+                      if (!isNaN(intValue)) {
+                        if (intValue < 1) {
+                          value = '1'
+                        } else if (intValue > 5) {
+                          value = '5'
+                        } else {
+                          value = intValue.toString()
+                        }
+                      }
                     }
-                  }
-                } else {
-                  // 년 단위: 정수만, 1~5 범위 강제
-                  const intValue = parseInt(value)
-                  if (!isNaN(intValue)) {
-                    if (intValue < 1) {
-                      value = '1'
-                    } else if (intValue > 5) {
-                      value = '5'
+
+                    setTimeframeInput(value)
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      handleApplyTimeframe()
+                    }
+                  }}
+                  className="border-input bg-background w-20 rounded border px-3 py-2 text-sm"
+                  placeholder={timeframeType === 'weeks' ? '1-260' : '1-5'}
+                />
+                <select
+                  value={timeframeType}
+                  onChange={e => {
+                    const newType = e.target.value as 'weeks' | 'years'
+                    setTimeframeType(newType)
+
+                    if (newType === 'weeks') {
+                      // 년에서 주로 변경: 현재 값을 주 단위로 변환
+                      const currentValue = parseInt(timeframeInput)
+                      if (!isNaN(currentValue) && currentValue > 0) {
+                        const weeks = currentValue * 52
+                        setTimeframeInput(
+                          Math.max(1, Math.min(weeks, 260)).toString()
+                        )
+                      } else {
+                        setTimeframeInput('52')
+                      }
                     } else {
-                      value = intValue.toString()
+                      // 주에서 년으로 변경: 기본값 '1'로 초기화
+                      setTimeframeInput('1')
                     }
-                  }
-                }
+                  }}
+                  className="border-input bg-background rounded border px-3 py-2 text-sm"
+                >
+                  <option value="weeks">주</option>
+                  <option value="years">년</option>
+                </select>
+                <Button
+                  onClick={handleApplyTimeframe}
+                  variant="outline"
+                  size="sm"
+                >
+                  적용
+                </Button>
+                <span className="text-muted-foreground text-sm">
+                  {getTimeframeDisplayText()}
+                </span>
+              </div>
 
-                setTimeframeInput(value)
-              }}
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  handleApplyTimeframe()
-                }
-              }}
-              className="border-input bg-background w-20 rounded border px-3 py-2 text-sm"
-              placeholder={timeframeType === 'weeks' ? '1-260' : '1-5'}
-            />
-            <select
-              value={timeframeType}
-              onChange={e => {
-                const newType = e.target.value as 'weeks' | 'years'
-                setTimeframeType(newType)
-
-                if (newType === 'weeks') {
-                  // 년에서 주로 변경: 현재 값을 주 단위로 변환
-                  const currentValue = parseInt(timeframeInput)
-                  if (!isNaN(currentValue) && currentValue > 0) {
-                    const weeks = currentValue * 52
-                    setTimeframeInput(
-                      Math.max(1, Math.min(weeks, 260)).toString()
-                    )
-                  } else {
-                    setTimeframeInput('52')
-                  }
-                } else {
-                  // 주에서 년으로 변경: 기본값 '1'로 초기화
-                  setTimeframeInput('1')
-                }
-              }}
-              className="border-input bg-background rounded border px-3 py-2 text-sm"
-            >
-              <option value="weeks">주</option>
-              <option value="years">년</option>
-            </select>
-            <Button onClick={handleApplyTimeframe} variant="outline" size="sm">
-              적용
-            </Button>
-            <span className="text-muted-foreground text-sm">
-              {getTimeframeDisplayText()}
-            </span>
-          </div>
-
-          {/* 차트 */}
-          <KeywordStandaloneChart
-            keyword={keyword.keyword}
-            chartData={filteredChartData}
-            formattedDate={formattedDate}
-            overlayStock={selectedStock || undefined}
-            visibleLines={visibleLines}
-            onToggleLine={handleToggleLine}
-          />
-
-          {/* 커스텀 차트 저장 버튼 */}
-          {selectedStock && (
-            <div className="flex justify-end">
-              <Button
-                onClick={handleSaveCustomChart}
-                disabled={isSavingCustomChart}
-                className="h-10"
-              >
-                {isSavingCustomChart ? '저장 중...' : '커스텀 차트 저장'}
-              </Button>
-            </div>
-          )}
-        </div>
-
-        {/* 구분선 */}
-        <div className="border-border my-12 border-t" />
-
-        {/* 섹션2: 해당 키워드 커스텀 차트 목록 */}
-        <div>
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h1 className="mb-2 text-3xl font-bold">
-                {keyword.keyword} 키워드 커스텀 목록
-              </h1>
-              <p className="text-muted-foreground text-sm">
-                {chartData.length > 0
-                  ? `${chartData[0].date} ~ ${chartData[chartData.length - 1].date} (${chartData.length}주)`
-                  : '데이터 없음'}
-                • 오버레이 {overlays.length}개
-              </p>
-            </div>
-          </div>
-
-          {/* 모드별 버튼 UI */}
-          {overlays.length > 0 && (
-            <div className="mb-6 flex justify-end gap-2">
-              {mode === 'normal' && (
-                <>
-                  <Button
-                    variant="outline"
-                    onClick={() => handleModeChange('delete')}
-                  >
-                    선택 삭제
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => handleModeChange('reorder')}
-                  >
-                    위치 변경
-                  </Button>
-                </>
-              )}
-
-              {mode === 'delete' && (
-                <>
-                  <Button variant="outline" onClick={handleToggleSelectAll}>
-                    {selectedIds.size === overlays.length
-                      ? '전체 해제'
-                      : '전체 선택'}
-                  </Button>
-                  <span className="text-muted-foreground flex items-center">
-                    {selectedIds.size}개 선택됨
-                  </span>
-                  <Button
-                    disabled={selectedIds.size === 0}
-                    onClick={handleOpenDeleteConfirm}
-                    variant="destructive"
-                  >
-                    {deletingId === 'batch' ? '삭제 중...' : '확인'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setMode('normal')
-                      setSelectedIds(new Set())
-                    }}
-                  >
-                    취소
-                  </Button>
-                </>
-              )}
-
-              {mode === 'reorder' && (
-                <>
-                  <Button onClick={handleConfirmReorder}>확인</Button>
-                  <Button variant="outline" onClick={handleCancelReorder}>
-                    취소
-                  </Button>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* 오버레이 그리드 */}
-          {overlays.length > 0 ? (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext
-                items={overlays.map(o => o.id)}
-                strategy={verticalListSortingStrategy}
-              >
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  {overlays.map(overlay => (
-                    <SortableOverlayCard
-                      key={overlay.id}
-                      overlay={overlay}
-                      chartData={chartData}
-                      mergeChartData={mergeChartData}
-                      formattedDate={formattedDate}
-                      keywordId={keyword.id}
-                      mode={mode}
-                      isSelected={selectedIds.has(overlay.id)}
-                      onToggleSelect={handleToggleSelect}
-                    />
-                  ))}
-                </div>
-              </SortableContext>
-              <DragOverlayComponent
-                overlays={overlays}
-                chartData={chartData}
-                mergeChartData={mergeChartData}
+              {/* 차트 */}
+              <KeywordStandaloneChart
+                keyword={keyword.keyword}
+                chartData={filteredChartData}
                 formattedDate={formattedDate}
+                overlayStock={selectedStock || undefined}
+                visibleLines={visibleLines}
+                onToggleLine={handleToggleLine}
               />
-            </DndContext>
-          ) : (
-            <Card>
-              <CardContent className="flex items-center justify-center py-12">
-                <p className="text-muted-foreground text-sm">
-                  추가된 종목이 없습니다
-                </p>
-              </CardContent>
-            </Card>
-          )}
 
-          {/* 데이터 정보 */}
-          <div className="mt-12 rounded-lg border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-6 dark:border-amber-800 dark:from-amber-950/20 dark:to-orange-950/20">
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-amber-900 dark:text-amber-100">
-              <span className="text-lg">📊</span>이 페이지의 데이터
-            </h3>
-            <ul className="space-y-2 text-xs text-amber-800 dark:text-amber-200">
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 font-bold text-green-500">✓</span>
-                <span>
-                  상단 차트는 키워드의 트렌드 데이터만 표시합니다 (5년 전체)
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 font-bold text-green-500">✓</span>
-                <span>
-                  하단 카드는 키워드 + 종목 조합의 정확한 시계열 데이터입니다
-                  (1년치 = 52주)
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 font-bold text-green-500">✓</span>
-                <span>
-                  각 카드는 4개 라인으로 구성:{' '}
-                  <span className="font-medium">13주 이동평균</span>(주황색),{' '}
-                  <span className="font-medium">52주 YoY</span>(분홍색),{' '}
-                  <span className="font-medium">AAPL/TSLA 등 종목 주가</span>
-                  (초록색), <span className="font-medium">트렌드 지수</span>
-                  (파란색)
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 font-bold text-green-500">✓</span>
-                <span>드래그로 카드 순서를 변경할 수 있습니다</span>
-              </li>
-            </ul>
-          </div>
-        </div>
+              {/* 커스텀 차트 저장 버튼 */}
+              {selectedStock && (
+                <div className="flex justify-end">
+                  <Button
+                    onClick={handleSaveCustomChart}
+                    disabled={isSavingCustomChart}
+                    className="h-10"
+                  >
+                    {isSavingCustomChart ? '저장 중...' : '커스텀 차트 저장'}
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <div className="border-border my-12 border-t" />
+
+            {/* 섹션2: 해당 키워드 커스텀 차트 목록 */}
+            <div>
+              <div className="mb-6 flex items-center justify-between">
+                <div>
+                  <h1 className="mb-2 text-3xl font-bold">
+                    {keyword.keyword} 키워드 커스텀 목록
+                  </h1>
+                  <p className="text-muted-foreground text-sm">
+                    {chartData.length > 0
+                      ? `${chartData[0].date} ~ ${chartData[chartData.length - 1].date} (${chartData.length}주)`
+                      : '데이터 없음'}
+                    • 오버레이 {overlays.length}개
+                  </p>
+                </div>
+              </div>
+
+              {/* 모드별 버튼 UI */}
+              {overlays.length > 0 && (
+                <div className="mb-6 flex justify-end gap-2">
+                  {mode === 'normal' && (
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={() => handleModeChange('delete')}
+                      >
+                        선택 삭제
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => handleModeChange('reorder')}
+                      >
+                        위치 변경
+                      </Button>
+                    </>
+                  )}
+
+                  {mode === 'delete' && (
+                    <>
+                      <Button variant="outline" onClick={handleToggleSelectAll}>
+                        {selectedIds.size === overlays.length
+                          ? '전체 해제'
+                          : '전체 선택'}
+                      </Button>
+                      <span className="text-muted-foreground flex items-center">
+                        {selectedIds.size}개 선택됨
+                      </span>
+                      <Button
+                        disabled={selectedIds.size === 0}
+                        onClick={handleOpenDeleteConfirm}
+                        variant="destructive"
+                      >
+                        {deletingId === 'batch' ? '삭제 중...' : '확인'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setMode('normal')
+                          setSelectedIds(new Set())
+                        }}
+                      >
+                        취소
+                      </Button>
+                    </>
+                  )}
+
+                  {mode === 'reorder' && (
+                    <>
+                      <Button onClick={handleConfirmReorder}>확인</Button>
+                      <Button variant="outline" onClick={handleCancelReorder}>
+                        취소
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* 오버레이 그리드 */}
+              {overlays.length > 0 ? (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={overlays.map(o => o.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                      {overlays.map(overlay => (
+                        <SortableOverlayCard
+                          key={overlay.id}
+                          overlay={overlay}
+                          chartData={chartData}
+                          mergeChartData={mergeChartData}
+                          formattedDate={formattedDate}
+                          keywordId={keyword.id}
+                          mode={mode}
+                          isSelected={selectedIds.has(overlay.id)}
+                          onToggleSelect={handleToggleSelect}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                  <DragOverlayComponent
+                    overlays={overlays}
+                    chartData={chartData}
+                    mergeChartData={mergeChartData}
+                    formattedDate={formattedDate}
+                  />
+                </DndContext>
+              ) : (
+                <Card>
+                  <CardContent className="flex items-center justify-center py-12">
+                    <p className="text-muted-foreground text-sm">
+                      추가된 종목이 없습니다
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* 데이터 정보 */}
+              <div className="mt-12 rounded-lg border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-6 dark:border-amber-800 dark:from-amber-950/20 dark:to-orange-950/20">
+                <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-amber-900 dark:text-amber-100">
+                  <span className="text-lg">📊</span>이 페이지의 데이터
+                </h3>
+                <ul className="space-y-2 text-xs text-amber-800 dark:text-amber-200">
+                  <li className="flex items-start gap-2">
+                    <span className="mt-0.5 font-bold text-green-500">✓</span>
+                    <span>
+                      상단 차트는 키워드의 트렌드 데이터만 표시합니다 (5년 전체)
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="mt-0.5 font-bold text-green-500">✓</span>
+                    <span>
+                      하단 카드는 키워드 + 종목 조합의 정확한 시계열
+                      데이터입니다 (1년치 = 52주)
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="mt-0.5 font-bold text-green-500">✓</span>
+                    <span>
+                      각 카드는 4개 라인으로 구성:{' '}
+                      <span className="font-medium">13주 이동평균</span>
+                      (주황색), <span className="font-medium">52주 YoY</span>
+                      (분홍색),{' '}
+                      <span className="font-medium">
+                        AAPL/TSLA 등 종목 주가
+                      </span>
+                      (초록색), <span className="font-medium">트렌드 지수</span>
+                      (파란색)
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="mt-0.5 font-bold text-green-500">✓</span>
+                    <span>드래그로 카드 순서를 변경할 수 있습니다</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* 삭제 확인 Dialog */}
         <AlertDialog
