@@ -9,6 +9,10 @@ import type {
   PriceDataPoint,
   KeywordSearchRecord,
   KeywordStockOverlay,
+  KeywordAnalysis,
+  Region,
+  Period,
+  SearchType,
 } from '@/types/database'
 import { db } from '../adapters/db'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -205,3 +209,39 @@ export const getOverlayChartTimeseries = async (
     rawPrice: number
   }>
 > => db.getOverlayChartTimeseries(overlayId, client)
+
+// ============ keyword_analysis (조건 조합 기반) ============
+export const getKeywordAnalysisByFilters = async (
+  keywordId: string,
+  region: Region,
+  period: Period,
+  searchType: SearchType,
+  userId?: string,
+  client?: SupabaseClient
+): Promise<KeywordAnalysis | null> =>
+  db.getKeywordAnalysisByFilters(keywordId, region, period, searchType, userId, client)
+
+export const getAllKeywordAnalyses = async (
+  userId: string,
+  client?: SupabaseClient
+): Promise<KeywordAnalysis[]> =>
+  db.getAllKeywordAnalyses(userId, client)
+
+export const createKeywordAnalysis = async (
+  data: Omit<KeywordAnalysis, 'id' | 'created_at' | 'updated_at'>,
+  client?: SupabaseClient
+): Promise<string> =>
+  db.createKeywordAnalysis(data, client)
+
+export const updateKeywordAnalysis = async (
+  id: string,
+  data: Partial<Omit<KeywordAnalysis, 'id' | 'keyword_id' | 'region' | 'period' | 'search_type' | 'created_at'>>,
+  client?: SupabaseClient
+): Promise<boolean> =>
+  db.updateKeywordAnalysis(id, data, client)
+
+export const deleteKeywordAnalysis = async (
+  id: string,
+  client?: SupabaseClient
+): Promise<boolean> =>
+  db.deleteKeywordAnalysis(id, client)
