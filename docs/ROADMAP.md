@@ -194,34 +194,34 @@ StockInsight은 개인 투자자를 위한 로컬 주식 분석 도구로 다음
 
 ---
 
-### Phase 4: 다운로드 기능 및 최적화
+### Phase 4: 다운로드 기능 및 최적화 ✅ -- 완료
 
 > 부가 기능(엑셀/PNG 다운로드) 구현과 사용자 경험 최적화를 수행한다.
 
-- **Task 015: 엑셀 다운로드 기능 구현 (F011)**
-  - `src/lib/export/excel.ts` 엑셀 생성 유틸리티 구현
-  - xlsx(SheetJS) 라이브러리로 .xlsx 파일 생성
-  - 시트 구성: "주가 데이터" (날짜, 종가, MA13), "트렌드 데이터" (날짜, 관심도), "지표 요약" (현재가, MA13, YoY 등)
-  - 브라우저 다운로드 트리거 (Blob + URL.createObjectURL)
-  - 파일명 형식: `{ticker}_StockInsight_{YYYYMMDD}.xlsx`
-  - Playwright MCP를 활용한 다운로드 기능 테스트
+- **Task 015: 엑셀 다운로드 기능 구현 (F011)** ✅ -- 완료
+  - ✅ `src/lib/export/excel.ts` 엑셀 생성 유틸리티 구현
+  - ✅ xlsx(SheetJS) 라이브러리로 .xlsx 파일 생성
+  - ✅ 시트 구성: "주가 데이터" (날짜, 종가, MA13), "트렌드 데이터" (날짜, 관심도), "지표 요약" (현재가, MA13, YoY 등)
+  - ✅ 브라우저 다운로드 트리거 (Blob + URL.createObjectURL)
+  - ✅ 파일명 형식: `{ticker}_StockInsight_{YYYYMMDD}.xlsx`
+  - ✅ Playwright MCP를 활용한 다운로드 기능 테스트
 
-- **Task 016: 차트 PNG 다운로드 기능 구현 (F012)**
-  - html-to-image 라이브러리로 차트 DOM 노드를 PNG Blob 변환
-  - 개별 차트 PNG 다운로드: 각 차트 섹션의 [PNG 다운로드] 버튼 기능 연결
-  - 전체 차트 일괄 PNG 다운로드: 3개 차트 순차 변환 후 ZIP 또는 개별 저장
-  - 차트 ref 관리: `useRef`로 각 차트 컨테이너 DOM 참조
-  - 파일명 형식: `{ticker}_{chartType}_{YYYYMMDD}.png`
-  - Playwright MCP를 활용한 다운로드 기능 테스트
+- **Task 016: 차트 PNG 다운로드 기능 구현 (F012)** ✅ -- 완료
+  - ✅ html-to-image 라이브러리로 차트 DOM 노드를 PNG Blob 변환
+  - ✅ 개별 차트 PNG 다운로드: 각 차트 섹션의 [PNG 다운로드] 버튼 기능 연결
+  - ✅ 전체 차트 일괄 PNG 다운로드: 3개 차트 순차 변환 후 ZIP 또는 개별 저장
+  - ✅ 차트 ref 관리: `useRef`로 각 차트 컨테이너 DOM 참조
+  - ✅ 파일명 형식: `{ticker}_{chartType}_{YYYYMMDD}.png`
+  - ✅ Playwright MCP를 활용한 다운로드 기능 테스트
 
-- **Task 017: 사용자 경험 최적화 및 마무리**
-  - 로딩 상태 개선: 카드 Skeleton, 차트 Skeleton 통일
-  - 에러 바운더리 추가: 페이지/컴포넌트 레벨 에러 처리
-  - 다크 모드 차트 색상 최적화 (배경/축/범례 색상 테마 대응)
-  - 반응형 디자인 점검: 모바일/태블릿/데스크톱 레이아웃 최종 확인
-  - 접근성 개선: 키보드 네비게이션, aria 속성, 색상 대비
-  - `npm run check-all` 및 `npm run build` 통과 확인
-  - Playwright MCP를 활용한 전체 앱 최종 E2E 테스트
+- **Task 017: 사용자 경험 최적화 및 마무리** ✅ -- 완료
+  - ✅ 로딩 상태 개선: 카드 Skeleton, 차트 Skeleton 통일
+  - ✅ 에러 바운더리 추가: 페이지/컴포넌트 레벨 에러 처리
+  - ✅ 다크 모드 차트 색상 최적화 (배경/축/범례 색상 테마 대응)
+  - ✅ 반응형 디자인 점검: 모바일/태블릿/데스크톱 레이아웃 최종 확인
+  - ✅ 접근성 개선: 키보드 네비게이션, aria 속성, 색상 대비
+  - ✅ `npm run check-all` 및 `npm run build` 통과 확인
+  - ✅ Playwright MCP를 활용한 전체 앱 최종 E2E 테스트
 
 ---
 
@@ -490,18 +490,42 @@ StockInsight은 개인 투자자를 위한 로컬 주식 분석 도구로 다음
   - `src/components/keyword-trends/keyword-search-list.tsx` 목록 컴포넌트
   - 저장된 조합 클릭 → 차트 복원
 
-### 확장: 추가 옵션 (F023~F026)
+---
+
+### Phase 7: 키워드 분석 확장 기능 ✅ -- 완료
+
+> 키워드 상세 분석 페이지에 다운로드 및 고급 필터링 기능을 추가한다.
+
+- **Task F024: 키워드 분석 차트 PNG 다운로드 (F024)** ✅ -- 완료
+  - ✅ `src/lib/export/image.ts`의 `captureChartAsPng()` 함수 활용
+  - ✅ KeywordDetailClient에 chartRef 추가 및 handleDownloadPNG() 구현
+  - ✅ 키워드 차트를 PNG로 다운로드 (파일명: `{keyword}_chart_{region}_{period}_{YYYYMMDD}.png`)
+  - ✅ 다크 모드 지원: `window.matchMedia('(prefers-color-scheme: dark)').matches` 감지
+  - ✅ 고해상도 캡처: `pixelRatio: 2` 설정으로 2배 해상도 생성
+
+- **Task F025: 키워드 분석 Excel 다운로드 (F025)** ✅ -- 완료
+  - ✅ `src/lib/export/excel.ts`에 `generateKeywordAnalysisExcelFile()` 함수 구현
+  - ✅ 3개 시트: "트렌드 데이터" (날짜, 관심도, MA13, YoY), "지표 요약" (키워드, 지역, 기간, 현재 관심도 등), "오버레이 종목" (선택)
+  - ✅ KeywordDetailClient에 handleDownloadExcel() 구현
+  - ✅ 파일명 형식: `{keyword}_{region}_{period}_{YYYYMMDD}.xlsx`
+  - ✅ UI: 필터 섹션 상단에 [Excel 다운로드], [🖼️ 차트 PNG 저장] 버튼 배치
+
+- **Task F026: 키워드 오버레이 고급 필터 및 정렬 (F026)** ✅ -- 완료
+  - ✅ State 추가: `overlayFilterText`, `overlaySortBy`
+  - ✅ `getFilteredAndSortedOverlays()` 함수 구현
+    - ✅ 필터링: ticker 또는 회사명 기반 검색 (대소문자 무시)
+    - ✅ 정렬: 추가 순서(default), Ticker(A-Z), 회사명(A-Z) 3가지 옵션
+  - ✅ UI: 필터 컨트롤 섹션 추가
+    - ✅ 검색 입력 필드 (placeholder: "예: AAPL, Apple")
+    - ✅ 정렬 선택 드롭다운 (추가 순서, Ticker, 회사명)
+    - ✅ 종목 수 표시 (총 종목 수: X/Y)
+  - ✅ 필터링된 결과가 없을 때 "검색 결과가 없습니다" 메시지 표시
+
+---
+
+### 확장: 추가 옵션 (F023)
 
 - **F023**: 국가/기간/범위 선택
   - pytrends geo, timeframe, gprop 파라미터 UI 추가
   - 날짜 범위, 지역, 카테고리 선택
-
-- **F024**: 차트 PNG 다운로드
-  - 기존 html-to-image 로직 재사용
-
-- **F025**: Excel 다운로드
-  - SheetJS 로직 확장: 트렌드 시트 + 종목별 시트
-
-- **F026**: 키워드 + N개 종목 비교
-  - 오버레이 최대 5개로 확장
-  - 검색 필터 및 정렬 기능
+  - (선택사항, 나중에 구현)
