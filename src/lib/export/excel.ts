@@ -141,3 +141,91 @@ export function generateTableExcelFile(
   // 파일 다운로드
   XLSX.writeFile(workbook, filename)
 }
+
+interface KeywordAnalysisExcelParams {
+  keyword: string
+  region: string
+  period: string
+  searchType: string
+  trendsData: TrendsDataPoint[]
+  ma13Data?: number | null
+  yoyData?: number | null
+  overlayData?: Array<{
+    ticker: string
+    companyName: string
+  }>
+}
+
+/**
+ * 키워드 분석 데이터를 xlsx 파일로 생성하고 다운로드합니다.
+ * 시트: "트렌드 데이터", "지표 요약", (선택) "종목 목록"
+ */
+export function generateKeywordAnalysisExcelFile({
+  keyword,
+  region,
+  period,
+  searchType,
+  trendsData,
+  ma13Data,
+  yoyData,
+  overlayData,
+}: KeywordAnalysisExcelParams): void {
+  // 데이터 검증
+  if (!trendsData || trendsData.length === 0) {
+    throw new Error('트렌드 데이터가 없습니다.')
+  }
+
+  // 1. 트렌드 데이터 시트
+  const trendsSheetData = [
+    ['일자', '관심도 (0-100)', '13주 MA', 'YoY (%)'],
+    ...trendsData.map(item => [
+      item.date,
+      item.value,
+      item.ma13Value !== null ? item.ma13Value.toFixed(2) : '',
+      item.yoyValue !== null ? item.yoyValue.toFixed(2) : '',
+    ]),
+  ]
+
+  // 2. 지표 요약 시트
+  const metricsSheetData = [
+    ['항목', '값'],
+    ['키워드', keyword],
+    ['지역', region],
+    ['기간', period],
+    ['검색 타입', searchType],
+    ['현재 관심도', trendsData[trendsData.length - 1]?.value ?? ''],
+    ['13주 MA', ma13Data !== null && ma13Data !== undefined ? ma13Data.toFixed(2) : ''],
+    ['YoY (%)', yoyData !== null && yoyData !== undefined ? yoyData.toFixed(2) : ''],
+  ]
+
+  // 워크북 생성
+  const workbook = XLSX.utils.book_new()
+
+  // 트렌드 데이터 시트
+  const trendsSheet = XLSX.utils.aoa_to_sheet(trendsSheetData)
+  trendsSheet['!cols'] = [{ wch: 12 }, { wch: 15 }, { wch: 12 }, { wch: 12 }]
+
+  // 지표 요약 시트
+  const metricsSheet = XLSX.utils.aoa_to_sheet(metricsSheetData)
+  metricsSheet['!cols'] = [{ wch: 15 }, { wch: 30 }]
+
+  XLSX.utils.book_append_sheet(workbook, trendsSheet, '트렌드 데이터')
+  XLSX.utils.book_append_sheet(workbook, metricsSheet, '지표 요약')
+
+  // 종목 목록 시트 (선택)
+  if (overlayData && overlayData.length > 0) {
+    const overlaySheetData = [
+      ['Ticker', '회사명'],
+      ...overlayData.map(item => [item.ticker, item.companyName]),
+    ]
+    const overlaySheet = XLSX.utils.aoa_to_sheet(overlaySheetData)
+    overlaySheet['!cols'] = [{ wch: 12 }, { wch: 25 }]
+    XLSX.utils.book_append_sheet(workbook, overlaySheet, '오버레이 종목')
+  }
+
+  // 파일명: {keyword}_{region}_{period}_{YYYYMMDD}.xlsx
+  const filename = `${keyword}_${region}_${period}_${format(new Date(), 'yyyyMMdd')}.xlsx`
+
+  // 파일 다운로드
+  XLSX.writeFile(workbook, filename)
+}

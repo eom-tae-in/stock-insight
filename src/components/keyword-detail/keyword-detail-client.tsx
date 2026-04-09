@@ -61,6 +61,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { generateKeywordAnalysisExcelFile } from '@/lib/export/excel'
 import { KeywordStandaloneChart } from './keyword-standalone-chart'
 
 // Overlay 타입 정의
@@ -931,6 +932,34 @@ export function KeywordDetailClient({
     )
   }
 
+  // Excel 다운로드
+  const handleDownloadExcel = async () => {
+    if (!currentAnalysis || !chartData) {
+      toast.error('분석 데이터를 먼저 로드해주세요')
+      return
+    }
+
+    try {
+      generateKeywordAnalysisExcelFile({
+        keyword: keyword.keyword,
+        region,
+        period,
+        searchType,
+        trendsData: currentAnalysis.trends_data || [],
+        ma13Data: currentAnalysis.ma13_data,
+        yoyData: currentAnalysis.yoy_data,
+        overlayData: overlays.map(o => ({
+          ticker: o.ticker,
+          companyName: o.companyName,
+        })),
+      })
+      toast.success('Excel 파일이 다운로드되었습니다')
+    } catch (error) {
+      console.error('Excel 다운로드 오류:', error)
+      toast.error('Excel 다운로드에 실패했습니다')
+    }
+  }
+
   // 기간 표시 텍스트
   const getTimeframeDisplayText = () => {
     if (timeframeType === 'weeks') {
@@ -1231,6 +1260,18 @@ export function KeywordDetailClient({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          {/* 액션 버튼 */}
+          <div className="mt-6 flex flex-wrap gap-2 border-t pt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadExcel}
+              disabled={!currentAnalysis || isLoadingAnalysis}
+            >
+              📊 Excel 다운로드
+            </Button>
           </div>
         </div>
 
