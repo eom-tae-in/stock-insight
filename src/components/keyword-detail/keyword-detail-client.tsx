@@ -44,6 +44,7 @@ import type {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -628,6 +629,12 @@ export function KeywordDetailClient({
   const [timeframeValue, setTimeframeValue] = useState(5)
   const [timeframeInput, setTimeframeInput] = useState('5')
 
+  // 종목 필터 및 정렬
+  const [overlayFilterText, setOverlayFilterText] = useState('')
+  const [overlaySortBy, setOverlaySortBy] = useState<
+    'order' | 'ticker' | 'name'
+  >('order')
+
   // 카드 관리 모드 (normal: 기본, delete: 선택 삭제, reorder: 위치 변경)
   const [mode, setMode] = useState<'normal' | 'delete' | 'reorder'>('normal')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -1005,6 +1012,38 @@ export function KeywordDetailClient({
   }
 
   const filteredChartData = getFilteredChartData()
+
+  // 종목 필터링 및 정렬
+  const getFilteredAndSortedOverlays = () => {
+    let result = [...overlays]
+
+    // 필터링 (검색어)
+    if (overlayFilterText.trim()) {
+      const query = overlayFilterText.toLowerCase()
+      result = result.filter(
+        o =>
+          o.ticker.toLowerCase().includes(query) ||
+          o.companyName.toLowerCase().includes(query)
+      )
+    }
+
+    // 정렬
+    switch (overlaySortBy) {
+      case 'ticker':
+        result.sort((a, b) => a.ticker.localeCompare(b.ticker))
+        break
+      case 'name':
+        result.sort((a, b) => a.companyName.localeCompare(b.companyName))
+        break
+      case 'order':
+      default:
+        result.sort((a, b) => a.displayOrder - b.displayOrder)
+    }
+
+    return result
+  }
+
+  const filteredOverlays = getFilteredAndSortedOverlays()
 
   // 자동완성 검색
   const handleStockSearch = async (query: string) => {
@@ -1597,38 +1636,92 @@ export function KeywordDetailClient({
 
               {/* 오버레이 그리드 */}
               {overlays.length > 0 ? (
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handleDragEnd}
-                >
-                  <SortableContext
-                    items={overlays.map(o => o.id)}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                      {overlays.map(overlay => (
-                        <SortableOverlayCard
-                          key={overlay.id}
-                          overlay={overlay}
-                          chartData={chartData}
-                          mergeChartData={mergeChartData}
-                          formattedDate={formattedDate}
-                          keywordId={keyword.id}
-                          mode={mode}
-                          isSelected={selectedIds.has(overlay.id)}
-                          onToggleSelect={handleToggleSelect}
+                <>
+                  {/* 필터링 및 정렬 컨트롤 */}
+                  <div className="mb-6 flex flex-col gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/50">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+                      <div className="flex-1">
+                        <label className="mb-2 block text-xs font-semibold text-gray-600 dark:text-gray-400">
+                          검색 (Ticker 또는 회사명)
+                        </label>
+                        <Input
+                          placeholder="예: AAPL, Apple"
+                          value={overlayFilterText}
+                          onChange={e => setOverlayFilterText(e.target.value)}
+                          className="h-9"
                         />
-                      ))}
+                      </div>
+                      <div className="w-full sm:w-48">
+                        <label className="mb-2 block text-xs font-semibold text-gray-600 dark:text-gray-400">
+                          정렬
+                        </label>
+                        <Select
+                          value={overlaySortBy}
+                          onValueChange={value =>
+                            setOverlaySortBy(
+                              value as 'order' | 'ticker' | 'name'
+                            )
+                          }
+                        >
+                          <SelectTrigger className="h-9">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="order">추가 순서</SelectItem>
+                            <SelectItem value="ticker">Ticker</SelectItem>
+                            <SelectItem value="name">회사명</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                  </SortableContext>
-                  <DragOverlayComponent
-                    overlays={overlays}
-                    chartData={chartData}
-                    mergeChartData={mergeChartData}
-                    formattedDate={formattedDate}
-                  />
-                </DndContext>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                      총 종목 수: {filteredOverlays.length}/{overlays.length}
+                    </div>
+                  </div>
+
+                  {filteredOverlays.length > 0 ? (
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <SortableContext
+                        items={filteredOverlays.map(o => o.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                          {filteredOverlays.map(overlay => (
+                            <SortableOverlayCard
+                              key={overlay.id}
+                              overlay={overlay}
+                              chartData={chartData}
+                              mergeChartData={mergeChartData}
+                              formattedDate={formattedDate}
+                              keywordId={keyword.id}
+                              mode={mode}
+                              isSelected={selectedIds.has(overlay.id)}
+                              onToggleSelect={handleToggleSelect}
+                            />
+                          ))}
+                        </div>
+                      </SortableContext>
+                      <DragOverlayComponent
+                        overlays={filteredOverlays}
+                        chartData={chartData}
+                        mergeChartData={mergeChartData}
+                        formattedDate={formattedDate}
+                      />
+                    </DndContext>
+                  ) : (
+                    <Card>
+                      <CardContent className="flex items-center justify-center py-12">
+                        <p className="text-muted-foreground text-sm">
+                          검색 결과가 없습니다
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
               ) : (
                 <Card>
                   <CardContent className="flex items-center justify-center py-12">
