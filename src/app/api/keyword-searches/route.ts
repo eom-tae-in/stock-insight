@@ -90,7 +90,6 @@ export async function POST(request: NextRequest) {
         yoyValue: number | null
       }>
       overlays?: Array<{
-        searchId?: string
         ticker: string
         companyName: string
         overlayData: Array<{
@@ -170,13 +169,12 @@ export async function POST(request: NextRequest) {
         console.log(
           `[POST keyword-searches] Overlay ${i}:`,
           overlay.ticker,
-          overlay.searchId ?? 'keyword-only'
+          'keyword-only'
         )
 
         // 오버레이 메타데이터 저장
         const overlayId = await addStockOverlay(
           keywordSearchId,
-          overlay.searchId ?? '',
           overlay.ticker,
           overlay.companyName,
           i,

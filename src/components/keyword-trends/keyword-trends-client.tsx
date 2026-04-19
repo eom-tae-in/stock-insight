@@ -43,6 +43,32 @@ interface KeywordTrendsState {
   gprop: string
 }
 
+type KeywordOverlayResponse = KeywordStockOverlay & {
+  companyName?: string
+  displayOrder?: number
+  chartData?: Array<{
+    date: string
+    normalizedPrice: number
+    rawPrice: number
+  }>
+}
+
+function overlayToSearchRecord(overlay: KeywordOverlayResponse): SearchRecord {
+  return {
+    id: overlay.id,
+    user_id: '',
+    ticker: overlay.ticker,
+    company_name: overlay.company_name ?? overlay.companyName ?? overlay.ticker,
+    price_data: (overlay.chartData ?? []).map(point => ({
+      date: point.date,
+      close: point.rawPrice,
+    })),
+    trends_data: [],
+    searched_at: overlay.created_at ?? new Date().toISOString(),
+    created_at: overlay.created_at,
+  }
+}
+
 export default function KeywordTrendsClient() {
   // F027: 각 timeframe별 ref 저장
   const chartRefs = useRef<Record<string, HTMLDivElement | null>>({})
@@ -116,16 +142,14 @@ export default function KeywordTrendsClient() {
         if (!overlayRes.ok) throw new Error('Failed to fetch overlays')
 
         const overlayData = await overlayRes.json()
-        const overlays = overlayData.data as KeywordStockOverlay[]
+        const overlays = overlayData.data as KeywordOverlayResponse[]
 
         // overlayId가 있으면 해당 overlay만 필터링
         const targetOverlays = overlayId
           ? overlays.filter(o => o.id === overlayId)
           : overlays
 
-        const overlaySearches = targetOverlays
-          .map(o => availableSearches.find(s => s.id === o.search_id))
-          .filter(Boolean) as SearchRecord[]
+        const overlaySearches = targetOverlays.map(overlayToSearchRecord)
 
         // 2단계: 5y 데이터 재조회
         const params = new URLSearchParams({
@@ -169,7 +193,6 @@ export default function KeywordTrendsClient() {
     }
 
     restoreKeywordFromId()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, state.savedKeywords, router])
 
   // customWeeks 변경 시 입력 필드 동기화
@@ -759,11 +782,9 @@ export default function KeywordTrendsClient() {
       if (!overlayRes.ok) throw new Error('Failed to fetch overlays')
 
       const overlayData = await overlayRes.json()
-      const overlays = overlayData.data as KeywordStockOverlay[]
+      const overlays = overlayData.data as KeywordOverlayResponse[]
 
-      const overlaySearches = overlays
-        .map(o => availableSearches.find(s => s.id === o.search_id))
-        .filter(Boolean) as SearchRecord[]
+      const overlaySearches = overlays.map(overlayToSearchRecord)
 
       // 2단계: 5y 데이터 재조회
       const params = new URLSearchParams({

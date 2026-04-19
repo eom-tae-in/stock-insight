@@ -165,7 +165,7 @@ DB 테이블:
 남은 문제:
 
 - legacy route가 계속 신규 기능처럼 사용되고 있다.
-- route 이름과 일부 타입에는 `keyword_search_id`, `search_id` 호환 필드가 남아 있다.
+- DB cleanup 전까지 legacy route 이름은 남아 있지만, 오버레이 API/타입 계약에서는 `search_id`를 사용하지 않는다.
 
 결론:
 
@@ -236,8 +236,9 @@ DB 테이블:
 
 ### 즉시 확인해야 할 스키마 위험
 
-1. legacy route 이름과 타입 일부에 `keyword_search_id`, `search_id` 호환 필드가 남아 있다.
-2. `keywords.name`은 존재하지만 normalized name unique 정책이 아직 명확하지 않다.
+1. legacy route 이름은 아직 `/api/keyword-searches`에 남아 있다.
+2. DB 컬럼 `keyword_stock_overlays.search_id`는 최종 cleanup 마이그레이션 전까지 nullable legacy 컬럼으로 남아 있다.
+3. `keywords.name`은 존재하지만 normalized name unique 정책이 아직 명확하지 않다.
 
 ## 4. 현재 라우트 구조 문제
 

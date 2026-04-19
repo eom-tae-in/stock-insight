@@ -149,7 +149,6 @@ export interface DbAdapter {
   // ============ keyword_stock_overlays (오버레이) ============
   addStockOverlay(
     keywordSearchId: string,
-    searchId: string,
     ticker: string,
     companyName: string,
     displayOrder?: number,
@@ -701,7 +700,6 @@ class SupabaseDbAdapter implements DbAdapter {
 
   async addStockOverlay(
     keywordSearchId: string,
-    searchId: string,
     ticker: string,
     companyName: string,
     displayOrder: number = 0,
@@ -761,8 +759,6 @@ class SupabaseDbAdapter implements DbAdapter {
 
     return (data || []).map(row => ({
       id: row.id,
-      keyword_search_id: keywordSearchId,
-      search_id: row.search_id ?? null,
       ticker: row.ticker,
       company_name: row.company_name,
       display_order: row.display_order,
