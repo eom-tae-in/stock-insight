@@ -34,7 +34,6 @@ import {
 import { DragOverlay } from '@dnd-kit/core'
 import type {
   KeywordSearchRecord,
-  PriceDataPoint,
   KeywordAnalysis,
   Region,
   Period,
@@ -624,42 +623,22 @@ export function KeywordDetailClient({
       console.log('[loadOverlays] overlayList:', overlayList)
       console.log('[loadOverlays] analysisId:', analysisId, ', region:', region)
 
-      // overlayList는 KeywordAnalysisOverlay[] 이므로
-      // search_id를 통해 price data를 조회하고 chartData로 변환
       if (!Array.isArray(overlayList) || overlayList.length === 0) {
         console.log('[loadOverlays] No overlays found')
         setOverlays([])
         return
       }
 
-      // 병렬로 각 search 레코드 조회
-      const searchPromises = overlayList.map(overlay =>
-        fetch(`/api/searches/${overlay.search_id}`)
-          .then(res => (res.ok ? res.json().then(apiRes => apiRes.data) : null))
-          .catch(() => null)
-      )
-
-      const searchResults = await Promise.all(searchPromises)
-      console.log(
-        '[loadOverlays] searchResults sample:',
-        searchResults.map(r => ({
-          ticker: r?.ticker,
-          priceDataLength: r?.price_data?.length,
-          firstDate: r?.price_data?.[0]?.date,
-          lastDate: r?.price_data?.[r.price_data.length - 1]?.date,
-        }))
-      )
-
       // 모든 가격 데이터 수집하여 min/max 계산
       let minPrice = Infinity
       let maxPrice = -Infinity
 
-      for (const result of searchResults) {
-        if (result?.priceData && Array.isArray(result.priceData)) {
-          for (const point of result.priceData) {
-            if (typeof point.price === 'number') {
-              minPrice = Math.min(minPrice, point.price)
-              maxPrice = Math.max(maxPrice, point.price)
+      for (const overlay of overlayList) {
+        if (Array.isArray(overlay.chart_data)) {
+          for (const point of overlay.chart_data) {
+            if (typeof point.rawPrice === 'number') {
+              minPrice = Math.min(minPrice, point.rawPrice)
+              maxPrice = Math.max(maxPrice, point.rawPrice)
             }
           }
         }
@@ -669,36 +648,38 @@ export function KeywordDetailClient({
 
       // 정규화된 overlays 구성
       const convertedOverlays: OverlayItem[] = overlayList
-        .map((overlay, index) => {
-          const searchData = searchResults[index]
-          if (!searchData?.priceData) {
+        .map(overlay => {
+          if (!Array.isArray(overlay.chart_data)) {
             console.log(
-              '[loadOverlays] No priceData for overlay:',
+              '[loadOverlays] No chartData for overlay:',
               overlay.ticker
             )
             return null
           }
 
-          const priceData = searchData.priceData as Array<{
+          const priceData = overlay.chart_data as Array<{
             date: string
-            price: number
+            rawPrice: number | null
           }>
           const priceRange = maxPrice - minPrice
 
-          const chartData = priceData.map(
-            (point: { date: string; price: number }) => {
+          const chartData = priceData
+            .filter(
+              (point): point is { date: string; rawPrice: number } =>
+                typeof point.rawPrice === 'number'
+            )
+            .map(point => {
               const normalizedPrice =
                 priceRange > 0
-                  ? ((point.price - minPrice) / priceRange) * 100
+                  ? ((point.rawPrice - minPrice) / priceRange) * 100
                   : 50
 
               return {
                 date: point.date,
                 normalizedPrice: Math.max(0, Math.min(100, normalizedPrice)),
-                rawPrice: point.price,
+                rawPrice: point.rawPrice,
               }
-            }
-          )
+            })
 
           console.log(
             '[loadOverlays] overlay chartData for',
@@ -997,11 +978,9 @@ export function KeywordDetailClient({
     setIsRefreshing(true)
 
     try {
-      // Phase 6: Analysis 기준 배치 갱신
-      // 각 overlay의 search_id를 통해 최신 주가 데이터 조회
       const searchPromises = overlays.map(overlay =>
-        fetch(`/api/searches/${overlay.ticker}`)
-          .then(res => (res.ok ? res.json() : null))
+        fetch(`/api/stock-data?ticker=${overlay.ticker}`)
+          .then(res => (res.ok ? res.json().then(apiRes => apiRes.data) : null))
           .catch(() => null)
       )
 
@@ -1026,23 +1005,26 @@ export function KeywordDetailClient({
       setOverlays(prev =>
         prev.map((overlay, index) => {
           const searchData = searchResults[index]
-          if (!searchData?.price_data || searchData.price_data.length === 0) {
+          if (!searchData?.priceData || searchData.priceData.length === 0) {
             return overlay
           }
 
-          const priceData = searchData.price_data as PriceDataPoint[]
+          const priceData = searchData.priceData as Array<{
+            date: string
+            price: number
+          }>
           const priceRange = maxPrice - minPrice
 
-          const newChartData = priceData.map((pricePoint: PriceDataPoint) => {
+          const newChartData = priceData.map(pricePoint => {
             const normalizedPrice =
               priceRange > 0
-                ? ((pricePoint.close - minPrice) / priceRange) * 100
+                ? ((pricePoint.price - minPrice) / priceRange) * 100
                 : 50
 
             return {
               date: pricePoint.date,
               normalizedPrice: Math.max(0, Math.min(100, normalizedPrice)),
-              rawPrice: pricePoint.close,
+              rawPrice: pricePoint.price,
             }
           })
 
@@ -1346,30 +1328,15 @@ export function KeywordDetailClient({
 
     setIsSavingCustomChart(true)
     try {
-      // 1단계: 종목을 searches 테이블에 저장/조회
-      const searchRes = await fetch('/api/searches', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ticker: selectedStock.ticker,
-        }),
-      })
-
-      if (!searchRes.ok) throw new Error('Failed to save stock to searches')
-
-      const searchApiResponse = await searchRes.json()
-      const searchId = searchApiResponse.data.id
-
-      // 2단계: overlays에 연결 (현재 분석 조건 기반)
       const overlayRes = await fetch(
         `/api/keyword-analysis/${currentAnalysis.id}/overlays`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            search_id: searchId,
             ticker: selectedStock.ticker,
             company_name: selectedStock.companyName,
+            price_data: selectedStock.priceData,
           }),
         }
       )
