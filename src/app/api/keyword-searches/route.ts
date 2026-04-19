@@ -27,6 +27,7 @@ import {
   insertKeywordChartTimeseries,
   addStockOverlay,
   insertOverlayChartTimeseries,
+  createKeywordAnalysis,
 } from '@/lib/db/queries'
 import {
   createErrorResponse,
@@ -89,7 +90,7 @@ export async function POST(request: NextRequest) {
         yoyValue: number | null
       }>
       overlays?: Array<{
-        searchId: string
+        searchId?: string
         ticker: string
         companyName: string
         overlayData: Array<{
@@ -141,6 +142,24 @@ export async function POST(request: NextRequest) {
         chartData.length
       )
       await insertKeywordChartTimeseries(keywordSearchId, chartData, supabase)
+
+      await createKeywordAnalysis(
+        {
+          keyword_id: keywordSearchId,
+          region: 'GLOBAL',
+          period: '5Y',
+          search_type: 'WEB',
+          trends_data: chartData.map(point => ({
+            date: point.date,
+            value: point.trendsValue,
+            ma13Value: point.ma13Value,
+            yoyValue: point.yoyValue,
+          })),
+          ma13_data: chartData.at(-1)?.ma13Value ?? undefined,
+          yoy_data: chartData.at(-1)?.yoyValue ?? undefined,
+        },
+        supabase
+      )
     }
 
     // 3. 오버레이 저장
@@ -151,13 +170,13 @@ export async function POST(request: NextRequest) {
         console.log(
           `[POST keyword-searches] Overlay ${i}:`,
           overlay.ticker,
-          overlay.searchId
+          overlay.searchId ?? 'keyword-only'
         )
 
         // 오버레이 메타데이터 저장
         const overlayId = await addStockOverlay(
           keywordSearchId,
-          overlay.searchId,
+          overlay.searchId ?? '',
           overlay.ticker,
           overlay.companyName,
           i,

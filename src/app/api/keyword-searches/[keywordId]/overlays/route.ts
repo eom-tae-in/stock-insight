@@ -14,6 +14,14 @@ import {
   validateApiAuth,
   createSuccessResponse,
 } from '@/lib/api-helpers'
+import {
+  addStockOverlay,
+  getKeywordStockOverlays,
+  getOverlayChartTimeseries,
+  insertOverlayChartTimeseries,
+  updateStockOverlayOrder,
+} from '@/lib/db/queries'
+import { fetchStockData } from '@/lib/services/stock-service'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,29 +44,22 @@ export async function GET(
       return createErrorResponse('INVALID_ID', '유효하지 않은 ID입니다.', 400)
     }
 
-    // 임시 오버레이 목록 조회
-    const { data: overlays, error: overlayError } = await supabase
-      .from('keyword_temporary_overlays')
-      .select('*')
-      .eq('keyword_search_id', keywordId)
-      .order('display_order', { ascending: true })
+    const overlays = await getKeywordStockOverlays(keywordId, supabase)
 
-    if (overlayError) throw overlayError
-
-    // 응답 형식 변환 (price_data → chartData)
-    const formattedOverlays = (overlays || []).map(overlay => ({
-      id: overlay.id,
-      ticker: overlay.ticker,
-      companyName: overlay.company_name,
-      displayOrder: overlay.display_order,
-      chartData: (overlay.price_data || []).map(
-        (p: { date: string; price: number }) => ({
-          date: p.date,
-          normalizedPrice: p.price,
-          rawPrice: p.price,
-        })
-      ),
-    }))
+    const formattedOverlays = await Promise.all(
+      overlays.map(async overlay => ({
+        id: overlay.id,
+        keyword_search_id: keywordId,
+        search_id: overlay.search_id ?? null,
+        ticker: overlay.ticker,
+        company_name: overlay.company_name,
+        companyName: overlay.company_name,
+        display_order: overlay.display_order,
+        displayOrder: overlay.display_order,
+        created_at: overlay.created_at,
+        chartData: await getOverlayChartTimeseries(overlay.id, supabase),
+      }))
+    )
 
     return createSuccessResponse(formattedOverlays, 200)
   } catch (error) {
@@ -90,18 +91,16 @@ export async function POST(
     }
 
     const body = await request.json()
-    const { ticker, companyName, priceData } = body as {
+    const { ticker, priceData } = body as {
       ticker: string
-      companyName: string
-      priceData: Array<{ date: string; price: number }>
+      companyName?: string
+      company_name?: string
+      priceData?: Array<{ date: string; price: number }>
     }
+    const companyName = body.companyName ?? body.company_name ?? ticker
 
-    if (!ticker || !priceData) {
-      return createErrorResponse(
-        'INVALID_BODY',
-        'ticker과 priceData는 필수입니다.',
-        400
-      )
+    if (!ticker) {
+      return createErrorResponse('INVALID_BODY', 'ticker는 필수입니다.', 400)
     }
 
     const tickerUpper = ticker.toUpperCase()
@@ -109,72 +108,50 @@ export async function POST(
       `[Overlay POST] Creating temporary overlay for ticker: ${tickerUpper}`
     )
 
-    // 1. 기존 임시 오버레이가 있는지 확인
-    const { data: existingOverlay, error: checkError } = await supabase
-      .from('keyword_temporary_overlays')
-      .select('id')
-      .eq('keyword_search_id', keywordId)
-      .eq('ticker', tickerUpper)
-      .single()
-
-    if (checkError && checkError.code !== 'PGRST116') {
-      console.error('[Overlay POST] Check error:', checkError)
-      throw checkError
-    }
-
-    if (existingOverlay) {
-      console.log(
-        `[Overlay POST] DUPLICATE: ${tickerUpper} already exists in keyword_temporary_overlays`
-      )
-      return createErrorResponse('DUPLICATE', '이미 추가된 종목입니다.', 409)
-    }
-
-    // 2. 새 임시 오버레이 생성 (keyword_temporary_overlays에 저장)
-    console.log(
-      `[Overlay POST] Creating temporary overlay for keywordId: ${keywordId}, ticker: ${tickerUpper}`
+    const overlayId = await addStockOverlay(
+      keywordId,
+      '',
+      tickerUpper,
+      companyName,
+      0,
+      supabase
     )
 
-    const { data: newOverlay, error: insertError } = await supabase
-      .from('keyword_temporary_overlays')
-      .insert({
-        keyword_search_id: keywordId,
-        ticker: tickerUpper,
-        company_name: companyName,
-        price_data: priceData,
-        display_order: 0,
-      })
-      .select()
-      .single()
+    let resolvedPriceData = priceData
+    if (!resolvedPriceData || resolvedPriceData.length === 0) {
+      const stockData = await fetchStockData(tickerUpper)
+      resolvedPriceData = stockData.priceData.map(point => ({
+        date: point.date,
+        price: point.close,
+      }))
+    }
 
-    if (insertError) {
-      console.error('[Overlay POST] Insert error details:', {
-        code: insertError.code,
-        message: insertError.message,
-        details: insertError.details,
-        hint: insertError.hint,
-      })
-      return createErrorResponse(
-        'DB_ERROR',
-        '오버레이 저장에 실패했습니다.',
-        500
+    if (resolvedPriceData.length > 0) {
+      const prices = resolvedPriceData.map(point => point.price)
+      const minPrice = Math.min(...prices)
+      const maxPrice = Math.max(...prices)
+      const range = maxPrice - minPrice
+
+      await insertOverlayChartTimeseries(
+        overlayId,
+        resolvedPriceData.map(point => ({
+          date: point.date,
+          rawPrice: point.price,
+          normalizedPrice:
+            range > 0 ? ((point.price - minPrice) / range) * 100 : 50,
+        })),
+        supabase
       )
     }
 
-    console.log(`[Overlay POST] Successfully created overlay: ${newOverlay.id}`)
+    console.log(`[Overlay POST] Successfully created overlay: ${overlayId}`)
 
-    // 응답 형식 변환 (price_data → chartData)
     const formattedOverlay = {
-      id: newOverlay.id,
-      ticker: newOverlay.ticker,
-      companyName: newOverlay.company_name,
-      displayOrder: newOverlay.display_order,
-      chartData: (newOverlay.price_data || []).map(
-        (p: { date: string; price: number }) => ({
-          date: p.date,
-          normalizedPrice: p.price,
-          rawPrice: p.price,
-        })
-      ),
+      id: overlayId,
+      ticker: tickerUpper,
+      companyName,
+      displayOrder: 0,
+      chartData: await getOverlayChartTimeseries(overlayId, supabase),
     }
 
     return createSuccessResponse(formattedOverlay, 201)
@@ -217,21 +194,13 @@ export async function PATCH(
       )
     }
 
-    // 임시 오버레이의 display_order 업데이트
-    const updates = orderedIds.map((id, index) =>
-      supabase
-        .from('keyword_temporary_overlays')
-        .update({ display_order: index })
-        .eq('id', id)
-        .eq('keyword_search_id', keywordId)
-    )
-
-    const results = await Promise.all(updates)
-
-    // 에러 확인
-    for (const result of results) {
-      if (result.error) {
-        console.error('Update error:', result.error)
+    for (let index = 0; index < orderedIds.length; index++) {
+      const updated = await updateStockOverlayOrder(
+        orderedIds[index],
+        index,
+        supabase
+      )
+      if (!updated) {
         return createErrorResponse(
           'DB_ERROR',
           '순서 업데이트에 실패했습니다.',
@@ -240,29 +209,17 @@ export async function PATCH(
       }
     }
 
-    // 업데이트된 오버레이 목록 반환
-    const { data: overlays, error: overlayError } = await supabase
-      .from('keyword_temporary_overlays')
-      .select('*')
-      .eq('keyword_search_id', keywordId)
-      .order('display_order', { ascending: true })
+    const overlays = await getKeywordStockOverlays(keywordId, supabase)
 
-    if (overlayError) throw overlayError
-
-    // 응답 형식 변환 (price_data → chartData)
-    const formattedOverlays = (overlays || []).map(overlay => ({
-      id: overlay.id,
-      ticker: overlay.ticker,
-      companyName: overlay.company_name,
-      displayOrder: overlay.display_order,
-      chartData: (overlay.price_data || []).map(
-        (p: { date: string; price: number }) => ({
-          date: p.date,
-          normalizedPrice: p.price,
-          rawPrice: p.price,
-        })
-      ),
-    }))
+    const formattedOverlays = await Promise.all(
+      overlays.map(async overlay => ({
+        id: overlay.id,
+        ticker: overlay.ticker,
+        companyName: overlay.company_name,
+        displayOrder: overlay.display_order,
+        chartData: await getOverlayChartTimeseries(overlay.id, supabase),
+      }))
+    )
 
     return createSuccessResponse(formattedOverlays, 200)
   } catch (error) {

@@ -137,8 +137,8 @@ export interface KeywordSearchRecordRaw {
  */
 export interface KeywordStockOverlay {
   id: string // UUID
-  keyword_search_id: string // keyword_searches.id
-  search_id: string // searches.id
+  keyword_search_id?: string | null // legacy: keyword_searches.id
+  search_id?: string | null // legacy: searches.id
   ticker: string // 종목 심볼 (예: AAPL)
   company_name: string // 회사명 (예: Apple Inc.)
   display_order: number // 그래프에서 표시할 순서
