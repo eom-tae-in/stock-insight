@@ -14,11 +14,9 @@ import {
   validateApiAuth,
   createSuccessResponse,
 } from '@/lib/api-helpers'
-import YahooFinance from 'yahoo-finance2'
+import { fetchStockData } from '@/lib/services/stock-service'
 
 export const dynamic = 'force-dynamic'
-
-const yf = new YahooFinance()
 
 export async function POST(
   request: NextRequest,
@@ -50,40 +48,18 @@ export async function POST(
       )
     }
 
-    // yahoo-finance2로 주가 데이터 조회
-    const quoteData = await yf.quote(overlay.ticker)
+    const stockData = await fetchStockData(overlay.ticker)
+    const prices = stockData.priceData.map(point => point.close)
+    const minPrice = Math.min(...prices)
+    const maxPrice = Math.max(...prices)
+    const priceRange = maxPrice - minPrice
 
-    if (!quoteData || !quoteData.regularMarketPrice) {
-      return createErrorResponse(
-        'QUOTE_FAILED',
-        '주가 데이터를 조회할 수 없습니다.',
-        500
-      )
-    }
-
-    const currentPrice = quoteData.regularMarketPrice
-
-    // 정규화를 위해 52주 가격 범위 사용
-    const fiftyTwoWeekLow = quoteData.fiftyTwoWeekLow ?? currentPrice * 0.8
-    const fiftyTwoWeekHigh = quoteData.fiftyTwoWeekHigh ?? currentPrice * 1.2
-
-    const priceRange = fiftyTwoWeekHigh - fiftyTwoWeekLow
-
-    // 정규화된 데이터 생성
-    const normalizedPrice =
-      priceRange > 0
-        ? ((currentPrice - fiftyTwoWeekLow) / priceRange) * 100
-        : 50
-
-    // 현재 데이터 저장
-    const today = new Date().toISOString().split('T')[0]
-    const overlayData = [
-      {
-        date: today,
-        normalizedPrice: Math.max(0, Math.min(100, normalizedPrice)),
-        rawPrice: currentPrice,
-      },
-    ]
+    const overlayData = stockData.priceData.map(point => ({
+      date: point.date,
+      normalizedPrice:
+        priceRange > 0 ? ((point.close - minPrice) / priceRange) * 100 : 50,
+      rawPrice: point.close,
+    }))
 
     // DB에 저장
     await insertOverlayChartTimeseries(overlayId, overlayData, supabase)

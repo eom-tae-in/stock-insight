@@ -14,8 +14,15 @@
 
 import { NextRequest } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { removeStockOverlaysBatch } from '@/lib/db/queries'
-import { createSuccessResponse, createErrorResponse } from '@/lib/api-helpers'
+import {
+  getKeywordStockOverlays,
+  removeStockOverlaysBatch,
+} from '@/lib/db/queries'
+import {
+  createSuccessResponse,
+  createErrorResponse,
+  validateApiAuth,
+} from '@/lib/api-helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,14 +35,10 @@ export async function POST(
   { params }: { params: Promise<{ keywordId: string }> }
 ) {
   try {
-    // 인증 확인
     const supabase = await createSupabaseServerClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-    if (!user || authError) {
-      return createErrorResponse('UNAUTHORIZED', '로그인이 필요합니다.', 401)
+    const authResult = await validateApiAuth(supabase)
+    if (authResult instanceof Response) {
+      return authResult
     }
 
     const { keywordId } = await params
@@ -65,9 +68,21 @@ export async function POST(
       `[batch-delete] 배치 삭제 시작: keywordId=${keywordId}, overlayIds=${overlayIds.length}개`
     )
 
+    const overlays = await getKeywordStockOverlays(keywordId, supabase)
+    const ownedOverlayIds = new Set(overlays.map(overlay => overlay.id))
+    const validOverlayIds = overlayIds.filter(id => ownedOverlayIds.has(id))
+
+    if (validOverlayIds.length !== overlayIds.length) {
+      return createErrorResponse(
+        'NOT_FOUND',
+        '삭제할 수 없는 오버레이가 포함되어 있습니다.',
+        404
+      )
+    }
+
     // 배치 삭제 API 호출
     try {
-      const success = await removeStockOverlaysBatch(overlayIds, supabase)
+      const success = await removeStockOverlaysBatch(validOverlayIds, supabase)
 
       if (!success) {
         return createErrorResponse(
@@ -77,11 +92,11 @@ export async function POST(
         )
       }
 
-      console.log(`[batch-delete] 배치 삭제 완료: ${overlayIds.length}개`)
+      console.log(`[batch-delete] 배치 삭제 완료: ${validOverlayIds.length}개`)
 
       return createSuccessResponse(
         {
-          deletedCount: overlayIds.length,
+          deletedCount: validOverlayIds.length,
         },
         200
       )

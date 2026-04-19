@@ -153,13 +153,19 @@ DB 테이블:
 
 - `keyword_searches`
 - `keyword_chart_timeseries`
-- `keyword_temporary_overlays` 사용 코드 있음
+- `keyword_stock_overlays`
+- `overlay_chart_timeseries`
 
-현재 문제:
+현재 상태:
 
-- `keyword_temporary_overlays`는 코드에서 사용하지만 현재 마이그레이션에 `CREATE TABLE` 정의가 없다.
-- `keyword_searches`는 새 마이그레이션에서 `(user_id, keyword, region, search_type)` unique로 바뀌었지만 adapter는 아직 `onConflict: 'user_id,keyword'`를 쓴다.
+- legacy route는 유지하지만 내부 저장/조회는 신형 `keyword_analysis`, `keyword_stock_overlays`, `overlay_chart_timeseries`를 사용한다.
+- `keyword_temporary_overlays` 직접 코드 참조는 제거됐다.
+- 삭제/배치 삭제/최신화 API는 요청한 keyword의 overlay인지 확인한 뒤 신형 테이블을 조작한다.
+
+남은 문제:
+
 - legacy route가 계속 신규 기능처럼 사용되고 있다.
+- route 이름과 일부 타입에는 `keyword_search_id`, `search_id` 호환 필드가 남아 있다.
 
 결론:
 
@@ -230,11 +236,8 @@ DB 테이블:
 
 ### 즉시 확인해야 할 스키마 위험
 
-1. `keyword_temporary_overlays` 생성 마이그레이션 없음.
-2. `keyword_searches` unique 제약과 adapter upsert conflict target 불일치.
-3. `keyword_stock_overlays`는 migration 20260410에서 재생성되지만 legacy 코드 일부는 `keyword_search_id` 기반 사고방식을 유지한다.
-4. `keyword_stock_overlays.search_id -> searches.id` 때문에 키워드 분석 오버레이가 사용자 저장 종목 도메인에 묶여 있다.
-5. `keywords.name`은 존재하지만 normalized name unique 정책이 아직 명확하지 않다.
+1. legacy route 이름과 타입 일부에 `keyword_search_id`, `search_id` 호환 필드가 남아 있다.
+2. `keywords.name`은 존재하지만 normalized name unique 정책이 아직 명확하지 않다.
 
 ## 4. 현재 라우트 구조 문제
 

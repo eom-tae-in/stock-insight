@@ -13,7 +13,8 @@ import { OverlayDetailClient } from '@/components/overlay-detail/overlay-detail-
 import {
   getKeywordSearchById,
   getKeywordChartTimeseries,
-  getKeywordTemporaryOverlay,
+  getKeywordStockOverlays,
+  getOverlayChartTimeseries,
 } from '@/lib/db/queries'
 
 interface OverlayDetailPageProps {
@@ -51,23 +52,16 @@ export default async function OverlayDetailPage({
   // 2. 키워드 차트 시계열 조회
   const chartTimeseries = await getKeywordChartTimeseries(keywordId, supabase)
 
-  // 3. 임시 오버레이 정보 조회 (keyword_temporary_overlays)
-  const overlay = await getKeywordTemporaryOverlay(
-    keywordId,
-    overlayId,
-    supabase
-  )
+  // 3. 신형 오버레이 정보 조회
+  const overlays = await getKeywordStockOverlays(keywordId, supabase)
+  const overlay = overlays.find(item => item.id === overlayId)
 
   if (!overlay) {
     redirect(`/keywords/${keywordId}`)
   }
 
-  // 4. 오버레이 차트 데이터 (price_data에서 직접 사용)
-  const overlayChartData = (overlay.price_data || []).map(p => ({
-    date: p.date,
-    normalizedPrice: p.price,
-    rawPrice: p.price,
-  }))
+  // 4. 오버레이 차트 시계열 조회
+  const overlayChartData = await getOverlayChartTimeseries(overlayId, supabase)
 
   return (
     <OverlayDetailClient
