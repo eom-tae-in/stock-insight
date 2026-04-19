@@ -156,7 +156,10 @@ export interface StockProvider {
 `keyword_stock_overlays`
 
 - analysis별 종목 오버레이.
-- unique: `(analysis_id, search_id)`.
+- `searches`와 독립적인 키워드 분석 전용 오버레이 메타데이터.
+- 필수 필드: `analysis_id`, `ticker`, `company_name`, `display_order`.
+- 선택 필드: `exchange`, `currency`, `provider`, `last_refreshed_at`.
+- unique: `(analysis_id, ticker)`.
 
 `overlay_chart_timeseries`
 
@@ -171,6 +174,7 @@ export interface StockProvider {
 - `keyword_chart_timeseries`
 - `keyword_temporary_overlays`
 - `keyword_stock_overlays.keyword_search_id`
+- `keyword_stock_overlays.search_id`
 
 마이그레이션 기간에는 legacy read만 허용하고, 신규 write는 목표 테이블로만 수행한다.
 

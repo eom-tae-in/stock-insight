@@ -157,6 +157,7 @@ legacy:
 ### Analysis Overlays
 
 오버레이는 반드시 analysis 하위 리소스다.
+키워드 분석 오버레이는 저장 종목 리소스가 아니므로 `search_id`를 요구하지 않는다. 클라이언트는 실제 시장 데이터 검색 결과의 `ticker`, `companyName`, 필요 시 `currency`/`exchange`를 전달하고, 서버는 analysis 소유권과 `(analysisId, ticker)` 중복만 검증한다.
 
 목표:
 
