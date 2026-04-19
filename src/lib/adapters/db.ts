@@ -435,13 +435,14 @@ class SupabaseDbAdapter implements DbAdapter {
     client?: SupabaseClient
   ): Promise<string> {
     const supabase = client ?? getSupabaseClient()
+    const keywordName = record.keyword.trim()
 
     const { data, error } = await supabase
       .from('keyword_searches')
       .upsert(
         {
           user_id: record.user_id,
-          keyword: record.keyword.trim(),
+          keyword: keywordName,
           region: record.region,
           search_type: record.search_type,
           searched_at: record.searched_at,
@@ -453,6 +454,18 @@ class SupabaseDbAdapter implements DbAdapter {
       .single()
 
     if (error) throw error
+
+    const { error: keywordError } = await supabase.from('keywords').upsert(
+      {
+        id: data.id,
+        user_id: record.user_id,
+        name: keywordName,
+      },
+      { onConflict: 'id' }
+    )
+
+    if (keywordError) throw keywordError
+
     return data.id
   }
 
