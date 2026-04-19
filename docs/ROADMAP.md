@@ -57,6 +57,7 @@
 
 - 누락 테이블을 제거하거나 정식 마이그레이션으로 추가한다.
 - `keyword_stock_overlays`가 `analysis_id` 기준으로만 동작하게 정리한다.
+- 키워드 오버레이가 `searches`에 의존하지 않도록 `search_id` FK를 제거하고 `(analysis_id, ticker)` 기준으로 중복을 막는다.
 - legacy 데이터를 목표 스키마로 이동하는 SQL을 작성한다.
 
 수락 기준:

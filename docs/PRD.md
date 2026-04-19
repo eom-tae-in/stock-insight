@@ -114,6 +114,8 @@ StockInsight는 개인 투자자가 특정 종목의 가격 흐름과 대중 검
 
 - 키워드 분석 하나에 여러 종목을 오버레이할 수 있다.
 - 오버레이는 `analysis_id` 기준으로 저장한다.
+- 사용자는 저장된 종목 목록과 무관하게 실제 존재하는 종목 심볼을 검색해 오버레이할 수 있다.
+- 키워드 분석에서 추가한 종목은 키워드 분석 도메인 안에서만 저장되며, `searches`의 사용자 저장 종목으로 자동 등록하지 않는다.
 - 같은 분석 안에서 같은 종목은 중복 추가할 수 없다.
 - 사용자는 오버레이 순서를 변경하고 삭제할 수 있다.
 - 오버레이 시계열은 트렌드 차트 날짜 축과 정렬 가능한 형태여야 한다.
@@ -165,6 +167,7 @@ auth.users
 - `keywords.user_id = auth.uid()`
 - `keyword_analysis`는 `keywords.user_id`를 통해 소유권을 검증한다.
 - `keyword_stock_overlays`는 `keyword_analysis -> keywords.user_id`를 통해 소유권을 검증한다.
+- `keyword_stock_overlays`는 `searches` 소유권에 의존하지 않는다. 키워드 오버레이 종목은 실제 시장 데이터 조회 결과를 기준으로 저장한다.
 
 ## 8. 품질 요구사항
 
