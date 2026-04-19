@@ -121,6 +121,7 @@ Supabase Auth callback은 유지한다.
 ### Keywords
 
 목표 모델은 `keywords`와 `keyword_analysis`를 분리한다.
+키워드 중복 판단은 `trim + 연속 공백 1개 축소` 기준으로만 수행한다. 대소문자, 언어, 내부 단어 구분은 사용자의 검색 의도로 보고 보존한다.
 
 목표:
 

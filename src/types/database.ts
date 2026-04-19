@@ -103,6 +103,7 @@ export interface KeywordSearchRecord {
   id: string // UUID
   user_id: string // 사용자 UUID (OAuth 로그인한 사용자)
   keyword: string // Google Trends 검색어
+  normalized_keyword?: string // 공백 정규화 중복 체크용 키워드
   region: Region // 지역
   search_type: SearchType // 검색 타입
   ma13?: number // 트렌드 지수 기반 13주 이동평균 (0-100)
@@ -121,6 +122,7 @@ export interface KeywordSearchRecordRaw {
   id: string
   user_id: string
   keyword: string
+  normalized_keyword?: string
   region: Region // 지역
   search_type: SearchType // 검색 타입
   ma13?: number
@@ -188,6 +190,7 @@ export type SearchType = 'WEB' | 'YOUTUBE'
 export interface Keyword {
   id: string // UUID
   name: string // 키워드 이름 (예: "축구")
+  normalized_name?: string // 공백 정규화 중복 체크용 이름
   created_at: string // ISO 8601 타임스탬프
 }
 

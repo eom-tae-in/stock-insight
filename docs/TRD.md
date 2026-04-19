@@ -147,6 +147,8 @@ export interface StockProvider {
 
 - 사용자별 키워드 이름 컨테이너.
 - unique: `(user_id, normalized_name)`.
+- `normalized_name`은 앞뒤 공백 제거와 연속 공백 축소만 적용한다.
+- 대소문자, 언어, 내부 단어 구분은 보존한다.
 
 `keyword_analysis`
 
@@ -341,6 +343,7 @@ PR 수락 기준:
 - `TRENDS_API_URL` 포트와 Flask 실행 포트 불일치.
 - Trends 수집 경로가 Python script, Flask, Next API로 분산.
 - legacy route 이름이 `/api/keyword-searches`에 남아 있음.
+- 키워드 정규화 정책 적용 후 Supabase migration 반영 필요.
 - 일부 DB 조회가 코드상 `user_id` 필터를 명시하지 않음.
 - React hook dependency 경고와 unused handler가 누적됨.
 - 프로덕션 에러 화면에서 내부 메시지 노출 가능성.

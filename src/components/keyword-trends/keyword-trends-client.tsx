@@ -13,6 +13,7 @@ import type {
 import { calculateTrendsMA13, calculateTrendsYoY } from '@/lib/indicators'
 import { apiFetch, apiFetchJson } from '@/lib/fetch-client'
 import { filterTrendsForTimeframe } from '@/lib/trends-filter'
+import { normalizeKeywordSpacing } from '@/lib/utils/keyword-normalization'
 import KeywordTrendsChart from './keyword-trends-chart'
 import {
   TIMEFRAMES,
@@ -302,7 +303,7 @@ export default function KeywordTrendsClient() {
   // 키워드로 트렌드 조회 — 아키텍처 변경: 5y 단일 fetch
   // URL 파라미터에서 받은 값으로 검색 수행 (자동 검색용)
   const performSearch = async (keyword: string, geo: string, gprop: string) => {
-    const trimmedKeyword = keyword.trim()
+    const trimmedKeyword = normalizeKeywordSpacing(keyword)
     if (!trimmedKeyword) return
 
     setState(prev => ({ ...prev, isLoading: true }))
@@ -353,7 +354,7 @@ export default function KeywordTrendsClient() {
 
   // 키워드 단독 저장 (차트 데이터 포함)
   const handleSaveKeyword = async () => {
-    const trimmedKeyword = state.keyword.trim()
+    const trimmedKeyword = normalizeKeywordSpacing(state.keyword)
     if (!trimmedKeyword) {
       toast.error('키워드를 입력하세요')
       return
@@ -408,7 +409,7 @@ export default function KeywordTrendsClient() {
 
   // 키워드 + 종목 조합 저장 (차트 데이터 포함)
   const handleSaveCustomChart = async () => {
-    const trimmedKeyword = state.keyword.trim()
+    const trimmedKeyword = normalizeKeywordSpacing(state.keyword)
     if (!trimmedKeyword) {
       toast.error('키워드를 입력하세요')
       return
@@ -499,7 +500,7 @@ export default function KeywordTrendsClient() {
   }
 
   const handleSearchKeyword = async () => {
-    const trimmedKeyword = state.keyword.trim()
+    const trimmedKeyword = normalizeKeywordSpacing(state.keyword)
     if (!trimmedKeyword) {
       toast.error('키워드를 입력하세요')
       return

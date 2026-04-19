@@ -24,6 +24,7 @@ import type {
 } from '@/types/database'
 import { getSupabaseClient } from '@/lib/supabase'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { normalizeKeywordSpacing } from '@/lib/utils/keyword-normalization'
 
 export interface DbAdapter {
   // ============ searches (종목) ============
@@ -466,7 +467,7 @@ class SupabaseDbAdapter implements DbAdapter {
     client?: SupabaseClient
   ): Promise<string> {
     const supabase = client ?? getSupabaseClient()
-    const keywordName = record.keyword.trim()
+    const keywordName = normalizeKeywordSpacing(record.keyword)
 
     const { data, error } = await supabase
       .from('keyword_searches')
@@ -474,12 +475,13 @@ class SupabaseDbAdapter implements DbAdapter {
         {
           user_id: record.user_id,
           keyword: keywordName,
+          normalized_keyword: keywordName,
           region: record.region,
           search_type: record.search_type,
           searched_at: record.searched_at,
           updated_at: new Date().toISOString(),
         },
-        { onConflict: 'user_id,keyword,region,search_type' }
+        { onConflict: 'user_id,normalized_keyword,region,search_type' }
       )
       .select('id')
       .single()
@@ -491,6 +493,7 @@ class SupabaseDbAdapter implements DbAdapter {
         id: data.id,
         user_id: record.user_id,
         name: keywordName,
+        normalized_name: keywordName,
       },
       { onConflict: 'id' }
     )
@@ -533,11 +536,12 @@ class SupabaseDbAdapter implements DbAdapter {
     client?: SupabaseClient
   ): Promise<KeywordSearchRecord | null> {
     const supabase = client ?? getSupabaseClient()
+    const normalizedKeyword = normalizeKeywordSpacing(keyword)
 
     const { data, error } = await supabase
       .from('keyword_searches')
       .select('*')
-      .eq('keyword', keyword)
+      .eq('normalized_keyword', normalizedKeyword)
       .single()
 
     if (error) return null

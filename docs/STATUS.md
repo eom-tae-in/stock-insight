@@ -235,7 +235,7 @@ DB 테이블:
 ### 즉시 확인해야 할 스키마 위험
 
 1. legacy route 이름은 아직 `/api/keyword-searches`에 남아 있다.
-2. `keywords.name`은 존재하지만 normalized name unique 정책이 아직 명확하지 않다.
+2. 키워드 공백 정규화 unique 마이그레이션은 작성됐고, DB 적용 전에는 새 컬럼을 사용할 수 없다.
 
 ## 4. 현재 라우트 구조 문제
 
