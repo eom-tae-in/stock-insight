@@ -895,6 +895,18 @@ class SupabaseDbAdapter implements DbAdapter {
   ): Promise<KeywordAnalysis | null> {
     const supabase = client ?? getSupabaseClient()
 
+    if (userId) {
+      const { data: keywordOwner, error: keywordError } = await supabase
+        .from('keywords')
+        .select('id')
+        .eq('id', keywordId)
+        .eq('user_id', userId)
+        .single()
+
+      if (keywordError && keywordError.code !== 'PGRST116') throw keywordError
+      if (!keywordOwner) return null
+    }
+
     const { data, error } = await supabase
       .from('keyword_analysis')
       .select('*')
@@ -929,7 +941,7 @@ class SupabaseDbAdapter implements DbAdapter {
 
     const { data, error } = await supabase
       .from('keyword_analysis')
-      .select('*, keywords(user_id)')
+      .select('*, keywords!inner(user_id)')
       .eq('keywords.user_id', userId)
 
     if (error) throw error
