@@ -56,6 +56,22 @@ async function isOwnedAnalysis(
   return Boolean(keyword)
 }
 
+async function isOwnedSearch(
+  supabase: SupabaseClient,
+  searchId: string,
+  userId: string
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('searches')
+    .select('id')
+    .eq('id', searchId)
+    .eq('user_id', userId)
+    .single()
+
+  if (error && error.code !== 'PGRST116') throw error
+  return Boolean(data)
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ analysisId: string }> }
@@ -143,6 +159,11 @@ export async function POST(
         'Analysis를 찾을 수 없습니다.',
         404
       )
+    }
+
+    const ownsSearch = await isOwnedSearch(supabase, search_id, userId)
+    if (!ownsSearch) {
+      return createErrorResponse('NOT_FOUND', '종목을 찾을 수 없습니다.', 404)
     }
 
     // 최대 display_order 조회
