@@ -34,6 +34,7 @@ import {
   validateApiAuth,
   createSuccessResponse,
 } from '@/lib/api-helpers'
+import { normalizeKeywordSpacing } from '@/lib/utils/keyword-normalization'
 
 export const dynamic = 'force-dynamic'
 
@@ -100,15 +101,17 @@ export async function POST(request: NextRequest) {
       }>
     } = body
 
+    const normalizedKeyword = normalizeKeywordSpacing(keyword || '')
+
     // 유효성 검사 (keyword만 필수)
-    if (!keyword || keyword.trim().length === 0) {
+    if (!normalizedKeyword) {
       return createErrorResponse('INVALID_INPUT', '키워드가 필요합니다.', 400)
     }
 
     // 1. 키워드 저장
     console.log(
       '[POST keyword-searches] Saving keyword:',
-      keyword,
+      normalizedKeyword,
       ', region:',
       region,
       ', search_type:',
@@ -118,7 +121,7 @@ export async function POST(request: NextRequest) {
       {
         id: '',
         user_id: userId,
-        keyword,
+        keyword: normalizedKeyword,
         region,
         search_type,
         trends_data: [],
@@ -201,7 +204,7 @@ export async function POST(request: NextRequest) {
     return createSuccessResponse(
       {
         id: keywordSearchId,
-        keyword,
+        keyword: normalizedKeyword,
       },
       201
     )

@@ -10,6 +10,7 @@ import { callPyTrendsAPI } from '@/lib/services/trends-service'
 import { calculateTrendsMA13 } from '@/lib/indicators'
 import { createErrorResponse, createSuccessResponse } from '@/lib/api-helpers'
 import type { TrendsDataPoint } from '@/types/database'
+import { normalizeKeywordSpacing } from '@/lib/utils/keyword-normalization'
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
       return createErrorResponse('INVALID_KEYWORD', '키워드를 입력하세요.', 400)
     }
 
-    const trimmedKeyword = keyword.trim()
+    const trimmedKeyword = normalizeKeywordSpacing(keyword)
     if (!trimmedKeyword || trimmedKeyword.length > 100) {
       return createErrorResponse(
         'INVALID_KEYWORD',

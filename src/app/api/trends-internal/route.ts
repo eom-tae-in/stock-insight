@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import path from 'path'
+import { normalizeKeywordSpacing } from '@/lib/utils/keyword-normalization'
 
 const execFileAsync = promisify(execFile)
 
@@ -66,14 +67,16 @@ export async function GET(request: NextRequest) {
     const timeframe = request.nextUrl.searchParams.get('timeframe') || '5y'
     const gprop = request.nextUrl.searchParams.get('gprop') || ''
 
-    if (!keyword || keyword.trim().length === 0) {
+    const normalizedKeyword = normalizeKeywordSpacing(keyword)
+
+    if (!normalizedKeyword) {
       return NextResponse.json(
         { error: 'Keyword is required' },
         { status: 400 }
       )
     }
 
-    return await getTrendsData(keyword, geo, timeframe, gprop)
+    return await getTrendsData(normalizedKeyword, geo, timeframe, gprop)
   } catch (error) {
     console.error('trends-internal GET error:', error)
     return NextResponse.json([], { status: 200 })
@@ -85,14 +88,16 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { keyword, geo = '', timeframe = '5y', gprop = '' } = body
 
-    if (!keyword || keyword.trim().length === 0) {
+    const normalizedKeyword = normalizeKeywordSpacing(keyword || '')
+
+    if (!normalizedKeyword) {
       return NextResponse.json(
         { error: 'Keyword is required' },
         { status: 400 }
       )
     }
 
-    return await getTrendsData(keyword, geo, timeframe, gprop)
+    return await getTrendsData(normalizedKeyword, geo, timeframe, gprop)
   } catch (error) {
     console.error('trends-internal POST error:', error)
     return NextResponse.json([], { status: 200 })

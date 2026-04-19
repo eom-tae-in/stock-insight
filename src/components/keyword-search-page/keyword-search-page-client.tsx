@@ -15,6 +15,7 @@ import {
   type Timeframe,
 } from '@/lib/constants/trends'
 import type { KeywordSearchRecord } from '@/types/database'
+import { normalizeKeywordSpacing } from '@/lib/utils/keyword-normalization'
 
 export default function KeywordSearchPageClient() {
   const router = useRouter()
@@ -28,7 +29,7 @@ export default function KeywordSearchPageClient() {
   const [isLoading, setIsLoading] = useState(false)
 
   const handleSearch = async () => {
-    const trimmedKeyword = keyword.trim()
+    const trimmedKeyword = normalizeKeywordSpacing(keyword)
     if (!trimmedKeyword) {
       toast.error('키워드를 입력해주세요')
       return
@@ -50,7 +51,7 @@ export default function KeywordSearchPageClient() {
 
       const existingKeyword = keywords.find(
         (k: KeywordSearchRecord) =>
-          k.keyword.toLowerCase() === trimmedKeyword.toLowerCase()
+          normalizeKeywordSpacing(k.keyword) === trimmedKeyword
       )
 
       // 2단계: 기존 키워드가 있으면 상세 페이지로 이동
