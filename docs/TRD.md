@@ -173,7 +173,6 @@ export interface StockProvider {
 - `keyword_searches`
 - `keyword_chart_timeseries`
 - `keyword_temporary_overlays`
-- `keyword_stock_overlays.keyword_search_id`
 
 마이그레이션 기간에는 legacy read만 허용하고, 신규 write는 목표 테이블로만 수행한다.
 
