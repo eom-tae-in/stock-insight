@@ -151,26 +151,6 @@ export const getKeywordStockOverlays = async (
 ): Promise<KeywordStockOverlay[]> =>
   db.getKeywordStockOverlays(keywordSearchId, client)
 
-export const getKeywordTemporaryOverlays = async (
-  keywordSearchId: string,
-  client?: SupabaseClient
-): Promise<
-  Array<{
-    id: string
-    ticker: string
-    companyName: string
-    displayOrder: number
-    chartData: Array<{ date: string; normalizedPrice: number; rawPrice: number }>
-  }>
-> => db.getKeywordTemporaryOverlays(keywordSearchId, client)
-
-export const getKeywordTemporaryOverlay = async (
-  keywordSearchId: string,
-  overlayId: string,
-  client?: SupabaseClient
-): Promise<{ id: string; ticker: string; company_name: string; price_data: Array<{ date: string; price: number }> } | null> =>
-  db.getKeywordTemporaryOverlay(keywordSearchId, overlayId, client)
-
 export const removeStockOverlay = async (
   overlayId: string,
   client?: SupabaseClient

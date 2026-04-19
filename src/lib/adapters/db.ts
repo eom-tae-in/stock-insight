@@ -161,25 +161,6 @@ export interface DbAdapter {
     client?: SupabaseClient
   ): Promise<KeywordStockOverlay[]>
 
-  getKeywordTemporaryOverlays(
-    keywordSearchId: string,
-    client?: SupabaseClient
-  ): Promise<
-    Array<{
-      id: string
-      ticker: string
-      companyName: string
-      displayOrder: number
-      chartData: Array<{ date: string; normalizedPrice: number; rawPrice: number }>
-    }>
-  >
-
-  getKeywordTemporaryOverlay(
-    keywordSearchId: string,
-    overlayId: string,
-    client?: SupabaseClient
-  ): Promise<{ id: string; ticker: string; company_name: string; price_data: Array<{ date: string; price: number }> } | null>
-
   removeStockOverlay(
     overlayId: string,
     client?: SupabaseClient
@@ -787,70 +768,6 @@ class SupabaseDbAdapter implements DbAdapter {
       display_order: row.display_order,
       created_at: row.created_at,
     }))
-  }
-
-  // 임시 오버레이 목록 조회 (keyword_temporary_overlays)
-  async getKeywordTemporaryOverlays(
-    keywordSearchId: string,
-    client?: SupabaseClient
-  ): Promise<
-    Array<{
-      id: string
-      ticker: string
-      companyName: string
-      displayOrder: number
-      chartData: Array<{ date: string; normalizedPrice: number; rawPrice: number }>
-    }>
-  > {
-    const supabase = client ?? getSupabaseClient()
-
-    const { data, error } = await supabase
-      .from('keyword_temporary_overlays')
-      .select('*')
-      .eq('keyword_search_id', keywordSearchId)
-      .order('display_order', { ascending: true })
-
-    if (error) throw error
-
-    return (data || []).map(row => ({
-      id: row.id,
-      ticker: row.ticker,
-      companyName: row.company_name,
-      displayOrder: row.display_order,
-      chartData: (row.price_data || []).map(
-        (p: { date: string; price: number }) => ({
-          date: p.date,
-          normalizedPrice: p.price,
-          rawPrice: p.price,
-        })
-      ),
-    }))
-  }
-
-  // 임시 오버레이 단건 조회 (keyword_temporary_overlays)
-  async getKeywordTemporaryOverlay(
-    keywordSearchId: string,
-    overlayId: string,
-    client?: SupabaseClient
-  ): Promise<{ id: string; ticker: string; company_name: string; price_data: Array<{ date: string; price: number }> } | null> {
-    const supabase = client ?? getSupabaseClient()
-
-    const { data, error } = await supabase
-      .from('keyword_temporary_overlays')
-      .select('*')
-      .eq('keyword_search_id', keywordSearchId)
-      .eq('id', overlayId)
-      .single()
-
-    if (error && error.code !== 'PGRST116') throw error
-    if (!data) return null
-
-    return {
-      id: data.id,
-      ticker: data.ticker,
-      company_name: data.company_name,
-      price_data: data.price_data || [],
-    }
   }
 
   async removeStockOverlay(

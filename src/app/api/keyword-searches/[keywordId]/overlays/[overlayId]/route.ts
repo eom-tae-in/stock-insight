@@ -10,6 +10,7 @@ import {
   validateApiAuth,
   createSuccessResponse,
 } from '@/lib/api-helpers'
+import { getKeywordStockOverlays, removeStockOverlay } from '@/lib/db/queries'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,20 +26,26 @@ export async function DELETE(
       return authResult
     }
 
-    const { overlayId } = await params
+    const { keywordId, overlayId } = await params
 
-    if (!overlayId || overlayId.length === 0) {
+    if (!keywordId || !overlayId || overlayId.length === 0) {
       return createErrorResponse('INVALID_ID', '유효하지 않은 ID입니다.', 400)
     }
 
-    // 임시 오버레이 삭제
-    const { error: deleteError } = await supabase
-      .from('keyword_temporary_overlays')
-      .delete()
-      .eq('id', overlayId)
+    const overlays = await getKeywordStockOverlays(keywordId, supabase)
+    const targetOverlay = overlays.find(overlay => overlay.id === overlayId)
 
-    if (deleteError) {
-      console.error('Delete error:', deleteError)
+    if (!targetOverlay) {
+      return createErrorResponse(
+        'NOT_FOUND',
+        '오버레이를 찾을 수 없습니다.',
+        404
+      )
+    }
+
+    const deleted = await removeStockOverlay(overlayId, supabase)
+
+    if (!deleted) {
       return createErrorResponse(
         'DELETE_FAILED',
         '오버레이를 삭제하지 못했습니다.',
