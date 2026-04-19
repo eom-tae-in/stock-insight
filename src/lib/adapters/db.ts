@@ -965,6 +965,36 @@ class SupabaseDbAdapter implements DbAdapter {
     client?: SupabaseClient
   ): Promise<string> {
     const supabase = client ?? getSupabaseClient()
+    const trendsData = data.trends_data || []
+
+    const { data: existing, error: existingError } = await supabase
+      .from('keyword_analysis')
+      .select('id')
+      .eq('keyword_id', data.keyword_id)
+      .eq('region', data.region)
+      .eq('period', data.period)
+      .eq('search_type', data.search_type)
+      .single()
+
+    if (existingError && existingError.code !== 'PGRST116') throw existingError
+
+    if (existing) {
+      if (trendsData.length === 0) {
+        return existing.id
+      }
+
+      const { error } = await supabase
+        .from('keyword_analysis')
+        .update({
+          trends_data: trendsData,
+          ma13_data: data.ma13_data,
+          yoy_data: data.yoy_data,
+        })
+        .eq('id', existing.id)
+
+      if (error) throw error
+      return existing.id
+    }
 
     const { data: result, error } = await supabase
       .from('keyword_analysis')
@@ -973,7 +1003,7 @@ class SupabaseDbAdapter implements DbAdapter {
         region: data.region,
         period: data.period,
         search_type: data.search_type,
-        trends_data: data.trends_data || [],
+        trends_data: trendsData,
         ma13_data: data.ma13_data,
         yoy_data: data.yoy_data,
       })
