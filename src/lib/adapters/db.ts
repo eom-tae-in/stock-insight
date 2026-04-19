@@ -224,6 +224,57 @@ export interface DbAdapter {
 // ============================================================================
 
 class SupabaseDbAdapter implements DbAdapter {
+  private async getDefaultKeywordAnalysisId(
+    keywordId: string,
+    client?: SupabaseClient
+  ): Promise<string> {
+    const supabase = client ?? getSupabaseClient()
+
+    const { data: existingAnalysis, error: existingError } = await supabase
+      .from('keyword_analysis')
+      .select('id')
+      .eq('keyword_id', keywordId)
+      .eq('region', 'GLOBAL')
+      .eq('period', '5Y')
+      .eq('search_type', 'WEB')
+      .single()
+
+    if (existingError && existingError.code !== 'PGRST116') {
+      throw existingError
+    }
+
+    if (existingAnalysis) return existingAnalysis.id
+
+    const { data: createdAnalysis, error: createError } = await supabase
+      .from('keyword_analysis')
+      .insert({
+        keyword_id: keywordId,
+        region: 'GLOBAL',
+        period: '5Y',
+        search_type: 'WEB',
+        trends_data: [],
+      })
+      .select('id')
+      .single()
+
+    if (createError?.code === '23505') {
+      const { data: racedAnalysis, error: racedError } = await supabase
+        .from('keyword_analysis')
+        .select('id')
+        .eq('keyword_id', keywordId)
+        .eq('region', 'GLOBAL')
+        .eq('period', '5Y')
+        .eq('search_type', 'WEB')
+        .single()
+
+      if (racedError) throw racedError
+      return racedAnalysis.id
+    }
+
+    if (createError) throw createError
+    return createdAnalysis.id
+  }
+
   // ============ searches ============
 
   async upsertSearch(
@@ -676,18 +727,34 @@ class SupabaseDbAdapter implements DbAdapter {
     client?: SupabaseClient
   ): Promise<string> {
     const supabase = client ?? getSupabaseClient()
+    const analysisId = await this.getDefaultKeywordAnalysisId(
+      keywordSearchId,
+      supabase
+    )
+    const normalizedTicker = ticker.trim().toUpperCase()
 
     const { data, error } = await supabase
       .from('keyword_stock_overlays')
       .insert({
-        keyword_search_id: keywordSearchId,
-        search_id: searchId,
-        ticker,
-        company_name: companyName,
+        analysis_id: analysisId,
+        ticker: normalizedTicker,
+        company_name: companyName.trim() || normalizedTicker,
         display_order: displayOrder,
       })
       .select('id')
       .single()
+
+    if (error?.code === '23505') {
+      const { data: existingOverlay, error: existingError } = await supabase
+        .from('keyword_stock_overlays')
+        .select('id')
+        .eq('analysis_id', analysisId)
+        .eq('ticker', normalizedTicker)
+        .single()
+
+      if (existingError) throw existingError
+      return existingOverlay.id
+    }
 
     if (error) throw error
     return data.id
@@ -698,19 +765,23 @@ class SupabaseDbAdapter implements DbAdapter {
     client?: SupabaseClient
   ): Promise<KeywordStockOverlay[]> {
     const supabase = client ?? getSupabaseClient()
+    const analysisId = await this.getDefaultKeywordAnalysisId(
+      keywordSearchId,
+      supabase
+    )
 
     const { data, error } = await supabase
       .from('keyword_stock_overlays')
       .select('*')
-      .eq('keyword_search_id', keywordSearchId)
+      .eq('analysis_id', analysisId)
       .order('display_order', { ascending: true })
 
     if (error) throw error
 
     return (data || []).map(row => ({
       id: row.id,
-      keyword_search_id: row.keyword_search_id,
-      search_id: row.search_id,
+      keyword_search_id: keywordSearchId,
+      search_id: row.search_id ?? null,
       ticker: row.ticker,
       company_name: row.company_name,
       display_order: row.display_order,
@@ -851,7 +922,7 @@ class SupabaseDbAdapter implements DbAdapter {
 
     const { error } = await supabase
       .from('overlay_chart_timeseries')
-      .insert(records)
+      .upsert(records, { onConflict: 'overlay_id,date' })
 
     if (error) throw error
   }
