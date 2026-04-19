@@ -49,8 +49,6 @@ export async function GET(
     const formattedOverlays = await Promise.all(
       overlays.map(async overlay => ({
         id: overlay.id,
-        keyword_search_id: keywordId,
-        search_id: overlay.search_id ?? null,
         ticker: overlay.ticker,
         company_name: overlay.company_name,
         companyName: overlay.company_name,
@@ -110,7 +108,6 @@ export async function POST(
 
     const overlayId = await addStockOverlay(
       keywordId,
-      '',
       tickerUpper,
       companyName,
       0,

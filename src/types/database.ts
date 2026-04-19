@@ -137,8 +137,6 @@ export interface KeywordSearchRecordRaw {
  */
 export interface KeywordStockOverlay {
   id: string // UUID
-  keyword_search_id?: string | null // legacy: keyword_searches.id
-  search_id?: string | null // legacy: searches.id
   ticker: string // 종목 심볼 (예: AAPL)
   company_name: string // 회사명 (예: Apple Inc.)
   display_order: number // 그래프에서 표시할 순서
@@ -265,7 +263,6 @@ export interface KeywordAnalysisRaw {
 export interface KeywordAnalysisOverlay {
   id: string // UUID
   analysis_id: string // keyword_analysis.id 참조 (★keyword_id 아님)
-  search_id?: string | null // legacy: 최종 cleanup 마이그레이션에서 제거 예정
   ticker: string // 종목 심볼 (예: AAPL)
   company_name: string // 회사명 (예: Apple Inc.)
   display_order: number // 그래프에서 표시할 순서

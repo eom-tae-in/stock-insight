@@ -130,7 +130,6 @@ export const getKeywordChartTimeseries = async (
 // ============ keyword_stock_overlays (오버레이) ============
 export const addStockOverlay = async (
   keywordSearchId: string,
-  searchId: string,
   ticker: string,
   companyName: string,
   displayOrder?: number,
@@ -138,7 +137,6 @@ export const addStockOverlay = async (
 ): Promise<string> =>
   db.addStockOverlay(
     keywordSearchId,
-    searchId,
     ticker,
     companyName,
     displayOrder,
