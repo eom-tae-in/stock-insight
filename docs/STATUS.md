@@ -236,6 +236,7 @@ DB 테이블:
 
 1. legacy route 이름은 아직 `/api/keyword-searches`에 남아 있다.
 2. 키워드 공백 정규화 unique 마이그레이션은 작성됐고, DB 적용 전에는 새 컬럼을 사용할 수 없다.
+3. `docs/sql/20260421_keyword_normalized_names_precheck.sql`로 기존 중복 후보를 먼저 확인한다.
 
 ## 4. 현재 라우트 구조 문제
 
