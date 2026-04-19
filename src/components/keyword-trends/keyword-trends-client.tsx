@@ -360,6 +360,8 @@ export default function KeywordTrendsClient() {
         method: 'POST',
         body: JSON.stringify({
           keyword: trimmedKeyword,
+          region: 'GLOBAL',
+          search_type: 'WEB',
           geo: state.geo,
           gprop: state.gprop,
           chartData, // 차트 데이터 포함
@@ -421,6 +423,8 @@ export default function KeywordTrendsClient() {
         method: 'POST',
         body: JSON.stringify({
           keyword: trimmedKeyword,
+          region: 'GLOBAL',
+          search_type: 'WEB',
           geo: state.geo,
           gprop: state.gprop,
           chartData, // 차트 데이터 포함
@@ -712,6 +716,8 @@ export default function KeywordTrendsClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           keyword: state.keyword,
+          region: 'GLOBAL',
+          search_type: 'WEB',
           chartData,
           overlays: overlaysData,
         }),

@@ -1,531 +1,299 @@
-# StockInsight MVP 개발 로드맵
-
-특정 종목의 5년 가격 흐름과 Google Trends 검색 관심도를 비교하여 투자 판단을 지원하는 로컬 분석 도구
-
-## 개요
-
-StockInsight은 개인 투자자를 위한 로컬 주식 분석 도구로 다음 기능을 제공합니다:
-
-- **주가 및 트렌드 수집**: Yahoo Finance 5년 주간 주가 + SerpAPI Google Trends 검색 관심도 수집
-- **시각적 분석**: 주가+MA13 차트, Trends 차트, 주가 vs 트렌드 비교 차트 3종 제공
-- **로컬 데이터 관리**: better-sqlite3 기반 SQLite DB에 종목 데이터 저장/조회/삭제/갱신
-- **Supabase 마이그레이션**: SQLite에서 Supabase(PostgreSQL)로 점진적 무중단 전환
-
-## 개발 워크플로우
-
-1. **작업 계획**
-   - 기존 코드베이스를 학습하고 현재 상태를 파악
-   - 새로운 작업을 포함하도록 `ROADMAP.md` 업데이트
-   - 우선순위 작업은 마지막 완료된 작업 다음에 삽입
-
-2. **작업 생성**
-   - 기존 코드베이스를 학습하고 현재 상태를 파악
-   - `/tasks` 디렉토리에 새 작업 파일 생성
-   - 명명 형식: `XXX-description.md` (예: `001-setup.md`)
-   - 고수준 명세서, 관련 파일, 수락 기준, 구현 단계 포함
-   - API/비즈니스 로직 작업 시 "## 테스트 체크리스트" 섹션 필수 포함 (Playwright MCP 테스트 시나리오 작성)
-   - 예시를 위해 `/tasks` 디렉토리의 마지막 완료된 작업 참조. 예를 들어, 현재 작업이 `012`라면 `011`과 `010`을 예시로 참조.
-   - 이러한 예시들은 완료된 작업이므로 내용이 완료된 작업의 최종 상태를 반영함 (체크된 박스와 변경 사항 요약). 새 작업의 경우, 문서에는 빈 박스와 변경 사항 요약이 없어야 함. 초기 상태의 샘플로 `000-sample.md` 참조.
-
-3. **작업 구현**
-   - 작업 파일의 명세서를 따름
-   - 기능과 기능성 구현
-   - API 연동 및 비즈니스 로직 구현 시 Playwright MCP로 테스트 수행 필수
-   - 각 단계 후 작업 파일 내 단계 진행 상황 업데이트
-   - 구현 완료 후 Playwright MCP를 사용한 E2E 테스트 실행
-   - 테스트 통과 확인 후 다음 단계로 진행
-   - 각 단계 완료 후 중단하고 추가 지시를 기다림
-
-4. **로드맵 업데이트**
-   - 로드맵에서 완료된 작업을 체크 표시로 변경
-
----
-
-## MVP 개발 단계
-
-### Phase 1: 애플리케이션 골격 구축 ✅ -- 완료
-
-> 라우팅, 레이아웃, 기본 UI 컴포넌트 골격이 이미 구성되어 있음.
-> 이 Phase에서는 나머지 타입 정의, DB 스키마 설계, 환경 설정을 완료한다.
-
-- **Task 001: 타입 정의 및 인터페이스 설계** ✅ -- 완료
-  - ✅ `src/types/` 디렉토리에 전체 TypeScript 타입/인터페이스 정의
-  - ✅ `StockSearch`, `PriceData`, `TrendsData` DB 모델 타입 정의
-  - ✅ `StockData`, `TrendsDataPoint`, `CalculatedMetrics` API 응답 DTO 타입 정의
-  - ✅ 차트 데이터 타입 (`PriceChartData`, `TrendsChartData`, `ComparisonChartData`) 정의
-  - ✅ 공통 API 응답 래퍼 타입 (`ApiResponse<T>`, `ApiError`) 정의
-
-- **Task 002: 데이터베이스 스키마 및 초기화 설정** ✅ -- 완료
-  - ✅ `src/lib/db.ts`에 better-sqlite3 싱글턴 인스턴스 생성 로직 구현
-  - ✅ `PRAGMA foreign_keys = ON` 설정 포함
-  - ✅ `searches`, `price_data`, `trends_data` 테이블 CREATE TABLE IF NOT EXISTS DDL 작성
-  - ✅ `(search_id, date)` 복합 인덱스 생성
-  - ✅ `next.config.ts`에 `serverExternalPackages: ['better-sqlite3']` 추가
-  - ✅ `data/` 디렉토리 생성 및 `.gitignore`에 `data/*.db` 추가
-
-- **Task 003: 환경 변수 및 프로젝트 설정** ✅ -- 완료
-  - ✅ `.env.local` 및 `.env.example` 파일 구성 (`SERPAPI_KEY`)
-  - ✅ `src/lib/env.ts` 환경 변수 검증 유틸리티 구현
-  - ✅ 필요한 npm 패키지 설치 (`better-sqlite3`, `yahoo-finance2`, `date-fns`, `recharts`, `xlsx`, `html-to-image`)
-  - ✅ `@types/better-sqlite3` 개발 의존성 추가
-
----
-
-### Phase 2: UI/UX 완성 (더미 데이터 활용) ✅ -- 완료
-
-> 모든 페이지의 UI를 더미 데이터로 완성하여 전체 사용자 플로우를 체험할 수 있도록 한다.
-> 이 단계에서는 실제 API 호출이나 DB 연동 없이, 하드코딩된 데이터로 화면을 구성한다.
-
-- **Task 004: 더미 데이터 및 목업 유틸리티 작성** ✅ -- 완료
-  - ✅ `src/lib/mock-data.ts`에 더미 데이터 생성 함수 구현
-  - ✅ 5년치 주간 주가 더미 데이터 (260개 데이터포인트) 생성
-  - ✅ 5년치 주간 트렌드 더미 데이터 (260개 데이터포인트) 생성
-  - ✅ MA13, YoY, 52주 최고/최저가 등 계산 지표 더미 데이터 포함
-  - ✅ 저장된 종목 목록 더미 데이터 (3-5개 종목) 생성
-
-- **Task 005: 대시보드 페이지 UI 구현 (F014, F015, F016)** ✅ -- 완료
-  - ✅ 종목 카드 컴포넌트 (`StockCard`) 구현: ticker, 회사명, 현재가, YoY, 스파크라인
-  - ✅ 4열 반응형 카드 그리드 레이아웃 구현 (모바일 1열, 태블릿 2열, 데스크톱 4열)
-  - ✅ 카드 호버 시 새로고침/삭제 버튼 오버레이 구현
-  - ✅ 삭제 확인 다이얼로그(AlertDialog) 구현
-  - ✅ 빈 상태 UI ("저장된 종목이 없습니다") 개선
-  - ✅ 하단 [+ 추가] 버튼 고정 배치
-  - ✅ 스파크라인 미니 차트 컴포넌트 구현 (Recharts LineChart 간소화 버전)
-
-- **Task 006: 검색 페이지 UI 구현 (F001)** ✅ -- 완료
-  - ✅ React Hook Form + Zod 기반 Ticker 입력 폼 구현
-  - ✅ 영문 대문자 자동 변환 로직 적용
-  - ✅ 빈 값 제출 방지 및 인라인 에러 메시지 표시
-  - ✅ Enter 키 및 조회 버튼 제출 지원
-  - ✅ 로딩 상태 UI: Skeleton 카드 5개 + 차트 Skeleton 3개 표시
-  - ✅ 단계별 진행 메시지 표시 컴포넌트 구현 ("주가 데이터 수집 중..." 등)
-  - ✅ 에러 상태 UI: 에러 메시지 + [다시 시도] 버튼
-
-- **Task 007: 종목 상세 페이지 UI 구현 (F010, F007, F008, F009)** ✅ -- 완료
-  - ✅ 지표 요약 카드 5개 구현: 현재 종가, MA13, YoY(색상 구분), 52주 최고가, 52주 최저가
-  - ✅ 주가 + MA13 라인 차트 구현 (Recharts LineChart, 파란색/주황색)
-  - ✅ Google Trends 영역 차트 구현 (Recharts AreaChart)
-  - ✅ 주가 vs 트렌드 비교 차트 구현 (Recharts ComposedChart, 이중 Y축)
-  - ✅ 차트 공통 설정: X축 날짜 레이블, Y축 단위, 범례, 반응형 크기
-  - ✅ 각 차트별 [PNG 다운로드] 버튼 배치 (기능은 Phase 4에서 구현)
-  - ✅ 다운로드 섹션: [엑셀 다운로드] + [전체 차트 PNG 일괄 다운로드] 버튼 배치
-
----
-
-### Phase 3: 핵심 기능 구현 ✅ -- 완료
-
-> 실제 API 연동, DB CRUD, 비즈니스 로직을 구현하여 더미 데이터를 실제 데이터로 교체한다.
-> 각 Task 완료 후 Playwright MCP를 활용한 E2E 테스트를 수행한다.
-
-- **Task 008: 데이터베이스 CRUD 레이어 구현 (F013, F014, F015)** ✅ -- 완료
-  - `src/lib/db/queries.ts`에 DB 접근 함수 구현
-  - `insertSearch()` / `upsertSearch()`: searches 테이블 UPSERT 로직
-  - `insertPriceData()` / `insertTrendsData()`: 시계열 데이터 배치 INSERT
-  - `getSearchById()` / `getAllSearches()`: 종목 조회 함수
-  - `getSearchByTicker()`: ticker 기반 중복 확인
-  - `getPriceDataBySearchId()` / `getTrendsDataBySearchId()`: 시계열 데이터 조회
-  - `deleteSearch()`: CASCADE 삭제 (searches + price_data + trends_data)
-  - `replaceStockData()`: 재조회 시 price_data/trends_data 전체 교체 (DELETE + INSERT 트랜잭션)
-  - Playwright MCP를 활용한 DB CRUD API 엔드포인트 통합 테스트
-
-- **Task 009: 주가 데이터 수집 API 구현 (F002, F003)** ✅ -- 완료
-  - `src/app/api/stock/route.ts` Route Handler 구현
-  - yahoo-finance2로 5년 주간 종가 수집 (`historical`, `interval: 1wk`)
-  - yahoo-finance2 `quoteSummary()`로 회사명(companyName) 조회
-  - 현재 종가 조회 (`quote`)
-  - Yahoo Finance 금요일 기준일을 date-fns `startOfISOWeek()`로 월요일 정규화
-  - 에러 처리: 잘못된 ticker, API 응답 실패, 네트워크 오류
-  - Playwright MCP를 활용한 API 엔드포인트 테스트
-
-- **Task 010: Google Trends 데이터 수집 API 구현 (F004)** ✅ -- 완료
-  - `src/app/api/trends/route.ts` Route Handler 구현
-  - SerpAPI Google Trends API 호출 (`engine: google_trends`, 5년 주간 데이터)
-  - 검색 키워드: companyName 우선, 실패 시 `"{ticker} stock"` 폴백
-  - SerpAPI 일요일 기준 날짜를 date-fns `startOfISOWeek()`로 월요일 정규화
-  - 환경 변수 `SERPAPI_KEY` 검증 및 누락 시 에러 반환
-  - 에러 처리: API 키 누락, 요청 실패, 데이터 없음
-  - Playwright MCP를 활용한 API 엔드포인트 테스트
-
-- **Task 011: 지표 계산 로직 구현 (F005, F006)** ✅ -- 완료
-  - `src/lib/calculations.ts` 비즈니스 로직 모듈 구현
-  - MA13 계산: 13주 이동평균선 (주간 종가 기반 sliding window)
-  - YoY 계산: 52주 전 대비 현재 주가 변화율 (%)
-  - 52주 최고가/최저가 추출: 최근 52개 주간 데이터에서 max/min
-  - ISO week number 기반 주가-트렌드 데이터 매칭 (F009 비교 차트용)
-  - 단위 테스트 수준의 검증 (엣지 케이스: 데이터 부족, 0 나눗셈 등)
-
-- **Task 012: 종목 조회 통합 플로우 구현 (F001 + F003 + F004 + F005 + F006 + F013)** ✅ -- 완료
-  - `src/app/api/searches/route.ts` 통합 API Route Handler 구현
-  - 조회 플로우: ticker 입력 -> 주가 수집 -> 트렌드 수집 -> 지표 계산 -> DB 저장 -> search_id 반환
-  - 검색 페이지에서 통합 API 호출 및 로딩 상태 관리
-  - 단계별 진행 메시지 업데이트 (SSE 또는 폴링 방식)
-  - 성공 시 `/analysis/[id]`로 리다이렉트
-  - 실패 시 에러 메시지 표시 + [다시 시도] 버튼 활성화
-  - 동일 ticker 재조회 시 UPSERT 처리 검증
-  - Playwright MCP를 활용한 전체 조회 플로우 E2E 테스트
-
-- **Task 013: 대시보드 실제 데이터 연동 (F014, F015, F016)** ✅ -- 완료
-  - 대시보드 페이지를 Server Component로 전환하여 DB 직접 조회
-  - `getAllSearches()` + 최근 52주 price_data 조회로 카드 데이터 구성
-  - 스파크라인 차트에 실제 52주 가격 데이터 바인딩
-  - 삭제 기능 연동: DELETE API Route -> `deleteSearch()` -> 카드 제거 (Client Component)
-  - 새로고침 기능 연동: 재수집 API 호출 -> DB 갱신 -> 카드 데이터 리렌더링 (F016)
-  - `searched_at` 최신순 정렬 적용
-  - Playwright MCP를 활용한 대시보드 CRUD E2E 테스트
-
-- **Task 014: 종목 상세 페이지 실제 데이터 연동 (F002, F007, F008, F009, F010)** ✅ -- 완료
-  - Server Component에서 `getSearchById()` + 시계열 데이터 조회
-  - 지표 요약 카드 5개에 실제 DB 데이터 바인딩
-  - 주가 + MA13 차트에 실제 price_data + 계산된 MA13 데이터 바인딩
-  - Google Trends 차트에 실제 trends_data 바인딩
-  - 비교 차트에 ISO week number 기반 매칭된 데이터 바인딩 (이중 Y축)
-  - 존재하지 않는 id 접근 시 404 또는 리다이렉트 처리
-  - Playwright MCP를 활용한 상세 페이지 데이터 표시 E2E 테스트
-
-- **Task 014-1: 핵심 기능 통합 테스트** ✅ -- 완료
-  - Playwright MCP를 사용한 전체 사용자 플로우 테스트
-    - 시나리오 1: 최초 방문 -> 빈 대시보드 -> [+ 추가] -> ticker 입력 -> 조회 -> 상세 페이지 확인 -> 대시보드 복귀
-    - 시나리오 2: 저장된 종목 카드 클릭 -> 상세 페이지 차트/지표 확인
-    - 시나리오 3: 카드 호버 -> 삭제 -> 확인 다이얼로그 -> 카드 제거 확인
-    - 시나리오 4: 카드 호버 -> 새로고침 -> 로딩 스피너 -> 데이터 갱신 확인
-    - 시나리오 5: 동일 ticker 재조회 -> UPSERT 정상 처리 확인
-  - API 연동 및 비즈니스 로직 검증
-  - 에러 핸들링 테스트: 잘못된 ticker, API 키 누락, 네트워크 오류
-
----
-
-### Phase 4: 다운로드 기능 및 최적화 ✅ -- 완료
-
-> 부가 기능(엑셀/PNG 다운로드) 구현과 사용자 경험 최적화를 수행한다.
-
-- **Task 015: 엑셀 다운로드 기능 구현 (F011)** ✅ -- 완료
-  - ✅ `src/lib/export/excel.ts` 엑셀 생성 유틸리티 구현
-  - ✅ xlsx(SheetJS) 라이브러리로 .xlsx 파일 생성
-  - ✅ 시트 구성: "주가 데이터" (날짜, 종가, MA13), "트렌드 데이터" (날짜, 관심도), "지표 요약" (현재가, MA13, YoY 등)
-  - ✅ 브라우저 다운로드 트리거 (Blob + URL.createObjectURL)
-  - ✅ 파일명 형식: `{ticker}_StockInsight_{YYYYMMDD}.xlsx`
-  - ✅ Playwright MCP를 활용한 다운로드 기능 테스트
-
-- **Task 016: 차트 PNG 다운로드 기능 구현 (F012)** ✅ -- 완료
-  - ✅ html-to-image 라이브러리로 차트 DOM 노드를 PNG Blob 변환
-  - ✅ 개별 차트 PNG 다운로드: 각 차트 섹션의 [PNG 다운로드] 버튼 기능 연결
-  - ✅ 전체 차트 일괄 PNG 다운로드: 3개 차트 순차 변환 후 ZIP 또는 개별 저장
-  - ✅ 차트 ref 관리: `useRef`로 각 차트 컨테이너 DOM 참조
-  - ✅ 파일명 형식: `{ticker}_{chartType}_{YYYYMMDD}.png`
-  - ✅ Playwright MCP를 활용한 다운로드 기능 테스트
-
-- **Task 017: 사용자 경험 최적화 및 마무리** ✅ -- 완료
-  - ✅ 로딩 상태 개선: 카드 Skeleton, 차트 Skeleton 통일
-  - ✅ 에러 바운더리 추가: 페이지/컴포넌트 레벨 에러 처리
-  - ✅ 다크 모드 차트 색상 최적화 (배경/축/범례 색상 테마 대응)
-  - ✅ 반응형 디자인 점검: 모바일/태블릿/데스크톱 레이아웃 최종 확인
-  - ✅ 접근성 개선: 키보드 네비게이션, aria 속성, 색상 대비
-  - ✅ `npm run check-all` 및 `npm run build` 통과 확인
-  - ✅ Playwright MCP를 활용한 전체 앱 최종 E2E 테스트
-
----
-
-## Supabase 마이그레이션 단계
-
-> SQLite(better-sqlite3)에서 Supabase(PostgreSQL)로의 점진적 무중단 마이그레이션.
-> 8가지 마이그레이션 원칙: (1) 점진적 전환, (2) 하위 호환성, (3) 이중 쓰기, (4) 읽기 우선 전환,
-> (5) 롤백 가능성, (6) 데이터 무결성 검증, (7) 타입 안전성, (8) 환경 변수 기반 전환.
-
-### Migration Phase 1: Adapter 구조 설계 및 환경 설정 -- 완료
-
-> DB Adapter 패턴을 도입하여 SQLite와 Supabase를 동일한 인터페이스로 추상화한다.
-> 이 Phase에서는 기존 기능이 깨지지 않는 것을 최우선으로 한다.
-
-- **Task M-001: DbAdapter 인터페이스 및 SQLite 구현체 작성** -- 완료
-  - See: `/tasks/M-001-db-adapter.md` (해당 시 생성)
-  - `src/lib/adapters/db.ts`에 `DbAdapter` 인터페이스 정의
-  - `sqliteAdapter` 구현 (기존 db-helpers.ts 함수 위임)
-  - `supabaseAdapter` 스텁 작성 (모든 메서드 NotImplementedError)
-  - `getAdapter()` 함수로 `USE_SUPABASE` 환경 변수 기반 선택 로직 구현
-  - `.env.example`에 `USE_SUPABASE`, `SUPABASE_URL`, `SUPABASE_KEY` 추가
-
----
-
-### Migration Phase 2: Adapter 통합 및 결함 수정 -- 완료
-
-> Phase 1에서 발견된 3가지 결함을 수정하고, adapter를 실제 앱 코드에 연결한다.
-> 이 Phase 완료 후 `USE_SUPABASE=false` 상태에서 기존 기능이 동일하게 동작해야 한다.
-
-- **Task M-002: queries.ts를 adapter 경유하도록 리팩토링** -- 완료
-  - ✅ `src/lib/db/queries.ts`가 `db-helpers.ts` 직접 import를 제거
-  - ✅ `src/lib/adapters/db.ts`의 `db` (adapter 인스턴스)를 import하여 모든 CRUD 함수를 adapter 메서드로 위임
-  - ✅ 기존 export 시그니처 유지 (하위 호환성): `upsertSearch`, `getSearchById`, `getAllSearches`, `deleteSearch` 등
-  - ✅ `replaceStockData()` 함수도 adapter 메서드 기반으로 전환
-  - ✅ 기존 앱 코드(`page.tsx`, `route.ts` 등)는 변경 없이 동작해야 함
-  - ✅ `npm run check-all` 및 `npm run build` 통과 확인
-  - ✅ Playwright MCP를 활용한 기존 기능 회귀 테스트
-
-- **Task M-003: withTransaction 콜백 타입 불일치 수정** -- 완료
-  - ✅ 현재 문제: `DbAdapter.withTransaction`의 콜백 파라미터가 `(db: unknown) => T`이나, SQLite 구현은 `(db: Database.Database) => T`를 기대
-  - ✅ 해결 방안: adapter 수준에서 트랜잭션을 추상화하여 콜백이 DB 인스턴스를 직접 받지 않도록 변경
-  - ✅ `withTransaction` 시그니처를 `<T>(callback: () => T | Promise<T>) => T | Promise<T>`로 변경
-  - ✅ SQLite adapter 내부에서 `db.transaction()` 래핑하여 콜백에 DB를 노출하지 않음
-  - ✅ Supabase adapter는 향후 `supabase.rpc()` 또는 개별 쿼리 순차 실행으로 구현
-  - ✅ `replaceStockData` 등 트랜잭션 사용처가 adapter 메서드만으로 동작하도록 조정
-  - ✅ 타입 검사 통과 확인: `npm run check-all`
-
-- **Task M-004: 조건부 환경 변수 검증 구현** -- 완료
-  - ✅ 현재 문제: `USE_SUPABASE=true`일 때 `SUPABASE_URL`, `SUPABASE_KEY`가 optional이라 누락해도 에러 없음
-  - ✅ `src/lib/env.ts`의 Zod 스키마에 `superRefine()` 추가
-  - ✅ `USE_SUPABASE=true`일 때 `SUPABASE_URL`과 `SUPABASE_KEY`가 반드시 존재하고 유효한 값인지 검증
-  - ✅ `SUPABASE_URL`은 `https://*.supabase.co` 형식 검증
-  - ✅ `SUPABASE_KEY`는 빈 문자열/placeholder 값(`your_supabase_anon_key`) 거부
-  - ✅ `USE_SUPABASE=false`일 때는 Supabase 관련 변수 검증 스킵
-  - ✅ 검증 실패 시 명확한 에러 메시지 출력 (어떤 변수가 누락/잘못되었는지)
-  - ✅ `npm run check-all` 통과 확인
-
-- **Task M-004-1: Adapter 통합 회귀 테스트** -- 완료
-  - ✅ `USE_SUPABASE=false` 상태에서 모든 기존 기능 정상 동작 확인
-  - ✅ Playwright MCP를 활용한 E2E 테스트
-    - ✅ 시나리오 1: 종목 검색 -> DB 저장 -> 대시보드 카드 표시
-    - ✅ 시나리오 2: 종목 상세 페이지 차트/지표 정상 렌더링
-    - ✅ 시나리오 3: 종목 삭제 -> 대시보드에서 제거 확인
-    - ✅ 시나리오 4: 동일 ticker 재조회 -> UPSERT 정상 처리
-  - ✅ `npm run build` 성공 확인
-
----
-
-### Migration Phase 3: Supabase 연결 및 searches 테이블 마이그레이션 -- 완료
-
-> Supabase 프로젝트에 테이블을 생성하고, supabaseAdapter의 searches 관련 메서드를 실제 구현한다.
-> 읽기를 먼저 전환하여 안전하게 검증한 후, 쓰기를 전환한다.
-
-- **Task M-005: Supabase 클라이언트 설정 및 테이블 생성** -- 완료
-  - ✅ `@supabase/supabase-js` 패키지 설치
-  - ✅ `src/lib/supabase/client.ts`에 Supabase 클라이언트 싱글턴 생성
-  - ✅ 환경 변수 (`SUPABASE_URL`, `SUPABASE_KEY`)로 클라이언트 초기화
-  - ✅ Supabase Dashboard 또는 SQL Editor에서 테이블 생성 SQL 작성
-    - ✅ `searches` 테이블: SQLite 스키마와 동일한 컬럼 구조 (PostgreSQL 타입 매핑)
-    - ✅ `price_data` 테이블: `search_id` FK, `(search_id, date)` 유니크 제약
-    - ✅ `trends_data` 테이블: `search_id` FK, `(search_id, date)` 유니크 제약
-  - ✅ RLS(Row Level Security) 정책 설정 (anon key 사용 시 필수)
-  - ✅ `data/migrations/supabase/` 디렉토리에 SQL 마이그레이션 파일 보관
-  - ✅ Supabase TypeScript 타입 생성: `npx supabase gen types typescript`
-
-- **Task M-006: supabaseAdapter searches CRUD 구현** -- 완료
-  - ✅ `supabaseAdapter.upsertSearch()`: `supabase.from('searches').upsert()` 구현
-  - ✅ `supabaseAdapter.getSearch()`: `supabase.from('searches').select().eq('id', searchId).single()` 구현
-  - ✅ `supabaseAdapter.getSearchByTicker()`: ticker 기반 조회 구현
-  - ✅ `supabaseAdapter.getAllSearches()`: 전체 조회 + `searched_at` 정렬 구현
-  - ✅ `supabaseAdapter.deleteSearch()`: CASCADE 삭제 구현 (PostgreSQL FK ON DELETE CASCADE 활용)
-  - ✅ SQLite의 `SearchRecordRaw` JSON 문자열과 PostgreSQL의 JSONB 차이 처리
-  - ✅ 반환 타입이 `SearchRecord`와 정확히 일치하도록 데이터 변환 레이어 구현
-  - ✅ Playwright MCP를 활용한 Supabase CRUD 테스트 (USE_SUPABASE=true 환경)
-
-- **Task M-007: searches 읽기 전환 (Shadow Read)** -- 완료
-  - ✅ adapter에 `shadowRead` 모드 추가: SQLite에서 읽되, Supabase에서도 병렬 읽기 후 결과 비교
-  - ✅ `getAdapter()` 함수에 `DB_READ_MODE` 환경 변수 추가 (`sqlite` | `supabase` | `shadow`)
-  - ✅ shadow 모드에서 두 결과가 불일치하면 경고 로그 출력 (에러는 발생시키지 않음)
-  - ✅ 불일치 로그 형식: `[Shadow Read Mismatch] table=searches, id=xxx, field=yyy`
-  - ✅ 충분한 검증 후 `DB_READ_MODE=supabase`로 전환하여 Supabase 읽기 활성화
-  - ✅ Playwright MCP를 활용한 shadow read 모드 테스트
-
----
-
-### Migration Phase 4: 이중 쓰기 (Dual-Write) -- 완료
-
-> SQLite와 Supabase에 동시 쓰기하여 데이터 동기화를 유지한다.
-> 부분 실패 처리와 데이터 정합성 검증이 핵심이다.
-
-- **Task M-008: 이중 쓰기 Adapter 구현** -- 완료
-  - ✅ `SupabaseAdapter.upsertSearch()` 이중 쓰기 로직 구현
-  - ✅ 쓰기 순서: SQLite 먼저 (동기, 필수) -> Supabase (비동기, 선택)
-  - ✅ 부분 실패 전략:
-    - ✅ SQLite 실패: 전체 실패 (throw)
-    - ✅ Supabase 실패: SQLite 성공 유지 + 에러 로그만 수행
-  - ✅ 읽기: `DB_READ_MODE` 환경 변수에 따라 SQLite 또는 Supabase에서 읽기
-  - ✅ `getAdapter()` 함수에 `DB_WRITE_MODE` 환경 변수 추가 (`sqlite` | `supabase` | `dual`)
-  - ✅ `DB_WRITE_MODE=dual` 설정 시 DualWriteAdapter 반환
-
-- **Task M-009: 기존 데이터 Supabase 동기화** -- 완료
-  - ✅ `scripts/sync-to-supabase.ts` 마이그레이션 스크립트 작성
-  - ✅ SQLite의 모든 searches + price_data + trends_data를 Supabase로 복사
-  - ✅ 배치 처리: 한 번에 100개씩 INSERT (Supabase API rate limit 고려)
-  - ✅ 중복 방지: `ON CONFLICT DO NOTHING` 또는 upsert 사용
-  - ✅ 실행 로그: 성공/실패/스킵 건수 출력
-  - ✅ 데이터 정합성 검증: SQLite와 Supabase의 레코드 수 + 샘플 데이터 비교
-  - ✅ `npx tsx scripts/sync-to-supabase.ts` 명령으로 실행
-
-- **Task M-009-1: 이중 쓰기 검증 테스트** -- 완료
-  - ✅ Playwright MCP를 활용한 이중 쓰기 E2E 테스트
-    - ✅ 시나리오: POST /api/searches 이중 쓰기 E2E 테스트
-    - ✅ AMZN 데이터로 양쪽 DB에 동일한 데이터 저장 확인
-    - ✅ Supabase 실패 시 로깅만 수행, SQLite 성공 유지 확인
-    - ✅ 동일 ticker 재조회 시 양쪽 DB UPSERT 정합성 확인
-  - ✅ 데이터 정합성 비교 스크립트 실행 검증
-
----
-
-### Migration Phase 5: Supabase Primary 전환 -- ✅ 완료
-
-> Supabase를 주 데이터베이스로 전환하고, SQLite를 폴백으로 유지한다.
-> 문제 발생 시 즉시 롤백할 수 있는 안전장치를 갖춘다.
-
-- **Task M-010: Supabase Primary 모드 구현** ✅ -- 완료
-  - ✅ `DB_WRITE_MODE=supabase` + `DB_READ_MODE=supabase` 설정 시 supabaseAdapter 사용
-  - ✅ 읽기는 fallbackAdapter로 Supabase 우선 + SQLite 폴백 지원
-  - ✅ 쓰기는 supabaseAdapter로 SQLite 먼저 (필수) → Supabase (선택) 이중 쓰기
-  - ✅ Supabase 쓰기 실패 시 경고 로그: `[Dual-Write] Supabase insertXxx failed`
-  - ✅ 환경 변수 한 줄 변경으로 롤백 가능: `DB_WRITE_MODE=sqlite`, `DB_READ_MODE=sqlite`
-  - ✅ `getAdapter()` 함수에 모든 조합 (4가지 모드) 지원
-
-- **Task M-011: price_data, trends_data 마이그레이션 완료** ✅ -- 완료
-  - ✅ `shadowReadAdapter` 구현: SQLite 읽기 + Supabase 병렬 비교로 데이터 정합성 검증
-  - ✅ `insertPriceData()` 이중 쓰기: SQLite (필수) → Supabase 배치 INSERT (100개씩)
-  - ✅ `getPriceDataBySearchId()` 읽기: SQLite 먼저 → Supabase 병렬 비교 + 불일치 로깅
-  - ✅ `insertTrendsData()` 이중 쓰기: SQLite (필수) → Supabase 배치 INSERT (100개씩)
-  - ✅ `getTrendsDataBySearchId()` 읽기: SQLite 먼저 → Supabase 병렬 비교 + 불일치 로깅
-  - ✅ 대량 데이터 처리: 260개 데이터포인트 배치 INSERT (100개씩 3배치) 성능 확인
-
-- **Task M-011-1: Supabase Primary 통합 테스트** ✅ -- 완료
-  - ✅ `DB_WRITE_MODE=supabase` + `DB_READ_MODE=supabase` 환경 설정
-  - ✅ `npm run check-all` 모든 검사 통과
-  - ✅ `npm run build` 프로덕션 빌드 성공 (First Load JS 158KB)
-  - ✅ Playwright MCP E2E 테스트 환경 준비 (SQLite Primary 모드 테스트 완료)
-  - ✅ 향후 유효한 Supabase API 키로 실제 Supabase Primary 모드 테스트 가능
-
-- **Task M-011-2: 코드 리뷰 피드백 적용 (7가지 버그 수정)** ✅ -- 완료
-
-  **Critical 버그 3가지:**
-  - ✅ Supabase Primary 모드: `supabaseAdapter` → `fallbackAdapter`
-    - 목적: Supabase 전용 쓰기 구현 (SQLite 이중 쓰기 제거)
-    - 변경: `db.ts` Line 735 → `return fallbackAdapter`
-  - ✅ Dual-Write 모드: `shadowReadAdapter` → `supabaseAdapter`
-    - 목적: SQLite (필수) + Supabase (선택) 이중 쓰기 구현
-    - 변경: `db.ts` Line 746 → `return supabaseAdapter`
-  - ✅ 환경 변수 검증: `process.env.USE_SUPABASE` → `env.USE_SUPABASE`
-    - 파일: `src/app/api/searches/route.ts`
-    - 목적: Zod 검증된 환경 변수 사용
-
-  **Medium 버그 2가지:**
-  - ✅ Supabase INSERT 원자성: DELETE → INSERT 대신 **UPSERT 패턴** 적용
-    - `insertPriceData()`, `insertTrendsData()` 메서드 수정
-    - `onConflict: 'search_id,date'` 설정으로 중복 시 업데이트
-    - DELETE 성공 후 INSERT 실패 시 데이터 손실 방지
-  - ✅ Shadow Read 병렬 실행: 순차 실행 → **fire-and-forget** 비블로킹
-    - `getSearch`, `getSearchByTicker`, `getAllSearches` 적용
-    - `getPriceDataBySearchId`, `getTrendsDataBySearchId` 적용
-    - 응답 지연 제거 (void async IIFE 사용)
-
-  **Low 버그 2가지:**
-  - ✅ 데이터 정합성 비교 개선: JSON.stringify → **필드 단위 비교**
-    - `compareSearchRecords()` 함수 추가 (SearchRecord 필드별 비교)
-    - `comparePriceDataArrays()` 함수 추가 (PriceDataPoint 배열 비교)
-    - `compareTrendsDataArrays()` 함수 추가 (TrendsDataPoint 배열 비교)
-  - ✅ Next.js 15 앱 초기화 패턴: layout.tsx → **instrumentation.ts**
-    - `instrumentation.ts` 생성 (register() 함수로 앱 초기화)
-    - `layout.tsx`에서 initializeApp() 제거
-    - 빌드 성공 (First Load JS 158KB)
-  - ✅ Next.js 15 동적 라우트:
-    - `/api/searches/route.ts`: `export const dynamic = 'force-dynamic'` 추가
-    - `/api/searches/[id]/route.ts`: `export const dynamic = 'force-dynamic'` 추가
-
----
-
-### Migration Phase 6: SQLite 제거 및 정리 ✅ 완료
-
-> SQLite 관련 코드와 의존성을 완전히 제거하고 Supabase로 완전 전환.
-> 기술 스택 단순화 및 환경 설정 통합 완료.
-
-- ✅ **Task M-012: SQLite 코드 및 의존성 제거**
-  - ✅ `src/lib/database.ts` 삭제
-  - ✅ `src/lib/db-helpers.ts` 삭제
-  - ✅ `src/lib/adapters/db.ts` 정리: sqliteAdapter, fallbackAdapter, shadowReadAdapter, getAdapter() 제거
-  - ✅ `supabaseAdapter` 직접 export로 변경
-  - ✅ `src/lib/env.ts` 환경 변수 정리: USE_SUPABASE, DB_READ_MODE, DB_WRITE_MODE 제거
-  - ✅ SUPABASE_URL, SUPABASE_KEY를 필수 환경 변수로 변경
-  - ✅ `initializeApp()` 단순화 (SQLite 초기화 로직 제거)
-  - ✅ `src/app/api/health/route.ts` 단순화 (Supabase만 확인)
-  - ✅ `src/app/api/searches/route.ts` 업데이트 (USE_SUPABASE 조건 제거)
-  - ✅ TypeScript 타입 검사 통과
-
-- ✅ **Task M-013: 의존성 정리 및 최종 검증**
-  - ✅ `npm uninstall better-sqlite3 @types/better-sqlite3`
-  - ✅ `next.config.ts`에서 `serverExternalPackages: ['better-sqlite3']` 제거
-  - ✅ `data/migrations/` 디렉토리 제거
-  - ✅ `data/stock-insight.db*` 파일 제거
-  - ✅ `.env.example` 업데이트: Supabase 변수만 유지
-  - ✅ `CLAUDE.md` 업데이트: 기술 스택에서 better-sqlite3 제거, Supabase 추가
-  - ✅ `docs/PRD.md` 업데이트: 운영 환경 설명 수정
-  - ✅ TypeScript 타입 검사: 모든 에러 해결
-
----
-
-## Phase 7: 키워드 트렌드 분석 기능 확장 🚀 예정
-
-> Google Trends 기반 키워드 검색 + 주식 오버레이 기능 추가 (F017~F026)
-> 기존 가격/트렌드 데이터 분석에서 특정 키워드의 검색 관심도 추이 분석으로 확장
-
-### MVP: 기본 키워드 트렌드 분석 (F017~F022)
-
-- **F017**: 키워드 입력 및 트렌드 조회
-  - `/api/trends` 에서 `keyword` 파라미터 분기 추가
-  - pytrends로 자유 텍스트 키워드 5년 데이터 수집
-
-- **F018**: 트렌드 지수 기반 MA13 계산
-  - `calculateTrendsMA13(trendsData: TrendsDataPoint[])` 함수
-  - 기존 calculateMA13() 로직을 `.value` 기반으로 어댑트
-
-- **F019**: 트렌드 지수 기반 YoY 계산
-  - `calculateTrendsYoY(trendsData: TrendsDataPoint[])` 함수
-  - 트렌드 지수 52주 변화율 계산
-
-- **F020**: 키워드 트렌드 그래프
-  - `src/app/trends/page.tsx` 신규 페이지
-  - Recharts ComposedChart: 트렌드 라인(파란색) + MA13 라인(주황색)
-  - `src/components/keyword-trends/keyword-trends-chart.tsx`
-
-- **F021**: 주식 종목 오버레이 추가
-  - 저장된 주식의 price_data를 min-max 정규화 (0-100)
-  - 최대 3개 종목 선택하여 차트에 오버레이
-  - 이중 Y축 설정
-
-- **F022**: 키워드 + 종목 조합 저장/목록
-  - `keyword_searches` + `keyword_stock_overlays` 테이블에 저장
-  - `src/components/keyword-trends/keyword-search-list.tsx` 목록 컴포넌트
-  - 저장된 조합 클릭 → 차트 복원
-
----
-
-### Phase 7: 키워드 분석 확장 기능 ✅ -- 완료
-
-> 키워드 상세 분석 페이지에 다운로드 및 고급 필터링 기능을 추가한다.
-
-- **Task F024: 키워드 분석 차트 PNG 다운로드 (F024)** ✅ -- 완료
-  - ✅ `src/lib/export/image.ts`의 `captureChartAsPng()` 함수 활용
-  - ✅ KeywordDetailClient에 chartRef 추가 및 handleDownloadPNG() 구현
-  - ✅ 키워드 차트를 PNG로 다운로드 (파일명: `{keyword}_chart_{region}_{period}_{YYYYMMDD}.png`)
-  - ✅ 다크 모드 지원: `window.matchMedia('(prefers-color-scheme: dark)').matches` 감지
-  - ✅ 고해상도 캡처: `pixelRatio: 2` 설정으로 2배 해상도 생성
-
-- **Task F025: 키워드 분석 Excel 다운로드 (F025)** ✅ -- 완료
-  - ✅ `src/lib/export/excel.ts`에 `generateKeywordAnalysisExcelFile()` 함수 구현
-  - ✅ 3개 시트: "트렌드 데이터" (날짜, 관심도, MA13, YoY), "지표 요약" (키워드, 지역, 기간, 현재 관심도 등), "오버레이 종목" (선택)
-  - ✅ KeywordDetailClient에 handleDownloadExcel() 구현
-  - ✅ 파일명 형식: `{keyword}_{region}_{period}_{YYYYMMDD}.xlsx`
-  - ✅ UI: 필터 섹션 상단에 [Excel 다운로드], [🖼️ 차트 PNG 저장] 버튼 배치
-
-- **Task F026: 키워드 오버레이 고급 필터 및 정렬 (F026)** ✅ -- 완료
-  - ✅ State 추가: `overlayFilterText`, `overlaySortBy`
-  - ✅ `getFilteredAndSortedOverlays()` 함수 구현
-    - ✅ 필터링: ticker 또는 회사명 기반 검색 (대소문자 무시)
-    - ✅ 정렬: 추가 순서(default), Ticker(A-Z), 회사명(A-Z) 3가지 옵션
-  - ✅ UI: 필터 컨트롤 섹션 추가
-    - ✅ 검색 입력 필드 (placeholder: "예: AAPL, Apple")
-    - ✅ 정렬 선택 드롭다운 (추가 순서, Ticker, 회사명)
-    - ✅ 종목 수 표시 (총 종목 수: X/Y)
-  - ✅ 필터링된 결과가 없을 때 "검색 결과가 없습니다" 메시지 표시
-
----
-
-### 확장: 추가 옵션 (F023)
-
-- **F023**: 국가/기간/범위 선택
-  - pytrends geo, timeframe, gprop 파라미터 UI 추가
-  - 날짜 범위, 지역, 카테고리 선택
-  - (선택사항, 나중에 구현)
+# StockInsight 개선 로드맵
+
+이 로드맵은 현재 중간 전환 상태의 프로젝트를 안정적인 Supabase 기반 주식/키워드 분석 앱으로 정리하기 위한 단계별 실행 계획이다. 각 Phase는 독립적으로 검증 가능한 결과물을 가져야 하며, 구현 전후로 문서와 테스트를 함께 갱신한다.
+
+## 운영 원칙
+
+- PRD는 제품 요구사항의 기준 문서다.
+- TRD는 아키텍처, 코드 컨벤션, 테스트 전략의 기준 문서다.
+- ROADMAP은 실행 순서와 수락 기준의 기준 문서다.
+- 새 기능보다 먼저 데이터 모델, API 계약, 테스트 기준을 안정화한다.
+- `keyword_searches` 기반 구형 모델과 `keyword_analysis` 기반 신형 모델을 동시에 확장하지 않는다.
+- 각 작업은 작은 PR 단위로 완료하고, 최소 `typecheck`, `lint`, 관련 테스트를 통과해야 한다.
+
+## Phase 0. 현상 고정 및 기준선 확보
+
+목표: 현재 동작/비동작 지점을 명확히 기록하고 이후 변경의 기준선을 만든다.
+
+### Task 0.1 문서 기준선 갱신
+
+- `docs/PRD.md`를 현재 제품 방향에 맞게 재작성한다.
+- `docs/TRD.md`를 추가해 목표 아키텍처와 코드/테스트 규칙을 정의한다.
+- `docs/ROADMAP.md`를 단계별 실행 계획으로 재작성한다.
+
+수락 기준:
+
+- 세 문서가 서로 충돌하지 않는다.
+- 오래된 SQLite/SerpAPI 중심 설명이 기준 문서에서 제거된다.
+- 현재 발견된 구조 문제와 개선 방향이 로드맵에 반영된다.
+
+### Task 0.2 상태 점검 리포트 작성
+
+- 현재 DB 테이블과 마이그레이션 적용 상태를 점검한다.
+- `.env.example`, `package.json`, 배포 설정의 불일치를 기록한다.
+- 현재 라우트별 사용 테이블을 표로 정리한다.
+
+수락 기준:
+
+- `docs/STATUS.md` 또는 이슈 문서에 현재 위험이 정리된다.
+- `keyword_temporary_overlays`처럼 코드에서 참조하지만 마이그레이션에 없는 테이블이 식별된다.
+
+## Phase 1. 데이터 모델 통합
+
+목표: 키워드/분석/오버레이 저장 모델을 하나로 통일한다.
+
+### Task 1.1 목표 스키마 확정
+
+- 최종 테이블을 확정한다: `keywords`, `keyword_analysis`, `keyword_stock_overlays`, `overlay_chart_timeseries`.
+- `keyword_searches`, `keyword_chart_timeseries`, `keyword_temporary_overlays`의 처리 방침을 정한다.
+- unique 제약, 외래키, cascade, RLS 정책을 재검토한다.
+
+수락 기준:
+
+- 신규 ERD가 TRD와 마이그레이션에 반영된다.
+- 모든 keyword 관련 API가 어떤 테이블을 쓰는지 결정된다.
+
+### Task 1.2 마이그레이션 정리
+
+- 누락 테이블을 제거하거나 정식 마이그레이션으로 추가한다.
+- `keyword_stock_overlays`가 `analysis_id` 기준으로만 동작하게 정리한다.
+- legacy 데이터를 목표 스키마로 이동하는 SQL을 작성한다.
+
+수락 기준:
+
+- 새 Supabase 프로젝트에 마이그레이션을 순서대로 적용할 수 있다.
+- 중복 unique 제약 또는 충돌하는 onConflict 대상이 없다.
+- RLS 정책이 모든 SELECT/INSERT/UPDATE/DELETE에 적용된다.
+
+### Task 1.3 TypeScript DB 타입 정리
+
+- `src/types/database.ts`를 목표 스키마 기준으로 정리한다.
+- legacy 타입은 명시적으로 `Legacy*` 이름을 사용하거나 제거한다.
+- Supabase row 타입, domain type, API DTO를 분리한다.
+
+수락 기준:
+
+- DB row와 UI DTO가 혼용되지 않는다.
+- `npm run typecheck`가 통과한다.
+
+## Phase 2. API와 서비스 레이어 재구성
+
+목표: API Route가 얇고 일관되며, 비즈니스 로직은 서비스 레이어에 모이도록 만든다.
+
+### Task 2.1 API 응답/오류 계약 표준화
+
+- 모든 API Route가 `createSuccessResponse`, `createErrorResponse`, `validateApiAuth`를 사용한다.
+- 오류 코드를 표준화한다.
+- 프로덕션에서는 내부 오류 메시지를 노출하지 않는다.
+
+수락 기준:
+
+- API 응답 형태가 모든 route에서 동일하다.
+- 인증 실패, 입력 오류, 외부 API 실패, DB 실패를 구분한다.
+
+### Task 2.2 종목 서비스 정리
+
+- `stock-service`는 Yahoo Finance 수집만 담당한다.
+- 종목 저장/조회/삭제/갱신은 `stock-repository` 또는 DB adapter로 분리한다.
+- 계산 로직은 순수 함수로 유지한다.
+
+수락 기준:
+
+- 종목 조회 API에서 데이터 수집, 계산, 저장 흐름이 명확하다.
+- 동일 ticker upsert와 price_data upsert가 원자성 있게 처리된다.
+
+### Task 2.3 Trends 서비스 단일화
+
+- `api/trends.py`, `src/lib/get_trends.py`, `/api/trends-internal`, `/api/trends`의 역할을 재정의한다.
+- 로컬/배포 공통으로 사용할 Trends provider 인터페이스를 만든다.
+- `TRENDS_API_URL` 포트와 실행 스크립트를 일치시킨다.
+
+수락 기준:
+
+- Trends 수집 진입점이 하나다.
+- 로컬 `npm run dev`에서 설정 그대로 Trends가 동작한다.
+- 실패 시 빈 배열로 성공 처리하지 않고 명확한 오류를 반환한다.
+
+### Task 2.4 키워드 분석 API 재작성
+
+- `GET/POST /api/keyword-analysis`를 목표 스키마 기준으로 정리한다.
+- 분석 생성은 keyword upsert 후 analysis upsert 흐름으로 처리한다.
+- 필터 변경 시 분석 조회/생성 규칙을 명확히 한다.
+
+수락 기준:
+
+- `(user_id, keyword, region, period, search_type)` 기준으로 중복 분석이 생기지 않는다.
+- `userId` 파라미터가 실제 쿼리 또는 RLS 검증에 의미 있게 사용된다.
+
+### Task 2.5 오버레이 API 재작성
+
+- 오버레이는 `analysis_id` 기준으로만 조회/삽입/삭제/정렬한다.
+- 구형 `keyword_search_id` 기반 route는 제거하거나 호환 redirect 레이어로 축소한다.
+- 오버레이 시계열 저장과 조회를 일관화한다.
+
+수락 기준:
+
+- 다른 분석의 오버레이가 섞이지 않는다.
+- 같은 분석에 같은 종목 중복 추가가 차단된다.
+
+## Phase 3. 프론트엔드 구조 정리
+
+목표: 페이지와 컴포넌트가 제품 도메인별로 읽히고, 클라이언트 상태가 서버 데이터와 충돌하지 않도록 한다.
+
+### Task 3.1 라우트와 페이지 모델 정리
+
+- 앱 라우트를 제품 기능 기준으로 정리한다.
+- 빈 오타 디렉터리(`src/app/\(app\)`, escaped dynamic route)를 제거한다.
+- route group과 URL 구조를 문서화한다.
+
+수락 기준:
+
+- `src/app` 구조만 보고 주요 페이지를 파악할 수 있다.
+- 잘못 이스케이프된 빈 디렉터리가 없다.
+
+### Task 3.2 키워드 화면 재구성
+
+- 검색, 내 키워드, 분석 상세, 오버레이 관리를 분리한다.
+- 조건 선택 UI는 분석 모델과 1:1로 매핑된다.
+- 필터 변경, 분석 생성, 오버레이 갱신 시 로딩/오류 상태를 제공한다.
+
+수락 기준:
+
+- 사용자가 현재 보고 있는 분석 조건을 항상 알 수 있다.
+- 조건 변경 시 오버레이가 올바르게 재조회된다.
+
+### Task 3.3 종목 화면 재구성
+
+- 종목 검색, 상세, 테이블 뷰, 다운로드 플로우를 점검한다.
+- 대시보드에서 종목과 키워드 분석 진입점을 명확히 한다.
+
+수락 기준:
+
+- 종목 저장/삭제/상세 진입 플로우가 회귀 없이 동작한다.
+- 불필요한 unused 상태와 핸들러가 제거된다.
+
+### Task 3.4 UI 접근성/반응형 점검
+
+- 주요 버튼에 명확한 accessible name을 제공한다.
+- 차트 컨테이너의 모바일/데스크톱 크기를 안정화한다.
+- 로딩, 빈 상태, 오류 상태를 모든 주요 화면에 적용한다.
+
+수락 기준:
+
+- 핵심 화면에서 텍스트/버튼 겹침이 없다.
+- 키보드로 주요 작업을 수행할 수 있다.
+
+## Phase 4. 테스트 체계 구축
+
+목표: 리팩터링 이후에도 핵심 기능이 깨지지 않도록 테스트 피라미드를 만든다.
+
+### Task 4.1 테스트 도구 도입
+
+- 단위 테스트 도구를 선택한다. 권장: Vitest + React Testing Library.
+- E2E 테스트 도구를 선택한다. 권장: Playwright.
+- 테스트 전용 env와 mock provider 전략을 정의한다.
+
+수락 기준:
+
+- `npm run test`, `npm run test:e2e` 스크립트가 추가된다.
+- CI 없이도 로컬에서 재현 가능한 테스트 실행이 가능하다.
+
+### Task 4.2 순수 로직 단위 테스트
+
+- MA13, YoY, 날짜 정규화, 시계열 매칭을 테스트한다.
+- keyword classifier, currency util 등 작은 유틸을 테스트한다.
+
+수락 기준:
+
+- 엣지 케이스: 데이터 부족, 0 나눗셈, 중복 날짜, 역순 데이터가 검증된다.
+
+### Task 4.3 API 통합 테스트
+
+- 인증 실패, 입력 검증 실패, 정상 생성/조회/삭제를 테스트한다.
+- Supabase는 테스트 DB 또는 repository mock으로 격리한다.
+- 외부 API는 mock provider로 대체한다.
+
+수락 기준:
+
+- 외부 네트워크 없이 테스트가 통과한다.
+- API 응답 계약이 스냅샷 또는 명시 assertion으로 보호된다.
+
+### Task 4.4 E2E 테스트
+
+- 로그인 후 종목 저장/상세 조회.
+- 키워드 분석 생성.
+- 종목 오버레이 추가/삭제/정렬.
+- Excel/PNG 다운로드 트리거.
+
+수락 기준:
+
+- 핵심 사용자 여정이 Playwright로 자동 검증된다.
+- 테스트 데이터 정리 절차가 명확하다.
+
+## Phase 5. 품질 게이트와 배포 준비
+
+목표: 로컬 개발과 Vercel 배포 모두에서 안정적인 운영 기준을 만든다.
+
+### Task 5.1 환경 변수 검증
+
+- `.env.example`과 `src/lib/env.ts`를 일치시킨다.
+- server-only env와 public env를 분리한다.
+- placeholder 값을 명시적으로 거부한다.
+
+수락 기준:
+
+- 필수 env 누락 시 앱 시작 단계에서 명확히 실패한다.
+- 문서와 실제 코드가 같은 env 이름을 사용한다.
+
+### Task 5.2 로깅과 에러 처리
+
+- 서버 로그에서 민감 정보를 제거한다.
+- 사용자-facing 오류 메시지를 정리한다.
+- `error.tsx`에서 내부 오류 메시지 노출을 제한한다.
+
+수락 기준:
+
+- 프로덕션 모드에서 내부 stack/message가 UI에 표시되지 않는다.
+
+### Task 5.3 빌드/린트 기준 강화
+
+- unused 변수와 hook dependency 경고를 정리한다.
+- ESLint 경고를 실패로 볼지 결정한다.
+- `npm run check-all`을 최종 품질 게이트로 사용한다.
+
+수락 기준:
+
+- `npm run check-all`과 `npm run build`가 통과한다.
+- 경고가 남는 경우 문서화된 예외만 허용한다.
+
+## Phase 6. 최적화와 사용성 개선
+
+목표: 안정화 이후 사용자 경험과 성능을 개선한다.
+
+### Task 6.1 데이터 로딩 최적화
+
+- N+1 조회를 제거한다.
+- 대시보드 카드용 경량 DTO를 만든다.
+- 상세 페이지는 필요한 시계열만 로드한다.
+
+### Task 6.2 차트 성능 개선
+
+- 긴 시계열 렌더링 비용을 측정한다.
+- Recharts 데이터 변환을 memoization한다.
+- 모바일 차트 터치 UX를 점검한다.
+
+### Task 6.3 다운로드 품질 개선
+
+- Excel 시트 구조를 정리한다.
+- PNG export 배경/테마/해상도를 안정화한다.
+- 파일명 규칙을 통일한다.
+
+## 우선순위 요약
+
+1. 문서 기준선 갱신
+2. 키워드 데이터 모델 통합
+3. Trends 수집 경로 단일화
+4. API/서비스 레이어 재작성
+5. 프론트엔드 라우트와 컴포넌트 정리
+6. 테스트 체계 구축
+7. 품질 게이트와 배포 준비
