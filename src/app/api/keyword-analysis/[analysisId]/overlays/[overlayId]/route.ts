@@ -12,8 +12,34 @@ import {
   validateApiAuth,
   createSuccessResponse,
 } from '@/lib/api-helpers'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
+
+async function isOwnedAnalysis(
+  supabase: SupabaseClient,
+  analysisId: string,
+  userId: string
+): Promise<boolean> {
+  const { data: analysis, error: analysisError } = await supabase
+    .from('keyword_analysis')
+    .select('keyword_id')
+    .eq('id', analysisId)
+    .single()
+
+  if (analysisError && analysisError.code !== 'PGRST116') throw analysisError
+  if (!analysis) return false
+
+  const { data: keyword, error: keywordError } = await supabase
+    .from('keywords')
+    .select('id')
+    .eq('id', analysis.keyword_id)
+    .eq('user_id', userId)
+    .single()
+
+  if (keywordError && keywordError.code !== 'PGRST116') throw keywordError
+  return Boolean(keyword)
+}
 
 export async function DELETE(
   request: NextRequest,
@@ -25,14 +51,25 @@ export async function DELETE(
     if (authResult instanceof NextResponse) {
       return authResult
     }
+    const { userId } = authResult
 
-    const { overlayId } = await params
+    const { analysisId, overlayId } = await params
+
+    const ownsAnalysis = await isOwnedAnalysis(supabase, analysisId, userId)
+    if (!ownsAnalysis) {
+      return createErrorResponse(
+        'NOT_FOUND',
+        'Analysis를 찾을 수 없습니다.',
+        404
+      )
+    }
 
     // overlay 삭제
     const { error } = await supabase
       .from('keyword_stock_overlays')
       .delete()
       .eq('id', overlayId)
+      .eq('analysis_id', analysisId)
 
     if (error) throw error
 
