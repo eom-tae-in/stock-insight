@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import {
@@ -66,6 +66,15 @@ import { generateKeywordAnalysisExcelFile } from '@/lib/export/excel'
 import { captureChartAsPng } from '@/lib/export/image'
 import { KeywordStandaloneChart } from './keyword-standalone-chart'
 
+// 차트 데이터 포인트 타입
+type ChartDataPoint = {
+  weekIndex: number
+  date: string
+  trendsValue: number
+  ma13Value: number | null
+  yoyValue: number | null
+}
+
 // Overlay 타입 정의
 type OverlayItem = {
   id: string
@@ -82,13 +91,6 @@ type OverlayItem = {
 interface KeywordDetailClientProps {
   keywordId: string
   keyword: KeywordSearchRecord
-  chartData: Array<{
-    weekIndex: number
-    date: string
-    trendsValue: number
-    ma13Value: number | null
-    yoyValue: number | null
-  }>
   initialSearchParams: {
     region: Region
     period: Period
@@ -104,9 +106,9 @@ function DragOverlayComponent({
   formattedDate,
 }: {
   overlays: OverlayItem[]
-  chartData: KeywordDetailClientProps['chartData']
+  chartData: ChartDataPoint[]
   mergeChartData: (
-    a: KeywordDetailClientProps['chartData'],
+    a: ChartDataPoint[],
     b: OverlayItem['chartData']
   ) => Array<{
     date: string
@@ -242,9 +244,9 @@ function SortableOverlayCard({
   onToggleSelect,
 }: {
   overlay: OverlayItem
-  chartData: KeywordDetailClientProps['chartData']
+  chartData: ChartDataPoint[]
   mergeChartData: (
-    a: KeywordDetailClientProps['chartData'],
+    a: ChartDataPoint[],
     b: OverlayItem['chartData']
   ) => Array<{
     date: string
@@ -433,7 +435,6 @@ function SortableOverlayCard({
 export function KeywordDetailClient({
   keywordId,
   keyword,
-  chartData: initialChartData,
   initialSearchParams,
 }: KeywordDetailClientProps) {
   const router = useRouter()
@@ -441,13 +442,21 @@ export function KeywordDetailClient({
 
   // 필터 상태 (URL 동기화)
   const [region, setRegion] = useState<Region>(initialSearchParams.region)
-  const [period, setPeriod] = useState<Period>(initialSearchParams.period)
   const [searchType, setSearchType] = useState<SearchType>(
     initialSearchParams.searchType
   )
+  const period: Period = '5Y' // 고정값
 
   // 데이터 상태
-  const [chartData, setChartData] = useState(initialChartData)
+  const [chartData, setChartData] = useState<
+    Array<{
+      weekIndex: number
+      date: string
+      trendsValue: number
+      ma13Value: number | null
+      yoyValue: number | null
+    }>
+  >([])
   const [overlays, setOverlays] = useState<
     Array<{
       id: string
@@ -463,20 +472,81 @@ export function KeywordDetailClient({
   >([])
   const [currentAnalysis, setCurrentAnalysis] =
     useState<KeywordAnalysis | null>(null)
-  const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false)
+  const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(true) // 초기 로드 상태
   const [analysisNotFound, setAnalysisNotFound] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [isCreatingAnalysis, setIsCreatingAnalysis] = useState(false)
 
-  // 필터 변경 시 URL 동기화 + 데이터 로드
-  useEffect(() => {
-    const newUrl = `/keywords/${keywordId}?region=${region}&period=${period}&searchType=${searchType}`
-    window.history.replaceState(null, '', newUrl)
+  // 새로운 분석 생성 및 바로 이동
+  const handleCreateNewAnalysis = useCallback(async () => {
+    setIsCreatingAnalysis(true)
+    try {
+      // 1. 분석 생성 (현재 조건 기반, trends_data 함께 저장)
+      const createRes = await fetch('/api/keyword-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          keyword_id: keywordId,
+          keyword: keyword.keyword,
+          region,
+          period,
+          search_type: searchType,
+        }),
+      })
 
-    // Analysis 조회
-    loadAnalysis()
-  }, [region, period, searchType, keywordId])
+      if (!createRes.ok) throw new Error('분석 생성 실패')
 
-  const loadAnalysis = async () => {
+      const createData = await createRes.json()
+      const analysisId = createData.data?.id
+      const trendsData = createData.data?.trends_data
+
+      if (!analysisId) throw new Error('분석 ID를 받지 못했습니다')
+
+      // 2. trends_data 즉시 화면에 표시
+      if (trendsData && Array.isArray(trendsData)) {
+        setCurrentAnalysis({
+          id: analysisId,
+          keyword_id: keywordId,
+          region,
+          period,
+          search_type: searchType,
+          trends_data: trendsData,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+
+        setChartData(
+          trendsData.map(
+            (point: {
+              date: string
+              value: number
+              ma13Value: number | null
+              yoyValue: number | null
+            }) => ({
+              weekIndex: 0,
+              date: point.date,
+              trendsValue: point.value,
+              ma13Value: point.ma13Value,
+              yoyValue: point.yoyValue,
+            })
+          )
+        )
+        setAnalysisNotFound(false)
+
+        // 오버레이도 새로고침
+        await loadOverlays(analysisId)
+      }
+
+      toast.success('새로운 분석이 생성되었습니다')
+    } catch (error) {
+      console.error('Failed to create analysis:', error)
+      toast.error('분석 생성에 실패했습니다')
+    } finally {
+      setIsCreatingAnalysis(false)
+    }
+  }, [keywordId, keyword, region, searchType])
+
+  const loadAnalysis = useCallback(async () => {
     setIsLoadingAnalysis(true)
     setAnalysisNotFound(false)
     try {
@@ -485,7 +555,8 @@ export function KeywordDetailClient({
       )
       if (!response.ok) throw new Error('Analysis not found')
 
-      const analysis = await response.json()
+      const apiResponse = await response.json()
+      const analysis = apiResponse.data
 
       if (!analysis) {
         // Analysis가 없는 경우
@@ -524,7 +595,21 @@ export function KeywordDetailClient({
     } finally {
       setIsLoadingAnalysis(false)
     }
-  }
+  }, [keywordId, region, period, searchType])
+
+  // 필터 변경 시 URL 동기화 + 데이터 로드
+  useEffect(() => {
+    const newUrl = `/keywords/${keywordId}?region=${region}&searchType=${searchType}`
+    window.history.replaceState(null, '', newUrl)
+
+    // 분석 조건 변경 시 selectedStock 초기화 (분석별 독립성 보장)
+    setSelectedStock(null)
+    setStockSearchInput('')
+    setShowAutocomplete(false)
+
+    // Analysis 조회
+    loadAnalysis()
+  }, [region, searchType, keywordId, loadAnalysis])
 
   const loadOverlays = async (analysisId: string) => {
     try {
@@ -533,11 +618,16 @@ export function KeywordDetailClient({
       )
       if (!response.ok) throw new Error('Failed to load overlays')
 
-      const overlayList = await response.json()
+      const apiResponse = await response.json()
+      const overlayList = apiResponse.data
+
+      console.log('[loadOverlays] overlayList:', overlayList)
+      console.log('[loadOverlays] analysisId:', analysisId, ', region:', region)
 
       // overlayList는 KeywordAnalysisOverlay[] 이므로
       // search_id를 통해 price data를 조회하고 chartData로 변환
       if (!Array.isArray(overlayList) || overlayList.length === 0) {
+        console.log('[loadOverlays] No overlays found')
         setOverlays([])
         return
       }
@@ -545,48 +635,81 @@ export function KeywordDetailClient({
       // 병렬로 각 search 레코드 조회
       const searchPromises = overlayList.map(overlay =>
         fetch(`/api/searches/${overlay.search_id}`)
-          .then(res => (res.ok ? res.json() : null))
+          .then(res => (res.ok ? res.json().then(apiRes => apiRes.data) : null))
           .catch(() => null)
       )
 
       const searchResults = await Promise.all(searchPromises)
+      console.log(
+        '[loadOverlays] searchResults sample:',
+        searchResults.map(r => ({
+          ticker: r?.ticker,
+          priceDataLength: r?.price_data?.length,
+          firstDate: r?.price_data?.[0]?.date,
+          lastDate: r?.price_data?.[r.price_data.length - 1]?.date,
+        }))
+      )
 
       // 모든 가격 데이터 수집하여 min/max 계산
       let minPrice = Infinity
       let maxPrice = -Infinity
 
       for (const result of searchResults) {
-        if (result?.price_data && Array.isArray(result.price_data)) {
-          for (const point of result.price_data) {
-            if (typeof point.close === 'number') {
-              minPrice = Math.min(minPrice, point.close)
-              maxPrice = Math.max(maxPrice, point.close)
+        if (result?.priceData && Array.isArray(result.priceData)) {
+          for (const point of result.priceData) {
+            if (typeof point.price === 'number') {
+              minPrice = Math.min(minPrice, point.price)
+              maxPrice = Math.max(maxPrice, point.price)
             }
           }
         }
       }
 
+      console.log('[loadOverlays] minPrice:', minPrice, ', maxPrice:', maxPrice)
+
       // 정규화된 overlays 구성
       const convertedOverlays: OverlayItem[] = overlayList
         .map((overlay, index) => {
           const searchData = searchResults[index]
-          if (!searchData?.price_data) return null
+          if (!searchData?.priceData) {
+            console.log(
+              '[loadOverlays] No priceData for overlay:',
+              overlay.ticker
+            )
+            return null
+          }
 
-          const priceData = searchData.price_data as PriceDataPoint[]
+          const priceData = searchData.priceData as Array<{
+            date: string
+            price: number
+          }>
           const priceRange = maxPrice - minPrice
 
-          const chartData = priceData.map((point: PriceDataPoint) => {
-            const normalizedPrice =
-              priceRange > 0
-                ? ((point.close - minPrice) / priceRange) * 100
-                : 50
+          const chartData = priceData.map(
+            (point: { date: string; price: number }) => {
+              const normalizedPrice =
+                priceRange > 0
+                  ? ((point.price - minPrice) / priceRange) * 100
+                  : 50
 
-            return {
-              date: point.date,
-              normalizedPrice: Math.max(0, Math.min(100, normalizedPrice)),
-              rawPrice: point.close,
+              return {
+                date: point.date,
+                normalizedPrice: Math.max(0, Math.min(100, normalizedPrice)),
+                rawPrice: point.price,
+              }
             }
-          })
+          )
+
+          console.log(
+            '[loadOverlays] overlay chartData for',
+            overlay.ticker,
+            '- count:',
+            chartData.length,
+            ', first:',
+            chartData[0],
+            ', last:',
+            chartData[chartData.length - 1]
+          )
 
           return {
             id: overlay.id,
@@ -598,6 +721,7 @@ export function KeywordDetailClient({
         })
         .filter((o): o is OverlayItem => o !== null)
 
+      console.log('[loadOverlays] convertedOverlays:', convertedOverlays)
       setOverlays(convertedOverlays)
     } catch (error) {
       console.error('Failed to load overlays:', error)
@@ -658,16 +782,50 @@ export function KeywordDetailClient({
     keywordData: typeof chartData,
     overlayData: OverlayItem['chartData']
   ) => {
+    console.log(
+      '[mergeChartData] keywordData length:',
+      keywordData.length,
+      ', overlayData length:',
+      overlayData.length
+    )
+    console.log(
+      '[mergeChartData] keywordData dates sample:',
+      keywordData.slice(0, 3).map(d => d.date)
+    )
+    console.log(
+      '[mergeChartData] overlayData dates sample:',
+      overlayData.slice(0, 3).map(d => d.date)
+    )
+
     const keywordMap = new Map(keywordData.map(d => [d.date, d]))
-    const merged = overlayData.map(point => ({
+
+    // overlayData에서 keywordMap에 있는 date만 필터링
+    const filteredOverlayData = overlayData.filter(point =>
+      keywordMap.has(point.date)
+    )
+    console.log(
+      '[mergeChartData] filteredOverlayData length:',
+      filteredOverlayData.length
+    )
+
+    const merged = filteredOverlayData.map(point => ({
       date: point.date,
       trendsValue: keywordMap.get(point.date)?.trendsValue ?? null,
       ma13Value: keywordMap.get(point.date)?.ma13Value ?? null,
       normalizedPrice: point.normalizedPrice,
       yoyValue: keywordMap.get(point.date)?.yoyValue ?? null,
     }))
+
+    console.log('[mergeChartData] merged length:', merged.length)
+    console.log('[mergeChartData] merged sample (first 3):', merged.slice(0, 3))
+    console.log('[mergeChartData] merged sample (last 3):', merged.slice(-3))
+
     // 마지막 52개만 (1년)
-    return merged.slice(Math.max(0, merged.length - 52))
+    const sliced = merged.slice(Math.max(0, merged.length - 52))
+    console.log('[mergeChartData] sliced length:', sliced.length)
+    console.log('[mergeChartData] sliced sample:', sliced.slice(0, 2))
+
+    return sliced
   }
 
   // 개별 삭제 (일반 모드에서만)
@@ -854,11 +1012,11 @@ export function KeywordDetailClient({
       let maxPrice = -Infinity
 
       for (const result of searchResults) {
-        if (result?.price_data && Array.isArray(result.price_data)) {
-          for (const point of result.price_data) {
-            if (typeof point.close === 'number') {
-              minPrice = Math.min(minPrice, point.close)
-              maxPrice = Math.max(maxPrice, point.close)
+        if (result?.priceData && Array.isArray(result.priceData)) {
+          for (const point of result.priceData) {
+            if (typeof point.price === 'number') {
+              minPrice = Math.min(minPrice, point.price)
+              maxPrice = Math.max(maxPrice, point.price)
             }
           }
         }
@@ -1181,23 +1339,44 @@ export function KeywordDetailClient({
       return
     }
 
+    if (!currentAnalysis) {
+      toast.error('분석 데이터를 먼저 로드해주세요')
+      return
+    }
+
     setIsSavingCustomChart(true)
     try {
-      const res = await fetch(`/api/keyword-searches/${keyword.id}/overlays`, {
+      // 1단계: 종목을 searches 테이블에 저장/조회
+      const searchRes = await fetch('/api/searches', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ticker: selectedStock.ticker,
-          companyName: selectedStock.companyName,
-          priceData: selectedStock.priceData,
         }),
       })
 
-      const data = await res.json()
+      if (!searchRes.ok) throw new Error('Failed to save stock to searches')
+
+      const searchApiResponse = await searchRes.json()
+      const searchId = searchApiResponse.data.id
+
+      // 2단계: overlays에 연결 (현재 분석 조건 기반)
+      const overlayRes = await fetch(
+        `/api/keyword-analysis/${currentAnalysis.id}/overlays`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            search_id: searchId,
+            ticker: selectedStock.ticker,
+            company_name: selectedStock.companyName,
+          }),
+        }
+      )
 
       // 409 DUPLICATE도 오버레이 목록 새로고침 필요
-      if (res.ok || res.status === 409) {
-        if (res.status === 409) {
+      if (overlayRes.ok || overlayRes.status === 409) {
+        if (overlayRes.status === 409) {
           toast.info('이미 추가된 종목입니다')
         } else {
           toast.success('커스텀 차트가 저장되었습니다')
@@ -1207,14 +1386,8 @@ export function KeywordDetailClient({
         setSelectedStock(null)
         setStockSearchInput('')
 
-        // 오버레이 목록 새로고침
-        const overlaysRes = await fetch(
-          `/api/keyword-searches/${keyword.id}/overlays`
-        )
-        if (overlaysRes.ok) {
-          const overlaysData = await overlaysRes.json()
-          setOverlays(overlaysData.data || [])
-        }
+        // 오버레이 목록 새로고침 (동일한 함수 재사용)
+        await loadOverlays(currentAnalysis.id)
       } else {
         throw new Error('Failed to save custom chart')
       }
@@ -1288,24 +1461,6 @@ export function KeywordDetailClient({
               </Select>
             </div>
 
-            {/* 기간 필터 */}
-            <div>
-              <label className="text-xs font-medium">기간</label>
-              <Select
-                value={period}
-                onValueChange={value => setPeriod(value as Period)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1Y">1년</SelectItem>
-                  <SelectItem value="3Y">3년</SelectItem>
-                  <SelectItem value="5Y">5년</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
             {/* 검색 타입 필터 */}
             <div>
               <label className="text-xs font-medium">검색 타입</label>
@@ -1352,12 +1507,15 @@ export function KeywordDetailClient({
               이 조건으로 저장된 분석이 없습니다
             </p>
             <p className="text-muted-foreground mb-4 text-sm">
-              지역: {region === 'GLOBAL' ? '전세계' : region} | 기간:{' '}
-              {period === '1Y' ? '1년' : period === '3Y' ? '3년' : '5년'} |
-              검색: {searchType === 'WEB' ? '웹' : '유튜브'}
+              지역: {region === 'GLOBAL' ? '전세계' : region} | 검색:{' '}
+              {searchType === 'WEB' ? '웹' : '유튜브'}
             </p>
-            <Button variant="outline" asChild>
-              <Link href="/keywords/search">새로운 분석 검색</Link>
+            <Button
+              onClick={handleCreateNewAnalysis}
+              disabled={isCreatingAnalysis}
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              {isCreatingAnalysis ? '분석 중...' : '새로운 분석 검색'}
             </Button>
           </div>
         )}
@@ -1400,7 +1558,7 @@ export function KeywordDetailClient({
                       <div className="absolute top-full right-0 left-0 z-50 mt-1 max-h-48 overflow-y-auto rounded border border-gray-300 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
                         {autocompleteResults.map((result, index) => (
                           <div
-                            key={result.ticker}
+                            key={`${result.ticker}-${index}`}
                             onClick={() =>
                               handleSelectAutocomplete(
                                 result.ticker,
@@ -1534,9 +1692,12 @@ export function KeywordDetailClient({
               <div ref={chartRef}>
                 <KeywordStandaloneChart
                   keyword={keyword.keyword}
-                  chartData={filteredChartData}
+                  chartData={chartData}
                   formattedDate={formattedDate}
                   overlayStock={selectedStock || undefined}
+                  overlays={overlays}
+                  timeframeType={timeframeType}
+                  timeframeValue={timeframeValue}
                   visibleLines={visibleLines}
                   onToggleLine={handleToggleLine}
                 />

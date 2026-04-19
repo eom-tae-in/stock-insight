@@ -7,10 +7,7 @@
 
 import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import {
-  getKeywordSearchById,
-  getKeywordChartTimeseries,
-} from '@/lib/db/queries'
+import { getKeywordSearchById } from '@/lib/db/queries'
 import { KeywordDetailClient } from '@/components/keyword-detail/keyword-detail-client'
 import type { Region, Period, SearchType } from '@/types/database'
 
@@ -48,20 +45,7 @@ export default async function KeywordDetailPage({
     redirect('/trends')
   }
 
-  // 2. 차트 시계열 데이터 조회 (기존 데이터 - 초기값용)
-  let chartTimeseries: Array<{
-    weekIndex: number
-    date: string
-    trendsValue: number
-    ma13Value: number | null
-    yoyValue: number | null
-  }> = []
-
-  try {
-    chartTimeseries = await getKeywordChartTimeseries(keywordId, supabase)
-  } catch (error) {
-    console.error('Failed to fetch chart timeseries:', error)
-  }
+  // 2. 차트 시계열 데이터는 클라이언트에서 API로 로드 (통일된 구조)
 
   // 쿼리 파라미터에서 필터 추출 (유효성 검사)
   const regionParam = (resolvedSearchParams.region as string) || 'GLOBAL'
@@ -84,7 +68,6 @@ export default async function KeywordDetailPage({
     <KeywordDetailClient
       keywordId={keywordId}
       keyword={keyword}
-      chartData={chartTimeseries}
       initialSearchParams={{
         region,
         period,

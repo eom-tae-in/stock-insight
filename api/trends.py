@@ -44,11 +44,19 @@ def fetch_trends_data(keyword: str, geo: str = '', timeframe: str = '5y', gprop:
         print(f'[fetch_trends_data] TrendReq 객체 생성 중...', flush=True)
         pytrends = TrendReq(hl='ko_KR', tz=0, retries=3, backoff_factor=1.0)
 
+        timeframe_str = f'{start_date.strftime("%Y-%m-%d")} {end_date.strftime("%Y-%m-%d")}'
+        print(f'[fetch_trends_data] build_payload 호출 전 파라미터:')
+        print(f'  - kw_list: {[keyword]}', flush=True)
+        print(f'  - cat: 0', flush=True)
+        print(f'  - timeframe: {timeframe_str}', flush=True)
+        print(f'  - geo (타입: {type(geo).__name__}): "{geo}"', flush=True)
+        print(f'  - gprop (타입: {type(gprop).__name__}): "{gprop}"', flush=True)
+
         print(f'[fetch_trends_data] build_payload 호출 중...', flush=True)
         pytrends.build_payload(
             kw_list=[keyword],
             cat=0,
-            timeframe=f'{start_date.strftime("%Y-%m-%d")} {end_date.strftime("%Y-%m-%d")}',
+            timeframe=timeframe_str,
             geo=geo,
             gprop=gprop,
         )

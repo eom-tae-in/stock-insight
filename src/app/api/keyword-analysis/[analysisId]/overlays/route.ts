@@ -1,7 +1,7 @@
 /**
  * Keyword Analysis Stock Overlays API
  *
- * GET /api/keyword-analysis/[analysisId]/overlays
+ * GET /api/keyword-analysis/[analysisId]/overlays?keywordId=xxx
  * Response: KeywordAnalysisOverlay[]
  *
  * POST /api/keyword-analysis/[analysisId]/overlays
@@ -43,7 +43,7 @@ export async function GET(
 
     const { analysisId } = await params
 
-    // analysis 기준 overlays 조회
+    // analysis_id 기준 overlays 조회
     const { data, error } = await supabase
       .from('keyword_stock_overlays')
       .select('*')
@@ -100,6 +100,21 @@ export async function POST(
       )
     }
 
+    // analysis 존재 검증
+    const { data: analysisData, error: analysisError } = await supabase
+      .from('keyword_analysis')
+      .select('id')
+      .eq('id', analysisId)
+      .single()
+
+    if (analysisError || !analysisData) {
+      return createErrorResponse(
+        'NOT_FOUND',
+        'Analysis를 찾을 수 없습니다.',
+        404
+      )
+    }
+
     // 최대 display_order 조회
     const { data: maxData } = await supabase
       .from('keyword_stock_overlays')
@@ -111,7 +126,7 @@ export async function POST(
     const nextOrder =
       maxData && maxData.length > 0 ? maxData[0].display_order + 1 : 1
 
-    // overlay 추가
+    // overlay 추가 (analysis_id 기준)
     const { data, error } = await supabase
       .from('keyword_stock_overlays')
       .insert({

@@ -73,12 +73,16 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const {
       keyword,
+      region = 'GLOBAL',
+      search_type = 'WEB',
       geo = '',
       gprop = '',
       chartData = [],
       overlays,
     }: {
       keyword: string
+      region?: 'GLOBAL' | 'US' | 'KR' | 'JP' | 'CN'
+      search_type?: 'WEB' | 'YOUTUBE'
       geo?: string
       gprop?: string
       chartData?: Array<{
@@ -106,12 +110,21 @@ export async function POST(request: NextRequest) {
     }
 
     // 1. 키워드 저장
-    console.log('[POST keyword-searches] Saving keyword:', keyword)
+    console.log(
+      '[POST keyword-searches] Saving keyword:',
+      keyword,
+      ', region:',
+      region,
+      ', search_type:',
+      search_type
+    )
     const keywordSearchId = await upsertKeywordSearch(
       {
         id: '',
         user_id: userId,
         keyword,
+        region,
+        search_type,
         trends_data: [],
         searched_at: new Date().toISOString(),
         created_at: new Date().toISOString(),

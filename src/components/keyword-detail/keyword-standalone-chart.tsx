@@ -31,6 +31,18 @@ interface KeywordStandaloneChartProps {
       price: number
     }>
   }
+  overlays?: Array<{
+    id: string
+    ticker: string
+    companyName: string
+    chartData: Array<{
+      date: string
+      normalizedPrice: number
+      rawPrice: number
+    }>
+  }>
+  timeframeType?: 'weeks' | 'years'
+  timeframeValue?: number
   visibleLines: {
     trendsValue: boolean
     ma13Value: boolean
@@ -47,6 +59,9 @@ export function KeywordStandaloneChart({
   chartData,
   formattedDate,
   overlayStock,
+  overlays = [],
+  timeframeType = 'years',
+  timeframeValue = 5,
   visibleLines,
   onToggleLine,
 }: KeywordStandaloneChartProps) {
@@ -60,16 +75,94 @@ export function KeywordStandaloneChart({
     )
   }
 
-  // 차트 데이터 병합 (overlayStock이 있으면)
-  const mergedData = chartData.map(point => {
-    const overlayPoint = overlayStock?.priceData.find(
-      p => p.date === point.date
-    )
-    return {
-      ...point,
-      stockPrice: overlayPoint ? overlayPoint.price : null,
+  // timeframe 기준 필터링 (trends_data와 overlays.chartData 동일 범위)
+  const getFilteredData = <T extends { date: string }>(data: T[]): T[] => {
+    if (timeframeType === 'weeks') {
+      const weeksToShow = Math.round(timeframeValue)
+      return data.slice(-weeksToShow)
+    } else {
+      const weeksToShow = Math.round(timeframeValue * 52)
+      return data.slice(-weeksToShow)
     }
+  }
+
+  const filteredChartData = getFilteredData(chartData)
+
+  // 차트 데이터 병합 (overlayStock + overlays)
+  const mergedData = filteredChartData.map(
+    (point: {
+      weekIndex: number
+      date: string
+      trendsValue: number
+      ma13Value: number | null
+      yoyValue: number | null
+    }) => {
+      const acc: {
+        weekIndex: number
+        date: string
+        trendsValue: number
+        ma13Value: number | null
+        yoyValue: number | null
+        stockPrice: number | null
+        [key: string]: number | null | string
+      } = {
+        weekIndex: point.weekIndex,
+        date: point.date,
+        trendsValue: point.trendsValue,
+        ma13Value: point.ma13Value,
+        yoyValue: point.yoyValue,
+        stockPrice: null, // selectedStock용
+      }
+
+      // selectedStock 병합 (overlayStock)
+      if (overlayStock?.priceData) {
+        const overlayPoint = overlayStock.priceData.find(
+          p => p.date === point.date
+        )
+        acc.stockPrice = overlayPoint ? overlayPoint.price : null
+      }
+
+      // DB 저장된 overlays 병합
+      overlays.forEach(overlay => {
+        // overlay.chartData도 같은 timeframe으로 필터링
+        const filteredOverlayData = getFilteredData(overlay.chartData)
+        const overlayPoint = filteredOverlayData.find(
+          p => p.date === point.date
+        )
+        acc[`overlay_${overlay.id}`] = overlayPoint
+          ? overlayPoint.normalizedPrice
+          : null
+      })
+
+      return acc
+    }
+  )
+
+  // Y축 범위 계산 (주가 데이터 포함)
+  let minPrice = Infinity
+  let maxPrice = -Infinity
+
+  // selectedStock 주가 범위
+  if (overlayStock?.priceData) {
+    overlayStock.priceData.forEach(p => {
+      minPrice = Math.min(minPrice, p.price)
+      maxPrice = Math.max(maxPrice, p.price)
+    })
+  }
+
+  // overlays 범위 (정규화된 값: 0-100)
+  overlays.forEach(overlay => {
+    overlay.chartData.forEach(p => {
+      minPrice = Math.min(minPrice, p.normalizedPrice)
+      maxPrice = Math.max(maxPrice, p.normalizedPrice)
+    })
   })
+
+  // 유효한 범위가 없으면 기본값
+  const priceAxisDomain =
+    minPrice === Infinity
+      ? [0, 100]
+      : [Math.floor(minPrice * 0.95), Math.ceil(maxPrice * 1.05)]
 
   return (
     <Card>
@@ -151,13 +244,16 @@ export function KeywordStandaloneChart({
                 fill: 'hsl(var(--foreground))',
               }}
             />
-            {overlayStock && (
+            {(overlayStock || overlays.length > 0) && (
               <YAxis
                 yAxisId="right"
                 orientation="right"
+                domain={priceAxisDomain}
                 tick={{ fontSize: 12, fill: 'hsl(var(--foreground))' }}
                 label={{
-                  value: `${overlayStock.ticker} 주가 ($)`,
+                  value: overlayStock
+                    ? `${overlayStock.ticker} 주가 ($)`
+                    : '가격 (정규화)',
                   angle: 90,
                   position: 'insideRight',
                   fill: 'hsl(var(--foreground))',
@@ -216,7 +312,7 @@ export function KeywordStandaloneChart({
               />
             )}
 
-            {/* 종목 주가 (보라색) */}
+            {/* 선택된 종목 주가 (보라색) */}
             {overlayStock && visibleLines.stockPrice && (
               <Line
                 type="monotone"
@@ -229,12 +325,39 @@ export function KeywordStandaloneChart({
                 yAxisId="right"
               />
             )}
+
+            {/* DB 저장된 overlays (여러 색상) */}
+            {overlays.map((overlay, index) => {
+              const colors = [
+                '#06b6d4', // cyan
+                '#10b981', // emerald
+                '#f59e0b', // amber
+                '#ef4444', // red
+                '#8b5cf6', // violet
+              ]
+              const color = colors[index % colors.length]
+              const dataKey = `overlay_${overlay.id}`
+
+              return (
+                <Line
+                  key={overlay.id}
+                  type="monotone"
+                  dataKey={dataKey}
+                  stroke={color}
+                  name={`${overlay.ticker}`}
+                  dot={false}
+                  strokeWidth={2}
+                  isAnimationActive={false}
+                  yAxisId="right"
+                />
+              )
+            })}
           </LineChart>
         </ResponsiveContainer>
 
         {/* 메타정보 */}
         <div className="text-muted-foreground flex items-center justify-between border-t pt-4 text-xs">
-          <span>전체 데이터 ({chartData.length}주)</span>
+          <span>표시 데이터 ({filteredChartData.length}주)</span>
           <span>{formattedDate}</span>
         </div>
       </CardContent>

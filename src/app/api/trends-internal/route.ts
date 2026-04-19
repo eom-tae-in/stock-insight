@@ -22,7 +22,7 @@ async function getTrendsData(
   gprop: string
 ) {
   try {
-    const pythonPath = 'python3'
+    const pythonPath = path.join(process.cwd(), '.venv', 'bin', 'python3')
     const scriptPath = path.join(process.cwd(), 'src', 'lib', 'get_trends.py')
 
     const { stdout, stderr } = await execFileAsync(pythonPath, [

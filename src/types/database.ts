@@ -103,6 +103,8 @@ export interface KeywordSearchRecord {
   id: string // UUID
   user_id: string // 사용자 UUID (OAuth 로그인한 사용자)
   keyword: string // Google Trends 검색어
+  region: Region // 지역
+  search_type: SearchType // 검색 타입
   ma13?: number // 트렌드 지수 기반 13주 이동평균 (0-100)
   yoy_change?: number // 트렌드 지수 기반 52주 YoY (%)
   trends_data: TrendsDataPoint[] // 5년 주간 트렌드 배열
@@ -119,6 +121,8 @@ export interface KeywordSearchRecordRaw {
   id: string
   user_id: string
   keyword: string
+  region: Region // 지역
+  search_type: SearchType // 검색 타입
   ma13?: number
   yoy_change?: number
   trends_data: string // JSON 문자열
