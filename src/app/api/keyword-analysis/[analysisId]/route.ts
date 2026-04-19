@@ -18,18 +18,42 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import {
-  getKeywordAnalysisByFilters,
-  updateKeywordAnalysis,
-  deleteKeywordAnalysis,
-} from '@/lib/db/queries'
+import { updateKeywordAnalysis, deleteKeywordAnalysis } from '@/lib/db/queries'
 import {
   createErrorResponse,
   validateApiAuth,
   createSuccessResponse,
 } from '@/lib/api-helpers'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
+
+async function getOwnedAnalysis(
+  supabase: SupabaseClient,
+  analysisId: string,
+  userId: string
+) {
+  const { data: analysis, error: analysisError } = await supabase
+    .from('keyword_analysis')
+    .select('*')
+    .eq('id', analysisId)
+    .single()
+
+  if (analysisError && analysisError.code !== 'PGRST116') throw analysisError
+  if (!analysis) return null
+
+  const { data: keyword, error: keywordError } = await supabase
+    .from('keywords')
+    .select('id')
+    .eq('id', analysis.keyword_id)
+    .eq('user_id', userId)
+    .single()
+
+  if (keywordError && keywordError.code !== 'PGRST116') throw keywordError
+  if (!keyword) return null
+
+  return analysis
+}
 
 export async function GET(
   request: NextRequest,
@@ -41,17 +65,11 @@ export async function GET(
     if (authResult instanceof NextResponse) {
       return authResult
     }
+    const { userId } = authResult
 
     const { analysisId } = await params
 
-    // 직접 조회 (RLS를 통해 자동으로 필터링)
-    const { data, error } = await supabase
-      .from('keyword_analysis')
-      .select('*')
-      .eq('id', analysisId)
-      .single()
-
-    if (error && error.code !== 'PGRST116') throw error
+    const data = await getOwnedAnalysis(supabase, analysisId, userId)
     if (!data) {
       return createErrorResponse(
         'NOT_FOUND',
@@ -94,9 +112,19 @@ export async function PATCH(
     if (authResult instanceof NextResponse) {
       return authResult
     }
+    const { userId } = authResult
 
     const { analysisId } = await params
     const body = await request.json()
+
+    const analysis = await getOwnedAnalysis(supabase, analysisId, userId)
+    if (!analysis) {
+      return createErrorResponse(
+        'NOT_FOUND',
+        'Analysis를 찾을 수 없습니다.',
+        404
+      )
+    }
 
     // analysis 업데이트
     await updateKeywordAnalysis(analysisId, body, supabase)
@@ -127,8 +155,18 @@ export async function DELETE(
     if (authResult instanceof NextResponse) {
       return authResult
     }
+    const { userId } = authResult
 
     const { analysisId } = await params
+
+    const analysis = await getOwnedAnalysis(supabase, analysisId, userId)
+    if (!analysis) {
+      return createErrorResponse(
+        'NOT_FOUND',
+        'Analysis를 찾을 수 없습니다.',
+        404
+      )
+    }
 
     // analysis 삭제
     await deleteKeywordAnalysis(analysisId, supabase)
