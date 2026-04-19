@@ -306,5 +306,5 @@ export interface KeywordAnalysisOverlay {
  * 규칙:
  * - 기존 KeywordSearchRecord는 기본값 (GLOBAL, 5Y, WEB)으로 변환
  * - UNIQUE(keyword_id, region, period, search_type) 보장
- * - 기존 오버레이 (keyword_search_id) → analysis_id로 재매핑
+ * - 기존 오버레이는 기본 analysis_id로 재매핑
  */
