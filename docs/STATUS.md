@@ -165,7 +165,7 @@ DB 테이블:
 남은 문제:
 
 - legacy route가 계속 신규 기능처럼 사용되고 있다.
-- DB cleanup 전까지 legacy route 이름은 남아 있지만, 오버레이 API/타입 계약에서는 `search_id`를 사용하지 않는다.
+- 오버레이 API/타입/DB 계약에서는 `search_id`를 사용하지 않는다.
 
 결론:
 
@@ -213,7 +213,7 @@ DB 테이블:
 - `keyword-detail-client.tsx`에 console debug 로그와 unused handler가 많다.
 - `POST /api/keyword-analysis`가 내부 HTTP로 `/api/trends-internal`을 호출한다. service 함수 호출로 바꿔야 한다.
 - overlay API는 신형 모델에 맞지만 repository/service 레이어 없이 route에서 직접 Supabase를 조작한다.
-- 키워드 분석 오버레이는 저장 종목(`searches`)과 독립되어 있다. 남은 `search_id` DB 컬럼은 cleanup 마이그레이션 적용 후 제거한다.
+- 키워드 분석 오버레이는 저장 종목(`searches`)과 독립되어 있다.
 
 ## 3. 현재 DB 모델 상태
 
@@ -231,13 +231,11 @@ DB 테이블:
 - `keyword_searches`
 - `keyword_chart_timeseries`
 - `keyword_temporary_overlays`
-- `keyword_stock_overlays.keyword_search_id`
 
 ### 즉시 확인해야 할 스키마 위험
 
 1. legacy route 이름은 아직 `/api/keyword-searches`에 남아 있다.
-2. `keyword_stock_overlays.search_id` 제거용 cleanup 마이그레이션은 작성됐고, DB 적용 후 정리 대상에서 제외된다.
-3. `keywords.name`은 존재하지만 normalized name unique 정책이 아직 명확하지 않다.
+2. `keywords.name`은 존재하지만 normalized name unique 정책이 아직 명확하지 않다.
 
 ## 4. 현재 라우트 구조 문제
 
