@@ -174,7 +174,6 @@ export interface StockProvider {
 - `keyword_chart_timeseries`
 - `keyword_temporary_overlays`
 - `keyword_stock_overlays.keyword_search_id`
-- `keyword_stock_overlays.search_id`
 
 마이그레이션 기간에는 legacy read만 허용하고, 신규 write는 목표 테이블로만 수행한다.
 
@@ -342,9 +341,7 @@ PR 수락 기준:
 
 - `TRENDS_API_URL` 포트와 Flask 실행 포트 불일치.
 - Trends 수집 경로가 Python script, Flask, Next API로 분산.
-- `keyword_temporary_overlays` 테이블 정의 누락.
-- `keyword_searches` unique 제약과 `upsert(... onConflict: 'user_id,keyword')` 불일치.
-- `keyword_stock_overlays`가 legacy `keyword_search_id`와 new `analysis_id` 모델을 혼용.
+- legacy route 이름이 `/api/keyword-searches`에 남아 있음.
 - 일부 DB 조회가 코드상 `user_id` 필터를 명시하지 않음.
 - React hook dependency 경고와 unused handler가 누적됨.
 - 프로덕션 에러 화면에서 내부 메시지 노출 가능성.
