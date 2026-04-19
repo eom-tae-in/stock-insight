@@ -27,8 +27,34 @@ import {
   validateApiAuth,
   createSuccessResponse,
 } from '@/lib/api-helpers'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
+
+async function isOwnedAnalysis(
+  supabase: SupabaseClient,
+  analysisId: string,
+  userId: string
+): Promise<boolean> {
+  const { data: analysis, error: analysisError } = await supabase
+    .from('keyword_analysis')
+    .select('keyword_id')
+    .eq('id', analysisId)
+    .single()
+
+  if (analysisError && analysisError.code !== 'PGRST116') throw analysisError
+  if (!analysis) return false
+
+  const { data: keyword, error: keywordError } = await supabase
+    .from('keywords')
+    .select('id')
+    .eq('id', analysis.keyword_id)
+    .eq('user_id', userId)
+    .single()
+
+  if (keywordError && keywordError.code !== 'PGRST116') throw keywordError
+  return Boolean(keyword)
+}
 
 export async function GET(
   request: NextRequest,
@@ -40,8 +66,17 @@ export async function GET(
     if (authResult instanceof NextResponse) {
       return authResult
     }
+    const { userId } = authResult
 
     const { analysisId } = await params
+    const ownsAnalysis = await isOwnedAnalysis(supabase, analysisId, userId)
+    if (!ownsAnalysis) {
+      return createErrorResponse(
+        'NOT_FOUND',
+        'Analysis를 찾을 수 없습니다.',
+        404
+      )
+    }
 
     // analysis_id 기준 overlays 조회
     const { data, error } = await supabase
@@ -86,6 +121,7 @@ export async function POST(
     if (authResult instanceof NextResponse) {
       return authResult
     }
+    const { userId } = authResult
 
     const { analysisId } = await params
     const body = await request.json()
@@ -100,14 +136,8 @@ export async function POST(
       )
     }
 
-    // analysis 존재 검증
-    const { data: analysisData, error: analysisError } = await supabase
-      .from('keyword_analysis')
-      .select('id')
-      .eq('id', analysisId)
-      .single()
-
-    if (analysisError || !analysisData) {
+    const ownsAnalysis = await isOwnedAnalysis(supabase, analysisId, userId)
+    if (!ownsAnalysis) {
       return createErrorResponse(
         'NOT_FOUND',
         'Analysis를 찾을 수 없습니다.',
@@ -166,10 +196,20 @@ export async function PATCH(
     if (authResult instanceof NextResponse) {
       return authResult
     }
+    const { userId } = authResult
 
     const { analysisId } = await params
     const body = await request.json()
     const { overlays } = body
+
+    const ownsAnalysis = await isOwnedAnalysis(supabase, analysisId, userId)
+    if (!ownsAnalysis) {
+      return createErrorResponse(
+        'NOT_FOUND',
+        'Analysis를 찾을 수 없습니다.',
+        404
+      )
+    }
 
     // 필수 필드 검증
     if (!Array.isArray(overlays) || overlays.length === 0) {
