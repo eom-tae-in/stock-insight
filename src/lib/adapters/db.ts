@@ -441,11 +441,13 @@ class SupabaseDbAdapter implements DbAdapter {
       .upsert(
         {
           user_id: record.user_id,
-          keyword: record.keyword,
+          keyword: record.keyword.trim(),
+          region: record.region,
+          search_type: record.search_type,
           searched_at: record.searched_at,
           updated_at: new Date().toISOString(),
         },
-        { onConflict: 'user_id,keyword' }
+        { onConflict: 'user_id,keyword,region,search_type' }
       )
       .select('id')
       .single()

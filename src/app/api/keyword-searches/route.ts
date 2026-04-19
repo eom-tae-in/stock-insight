@@ -75,16 +75,12 @@ export async function POST(request: NextRequest) {
       keyword,
       region = 'GLOBAL',
       search_type = 'WEB',
-      geo = '',
-      gprop = '',
       chartData = [],
       overlays,
     }: {
       keyword: string
       region?: 'GLOBAL' | 'US' | 'KR' | 'JP' | 'CN'
       search_type?: 'WEB' | 'YOUTUBE'
-      geo?: string
-      gprop?: string
       chartData?: Array<{
         weekIndex: number
         date: string
