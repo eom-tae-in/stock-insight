@@ -8,7 +8,7 @@
 import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getKeyword } from '@/server/keywords-service'
-import { KeywordDetailClient } from '@/components/keyword-detail/keyword-detail-client'
+import { KeywordDetailClient } from '@/components/keyword/keyword-detail/keyword-detail-client'
 import type { Region, Period, SearchType } from '@/types/database'
 
 export const metadata = {

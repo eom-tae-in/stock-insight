@@ -9,7 +9,7 @@
  */
 
 import { Container } from '@/components/layout/container'
-import { ThemeToggle } from '@/components/theme-toggle'
+import { ThemeToggle } from '@/components/shared/theme-toggle'
 import { OAuthLoginButton } from '@/components/auth/login-button'
 import { LoginForm } from '@/components/auth/login-form'
 import { Separator } from '@/components/ui/separator'

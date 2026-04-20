@@ -9,7 +9,7 @@
 import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getKeywords } from '@/server/keywords-service'
-import { MyKeywordsClient } from '@/components/keyword-trends/my-keywords-client'
+import { MyKeywordsClient } from '@/components/keyword/keyword-trends/my-keywords-client'
 
 export const metadata = {
   title: '내 키워드 | StockInsight',

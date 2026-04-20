@@ -1,10 +1,10 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Container } from '@/components/layout/container'
-import { MetricsSummary } from '@/components/metrics-summary'
-import { UnifiedChart } from '@/components/unified-chart'
-import { CustomChartBuilder } from '@/components/custom-chart-builder'
-import { CustomChartView } from '@/components/custom-chart-view'
+import { MetricsSummary } from '@/components/stock/metrics-summary'
+import { UnifiedChart } from '@/components/stock/unified-chart'
+import { CustomChartBuilder } from '@/components/stock/custom-chart-builder'
+import { CustomChartView } from '@/components/stock/custom-chart-view'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getSearchById } from '@/lib/db/queries'
 import { calculateMetrics, calculateMA13 } from '@/lib/calculations'
@@ -74,7 +74,6 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
             ticker={record.ticker}
             currency={record.currency}
             priceData={record.price_data}
-            trendsData={record.trends_data}
             ma13={ma13Values}
             metrics={metrics}
           />

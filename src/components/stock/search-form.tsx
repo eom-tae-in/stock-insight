@@ -255,8 +255,9 @@ export function SearchForm({
                     setTimeout(() => setShowSuggestions(false), 150)
                   }}
                   onChange={e => {
-                    field.onChange(e)
-                    handleInputChange(e.target.value)
+                    const upperValue = e.target.value.toUpperCase()
+                    field.onChange(upperValue)
+                    handleInputChange(upperValue)
                   }}
                   onKeyDown={handleKeyDown}
                 />

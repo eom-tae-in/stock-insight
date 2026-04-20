@@ -10,7 +10,7 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { StockCard } from '@/components/stock-card'
+import { StockCard } from '@/components/stock/stock-card'
 import { Edit2, Check } from 'lucide-react'
 import type { SearchRecord } from '@/types'
 
@@ -224,10 +224,14 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
                   id={record.id}
                   ticker={record.ticker}
                   companyName={record.company_name}
+                  currency={record.currency}
+                  weeklyOpen={record.weekly_open ?? 0}
+                  weeklyHigh={record.weekly_high ?? 0}
+                  weeklyLow={record.weekly_low ?? 0}
                   currentPrice={record.current_price ?? 0}
                   previousClose={record.previous_close ?? 0}
+                  ma13={record.ma13 ?? 0}
                   yoyChange={record.yoy_change ?? 0}
-                  sparklineData={record.price_data}
                   lastUpdatedAt={record.last_updated_at ?? record.searched_at}
                   onRefresh={() => handleRefresh(record.id)}
                   onDelete={() => handleDelete(record.id)}

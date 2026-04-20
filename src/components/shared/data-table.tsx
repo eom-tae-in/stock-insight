@@ -6,13 +6,12 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { calculateWeeklyYoY } from '@/lib/calculations'
 import { formatPrice, getCurrencySymbol } from '@/lib/utils/currency'
-import type { PriceDataPoint, TrendsDataPoint } from '@/types'
+import type { PriceDataPoint } from '@/types'
 
 interface DataTableProps {
   ticker: string
   currency?: string
   priceData: PriceDataPoint[]
-  trendsData: TrendsDataPoint[]
   ma13Values: (number | null)[]
 }
 
@@ -22,7 +21,6 @@ export function DataTable({
   ticker,
   currency,
   priceData,
-  trendsData,
   ma13Values,
 }: DataTableProps) {
   const [loadedCount, setLoadedCount] = useState(ITEMS_PER_PAGE)
@@ -33,26 +31,16 @@ export function DataTable({
   const [showScrollTop, setShowScrollTop] = useState(false)
   const lastRowRef = useRef<HTMLTableRowElement>(null)
 
-  // 트렌드 데이터 맵 만들기 (날짜 기준)
-  const trendsMap = useMemo(() => {
-    const map = new Map<string, number>()
-    trendsData.forEach(item => {
-      map.set(item.date, item.value)
-    })
-    return map
-  }, [trendsData])
-
   // 테이블 데이터 구성
   const tableData = useMemo(() => {
     const weeklyYoY = calculateWeeklyYoY(priceData)
     return priceData.map((price, index) => ({
       date: price.date,
       close: price.close,
-      trends: trendsMap.get(price.date) ?? 0,
       ma13: ma13Values[index] ?? 0,
       yoy: weeklyYoY[index] ?? 0,
     }))
-  }, [priceData, trendsMap, ma13Values])
+  }, [priceData, ma13Values])
 
   // 정렬
   const sortedData = useMemo(() => {
@@ -146,7 +134,6 @@ export function DataTable({
     const labelMap: { [key: string]: string } = {
       date: '일정',
       close: '주가',
-      trends: 'Google Trends',
       ma13: '13주 MA',
       yoy: '전년도 대비',
     }
@@ -182,11 +169,6 @@ export function DataTable({
               </th>
               <th className="border-muted/60 border-r px-4 py-3">
                 <div className="flex items-center justify-center">
-                  <SortHeader label="Google Trends (0-100)" sortKey="trends" />
-                </div>
-              </th>
-              <th className="border-muted/60 border-r px-4 py-3">
-                <div className="flex items-center justify-center">
                   <SortHeader
                     label={`13주 MA (${getCurrencySymbol(currency || ticker)})`}
                     sortKey="ma13"
@@ -213,17 +195,6 @@ export function DataTable({
                 <td className="border-muted/60 border-r px-4 py-3">
                   <div className="text-center">
                     {formatPrice(row.close, currency || ticker)}
-                  </div>
-                </td>
-                <td className="border-muted/60 border-r px-4 py-3">
-                  <div className="flex items-center justify-center gap-2">
-                    <div className="bg-muted relative h-6 w-16 overflow-hidden rounded">
-                      <div
-                        className="h-full bg-blue-500"
-                        style={{ width: `${row.trends}%` }}
-                      />
-                    </div>
-                    <span className="w-8 text-center">{row.trends}</span>
                   </div>
                 </td>
                 <td className="border-muted/60 border-r px-4 py-3">

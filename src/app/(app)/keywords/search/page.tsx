@@ -8,7 +8,7 @@
 
 import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import KeywordSearchPageClient from '@/components/keyword-search-page/keyword-search-page-client'
+import KeywordSearchPageClient from '@/components/keyword/keyword-search-page/keyword-search-page-client'
 
 export const metadata = {
   title: '키워드 검색 | StockInsight',

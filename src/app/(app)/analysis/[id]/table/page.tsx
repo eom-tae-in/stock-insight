@@ -2,8 +2,8 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Container } from '@/components/layout/container'
 import { Button } from '@/components/ui/button'
-import { DataTable } from '@/components/data-table'
-import { TableHeader } from '@/components/table-header'
+import { DataTable } from '@/components/shared/data-table'
+import { TableHeader } from '@/components/shared/table-header'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getSearchById } from '@/lib/db/queries'
 import { calculateMA13, calculateWeeklyYoY } from '@/lib/calculations'
@@ -42,15 +42,10 @@ export default async function TablePage({ params }: TablePageProps) {
   const weeklyYoY = calculateWeeklyYoY(record.price_data)
 
   // 테이블 데이터 구성 (Excel 다운로드용)
-  const trendsMap = new Map<string, number>()
-  record.trends_data.forEach(item => {
-    trendsMap.set(item.date, item.value)
-  })
-
   const tableData = record.price_data.map((price, index) => ({
     date: price.date,
     close: price.close,
-    trends: trendsMap.get(price.date) ?? 0,
+    trends: 0, // 엑셀 다운로드 타입 호환성 유지 (사용되지 않음)
     ma13: ma13Values[index] ?? null,
     yoy: weeklyYoY[index] ?? 0,
   }))
@@ -89,7 +84,6 @@ export default async function TablePage({ params }: TablePageProps) {
             ticker={record.ticker}
             currency={record.currency}
             priceData={record.price_data}
-            trendsData={record.trends_data}
             ma13Values={ma13Values}
           />
         </section>

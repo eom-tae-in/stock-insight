@@ -11,12 +11,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import {
-  matchPriceAndTrends,
-  calculateWeeklyYoY,
-  calculateWeekly52WeekHigh,
-  calculateWeekly52WeekLow,
-} from '@/lib/calculations'
+import { calculateWeeklyYoY } from '@/lib/calculations'
 import { captureChartAsPng } from '@/lib/export'
 import { getCurrencySymbol, formatPrice } from '@/lib/utils/currency'
 import { useChartTheme } from '@/hooks/use-chart-theme'
@@ -47,27 +42,6 @@ const SERIES_CONFIG = {
     yAxisId: 'left',
     enabled: true,
     minWeeks: 13,
-  },
-  week52High: {
-    name: '52주 최고가',
-    color: '#22c55e',
-    yAxisId: 'left',
-    enabled: true,
-    minWeeks: 52,
-  },
-  week52Low: {
-    name: '52주 최저가',
-    color: '#ef4444',
-    yAxisId: 'left',
-    enabled: true,
-    minWeeks: 52,
-  },
-  trends: {
-    name: '검색 관심도',
-    color: '#a78bfa',
-    yAxisId: 'middle',
-    enabled: true,
-    minWeeks: 0,
   },
   yoy: {
     name: '52주 YoY',
@@ -114,17 +88,11 @@ export function UnifiedChart({
       ? {
           close: initialEnabledSeries.includes('close'),
           ma13: initialEnabledSeries.includes('ma13'),
-          week52High: initialEnabledSeries.includes('week52High'),
-          week52Low: initialEnabledSeries.includes('week52Low'),
-          trends: initialEnabledSeries.includes('trends'),
           yoy: initialEnabledSeries.includes('yoy'),
         }
       : {
           close: true,
           ma13: true,
-          week52High: true,
-          week52Low: true,
-          trends: true,
           yoy: true,
         }
   )
@@ -137,9 +105,6 @@ export function UnifiedChart({
     setEnabledSeries({
       close: true,
       ma13: false,
-      week52High: false,
-      week52Low: false,
-      trends: false,
       yoy: false,
     })
   }
@@ -171,24 +136,14 @@ export function UnifiedChart({
     }
   }
 
-  // 데이터 병합: price + trends (matchPriceAndTrends 재사용)
-  const matchedData = matchPriceAndTrends(priceData, trendsData)
-
   // 주별 YoY 계산
   const weeklyYoY = calculateWeeklyYoY(priceData)
-
-  // 주별 52주 최고가/최저가 계산
-  const weekly52WeekHigh = calculateWeekly52WeekHigh(priceData)
-  const weekly52WeekLow = calculateWeekly52WeekLow(priceData)
 
   // 모든 데이터 병합
   const fullChartData = priceData.map((point, index) => ({
     date: point.date,
     close: point.close,
     ma13: ma13?.[index] ?? null,
-    week52High: weekly52WeekHigh[index] ?? null,
-    week52Low: weekly52WeekLow[index] ?? null,
-    trends: matchedData.find(d => d.date === point.date)?.trend ?? null,
     yoy: weeklyYoY[index] ?? null,
   }))
 
@@ -367,33 +322,13 @@ export function UnifiedChart({
             />
 
             {/* 좌측 Y축: 가격 (통화) */}
-            {(enabledSeries.close ||
-              enabledSeries.ma13 ||
-              enabledSeries.week52High ||
-              enabledSeries.week52Low) && (
+            {(enabledSeries.close || enabledSeries.ma13) && (
               <YAxis
                 yAxisId="left"
                 label={{
                   value: `가격 (${getCurrencySymbol(currency || ticker || '')})`,
                   angle: -90,
                   position: 'insideLeft',
-                }}
-                tick={{ fontSize: 12 }}
-                stroke={chartTheme.axisColor}
-              />
-            )}
-
-            {/* 중간 Y축: 검색 관심도 (0-100) */}
-            {enabledSeries.trends && (
-              <YAxis
-                yAxisId="middle"
-                orientation="right"
-                domain={[0, 100]}
-                label={{
-                  value: '검색 관심도 (0-100)',
-                  angle: 90,
-                  position: 'right',
-                  offset: 10,
                 }}
                 tick={{ fontSize: 12 }}
                 stroke={chartTheme.axisColor}
@@ -426,12 +361,7 @@ export function UnifiedChart({
                 if (typeof value !== 'number') return value
 
                 // 가격 시리즈: 통화 포맷 적용
-                const priceSeriesNames = [
-                  '종가',
-                  '13주 MA',
-                  '52주 최고가',
-                  '52주 최저가',
-                ]
+                const priceSeriesNames = ['종가', '13주 MA']
                 if (priceSeriesNames.includes(name as string)) {
                   return formatPrice(value, currency || ticker || '')
                 }
@@ -441,36 +371,6 @@ export function UnifiedChart({
               }}
               labelFormatter={label => `날짜: ${label}`}
             />
-
-            {/* 52주 최고가 라인 */}
-            {enabledSeries.week52High && (
-              <Line
-                yAxisId="left"
-                type="monotone"
-                dataKey="week52High"
-                stroke={SERIES_CONFIG.week52High.color}
-                strokeWidth={2}
-                strokeDasharray="5 5"
-                dot={false}
-                name="52주 최고가"
-                isAnimationActive={false}
-              />
-            )}
-
-            {/* 52주 최저가 라인 */}
-            {enabledSeries.week52Low && (
-              <Line
-                yAxisId="left"
-                type="monotone"
-                dataKey="week52Low"
-                stroke={SERIES_CONFIG.week52Low.color}
-                strokeWidth={2}
-                strokeDasharray="5 5"
-                dot={false}
-                name="52주 최저가"
-                isAnimationActive={false}
-              />
-            )}
 
             {/* 종가 라인 */}
             {enabledSeries.close && (
@@ -500,22 +400,6 @@ export function UnifiedChart({
               />
             )}
 
-            {/* 검색 관심도 영역 */}
-            {enabledSeries.trends && (
-              <Area
-                yAxisId="middle"
-                type="monotone"
-                dataKey="trends"
-                fill={SERIES_CONFIG.trends.color}
-                stroke={SERIES_CONFIG.trends.color}
-                fillOpacity={0.2}
-                strokeWidth={2}
-                dot={false}
-                name="검색 관심도"
-                isAnimationActive={false}
-              />
-            )}
-
             {/* 52주 YoY 바 */}
             {enabledSeries.yoy && (
               <Bar
@@ -536,7 +420,7 @@ export function UnifiedChart({
         <p>
           💡 위의 토글 버튼을 클릭하여 원하는 데이터를 표시/숨길 수 있습니다.
           좌측은 주가({getCurrencySymbol(currency || ticker || '')}), 우측은
-          검색 관심도와 YoY(%)를 표시합니다.
+          YoY(%)를 표시합니다.
         </p>
       </div>
     </div>
