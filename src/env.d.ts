@@ -32,5 +32,11 @@ declare namespace NodeJS {
 
     /** 주가 데이터 Redis 캐시 TTL 초 단위 (기본 86400) */
     STOCK_DATA_CACHE_TTL_SECONDS?: string
+
+    /** Vercel 런타임 표시 (Vercel 환경에서 자동 주입) */
+    VERCEL?: string
+
+    /** 현재 deployment hostname (Vercel 환경에서 자동 주입, scheme 없음) */
+    VERCEL_URL?: string
   }
 }
