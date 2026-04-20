@@ -29,24 +29,51 @@ import {
 import type { UnifiedChartProps } from '@/types'
 
 const SERIES_CONFIG = {
+  open: {
+    name: '시가',
+    color: '#fbbf24',
+    yAxisId: 'left',
+    type: 'line',
+    enabled: true,
+    minWeeks: 0,
+  },
   close: {
     name: '종가',
     color: '#3b82f6',
     yAxisId: 'left',
+    type: 'line',
     enabled: true,
+    minWeeks: 0,
+  },
+  low: {
+    name: '저가',
+    color: '#4ade80',
+    yAxisId: 'left',
+    type: 'line',
+    enabled: false,
+    minWeeks: 0,
+  },
+  high: {
+    name: '고가',
+    color: '#f87171',
+    yAxisId: 'left',
+    type: 'line',
+    enabled: false,
     minWeeks: 0,
   },
   ma13: {
     name: '13주 MA',
-    color: '#f97316',
+    color: '#a78bfa',
     yAxisId: 'left',
+    type: 'area',
     enabled: true,
     minWeeks: 13,
   },
   yoy: {
     name: '52주 YoY',
-    color: '#f59e0b',
+    color: '#f97316',
     yAxisId: 'right',
+    type: 'area',
     enabled: true,
     minWeeks: 52,
   },
@@ -86,12 +113,18 @@ export function UnifiedChart({
   >(
     initialEnabledSeries
       ? {
+          open: initialEnabledSeries.includes('open'),
           close: initialEnabledSeries.includes('close'),
+          low: initialEnabledSeries.includes('low'),
+          high: initialEnabledSeries.includes('high'),
           ma13: initialEnabledSeries.includes('ma13'),
           yoy: initialEnabledSeries.includes('yoy'),
         }
       : {
+          open: false,
           close: true,
+          low: false,
+          high: false,
           ma13: true,
           yoy: true,
         }
@@ -103,7 +136,10 @@ export function UnifiedChart({
 
   const disableAllSeries = () => {
     setEnabledSeries({
+      open: false,
       close: true,
+      low: false,
+      high: false,
       ma13: false,
       yoy: false,
     })
@@ -142,7 +178,10 @@ export function UnifiedChart({
   // 모든 데이터 병합
   const fullChartData = priceData.map((point, index) => ({
     date: point.date,
+    open: point.open ?? null,
     close: point.close,
+    low: point.low ?? null,
+    high: point.high ?? null,
     ma13: ma13?.[index] ?? null,
     yoy: weeklyYoY[index] ?? null,
   }))
@@ -361,7 +400,13 @@ export function UnifiedChart({
                 if (typeof value !== 'number') return value
 
                 // 가격 시리즈: 통화 포맷 적용
-                const priceSeriesNames = ['종가', '13주 MA']
+                const priceSeriesNames = [
+                  '시가',
+                  '종가',
+                  '저가',
+                  '고가',
+                  '13주 MA',
+                ]
                 if (priceSeriesNames.includes(name as string)) {
                   return formatPrice(value, currency || ticker || '')
                 }
@@ -371,6 +416,20 @@ export function UnifiedChart({
               }}
               labelFormatter={label => `날짜: ${label}`}
             />
+
+            {/* 시가 라인 */}
+            {enabledSeries.open && (
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="open"
+                stroke={SERIES_CONFIG.open.color}
+                strokeWidth={2}
+                dot={false}
+                name="시가"
+                isAnimationActive={false}
+              />
+            )}
 
             {/* 종가 라인 */}
             {enabledSeries.close && (
@@ -386,27 +445,59 @@ export function UnifiedChart({
               />
             )}
 
-            {/* 13주 MA 라인 */}
-            {enabledSeries.ma13 && (
+            {/* 저가 라인 */}
+            {enabledSeries.low && (
               <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="low"
+                stroke={SERIES_CONFIG.low.color}
+                strokeWidth={2}
+                dot={false}
+                name="저가"
+                isAnimationActive={false}
+              />
+            )}
+
+            {/* 고가 라인 */}
+            {enabledSeries.high && (
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="high"
+                stroke={SERIES_CONFIG.high.color}
+                strokeWidth={2}
+                dot={false}
+                name="고가"
+                isAnimationActive={false}
+              />
+            )}
+
+            {/* 13주 MA 영역 */}
+            {enabledSeries.ma13 && (
+              <Area
                 yAxisId="left"
                 type="monotone"
                 dataKey="ma13"
                 stroke={SERIES_CONFIG.ma13.color}
-                strokeWidth={2}
+                fill={SERIES_CONFIG.ma13.color}
+                fillOpacity={0.2}
                 dot={false}
                 name="13주 MA"
                 isAnimationActive={false}
               />
             )}
 
-            {/* 52주 YoY 바 */}
+            {/* 52주 YoY 영역 */}
             {enabledSeries.yoy && (
-              <Bar
+              <Area
                 yAxisId="right"
+                type="monotone"
                 dataKey="yoy"
+                stroke={SERIES_CONFIG.yoy.color}
                 fill={SERIES_CONFIG.yoy.color}
-                fillOpacity={0.6}
+                fillOpacity={0.2}
+                dot={false}
                 name="52주 YoY"
                 isAnimationActive={false}
               />
@@ -419,8 +510,9 @@ export function UnifiedChart({
       <div className="bg-muted/50 text-muted-foreground rounded-lg p-4 text-sm">
         <p>
           💡 위의 토글 버튼을 클릭하여 원하는 데이터를 표시/숨길 수 있습니다.
-          좌측은 주가({getCurrencySymbol(currency || ticker || '')}), 우측은
-          YoY(%)를 표시합니다.
+          선(Line)은 일일 가격(시가/종가/저가/고가), 영역(Area)은 이동평균과
+          YoY(%)를 표시합니다. 좌측 Y축은 주가(
+          {getCurrencySymbol(currency || ticker || '')}) 우측은 YoY(%)입니다.
         </p>
       </div>
     </div>
