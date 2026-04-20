@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { UnifiedChart } from '@/components/unified-chart'
+import { UnifiedChart } from '@/components/stock/unified-chart'
 import type {
   CustomChart,
   PriceDataPoint,
@@ -98,9 +98,20 @@ export function CustomChartView({
             className="bg-card overflow-hidden rounded-lg border"
           >
             {/* 차트 헤더 (토글 버튼) */}
-            <button
+            <div
+              role="button"
+              tabIndex={0}
+              aria-expanded={isExpanded}
               onClick={() => setExpandedChartId(isExpanded ? null : chart.id)}
-              className="hover:bg-muted/50 flex w-full items-center justify-between p-4 transition-colors"
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  if (e.key === ' ') {
+                    e.preventDefault()
+                  }
+                  setExpandedChartId(isExpanded ? null : chart.id)
+                }
+              }}
+              className="hover:bg-muted/50 flex w-full cursor-pointer items-center justify-between p-4 transition-colors"
             >
               <div className="flex-1 text-left">
                 <h4 className="font-semibold">{chart.name}</h4>
@@ -110,9 +121,6 @@ export function CustomChartView({
                       const seriesMap: Record<string, string> = {
                         close: '종가',
                         ma13: '13주 MA',
-                        week52High: '52주 최고가',
-                        week52Low: '52주 최저가',
-                        trends: '검색 관심도',
                         yoy: '52주 YoY',
                       }
                       return seriesMap[key] || key
@@ -140,7 +148,7 @@ export function CustomChartView({
                   <ChevronDown className="text-muted-foreground h-5 w-5" />
                 )}
               </div>
-            </button>
+            </div>
 
             {/* 차트 렌더링 */}
             {isExpanded && (
@@ -153,9 +161,6 @@ export function CustomChartView({
                         const seriesMap: Record<string, string> = {
                           close: '종가',
                           ma13: '13주 MA',
-                          week52High: '52주 최고가',
-                          week52Low: '52주 최저가',
-                          trends: '검색 관심도',
                           yoy: '52주 YoY',
                         }
                         return seriesMap[key] || key

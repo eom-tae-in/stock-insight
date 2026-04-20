@@ -17,9 +17,6 @@ import type { CustomChart, CustomChartBuilderProps } from '@/types'
 const AVAILABLE_SERIES = [
   { key: 'close', label: '종가', color: '#3b82f6', minWeeks: 0 },
   { key: 'ma13', label: '13주 MA', color: '#f97316', minWeeks: 13 },
-  { key: 'week52High', label: '52주 최고가', color: '#22c55e', minWeeks: 52 },
-  { key: 'week52Low', label: '52주 최저가', color: '#ef4444', minWeeks: 52 },
-  { key: 'trends', label: '검색 관심도', color: '#a78bfa', minWeeks: 0 },
   { key: 'yoy', label: '52주 YoY', color: '#f59e0b', minWeeks: 52 },
 ]
 
@@ -37,10 +34,7 @@ export function CustomChartBuilder({
 }: CustomChartBuilderProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [chartName, setChartName] = useState('')
-  const [selectedSeries, setSelectedSeries] = useState<string[]>([
-    'close',
-    'trends',
-  ])
+  const [selectedSeries, setSelectedSeries] = useState<string[]>(['close'])
   const [timeRange, setTimeRange] = useState(52)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -112,7 +106,7 @@ export function CustomChartBuilder({
       )
 
       setChartName('')
-      setSelectedSeries(['close', 'trends'])
+      setSelectedSeries(['close'])
       setIsOpen(false)
     } finally {
       setIsSubmitting(false)

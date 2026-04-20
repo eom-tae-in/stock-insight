@@ -89,8 +89,6 @@ export function calculateMetrics(priceData: PriceDataPoint[]): Metrics {
       currentPrice: 0,
       ma13: 0,
       yoyChange: 0,
-      week52High: 0,
-      week52Low: 0,
     }
   }
 
@@ -110,18 +108,11 @@ export function calculateMetrics(priceData: PriceDataPoint[]): Metrics {
       ? ((currentPrice - week52AgoPrice) / week52AgoPrice) * 100
       : 0
 
-  // 52주 최고/최저
-  const week52Data = priceData.slice(Math.max(0, priceData.length - 52))
-  const week52High = Math.max(...week52Data.map(p => p.high || p.close))
-  const week52Low = Math.min(...week52Data.map(p => p.low || p.close))
-
   return {
     currentPrice,
     previousClose,
     ma13: Math.round(ma13 * 100) / 100,
     yoyChange: Math.round(yoyChange * 100) / 100,
-    week52High: Math.round(week52High * 100) / 100,
-    week52Low: Math.round(week52Low * 100) / 100,
   }
 }
 
@@ -149,8 +140,6 @@ export function getMockSearchRecords(): SearchRecord[] {
       previous_close: metrics.previousClose,
       ma13: metrics.ma13,
       yoy_change: metrics.yoyChange,
-      week52_high: metrics.week52High,
-      week52_low: metrics.week52Low,
       price_data: priceData,
       trends_data: trendsData,
       last_updated_at: now.toISOString(),

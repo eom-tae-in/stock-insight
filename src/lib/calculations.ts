@@ -14,7 +14,7 @@ import {
   calculateTrendsMA13,
   calculateTrendsYoY,
 } from './indicators'
-import type { PriceDataPoint, TrendsDataPoint, Metrics } from '@/types'
+import type { PriceDataPoint, Metrics } from '@/types'
 
 // 지표 계산 함수 re-export
 export { calculateMA13, calculateTrendsMA13, calculateTrendsYoY }
@@ -37,25 +37,24 @@ export function calculateYoY(priceData: PriceDataPoint[]): number {
 }
 
 /**
- * 52주 최고가/최저가 계산
- * 최근 52주 데이터에서 최고가와 최저가를 추출합니다.
- * high/low 필드가 없으면 close를 사용합니다.
+ * 지난주 OHLC 데이터 추출
  */
-export function calculate52WeekHighLow(priceData: PriceDataPoint[]): {
+export function getWeeklyOHLC(priceData: PriceDataPoint[]): {
+  open: number
   high: number
   low: number
+  close: number
 } {
   if (priceData.length === 0) {
-    return { high: 0, low: 0 }
+    return { open: 0, high: 0, low: 0, close: 0 }
   }
 
-  const week52Data = priceData.slice(Math.max(0, priceData.length - 52))
-  const high = Math.max(...week52Data.map(p => p.high || p.close))
-  const low = Math.min(...week52Data.map(p => p.low || p.close))
-
+  const lastWeek = priceData[priceData.length - 1]
   return {
-    high: Math.round(high * 100) / 100,
-    low: Math.round(low * 100) / 100,
+    open: lastWeek.open || 0,
+    high: lastWeek.high || 0,
+    low: lastWeek.low || 0,
+    close: lastWeek.close,
   }
 }
 
@@ -69,8 +68,6 @@ export function calculateMetrics(priceData: PriceDataPoint[]): Metrics {
       previousClose: 0,
       ma13: 0,
       yoyChange: 0,
-      week52High: 0,
-      week52Low: 0,
     }
   }
 
@@ -84,16 +81,11 @@ export function calculateMetrics(priceData: PriceDataPoint[]): Metrics {
   // YoY: 52주 대비 변화율
   const yoyChange = calculateYoY(priceData)
 
-  // 52주 최고/최저
-  const { high: week52High, low: week52Low } = calculate52WeekHighLow(priceData)
-
   return {
     currentPrice,
     previousClose,
     ma13,
     yoyChange,
-    week52High,
-    week52Low,
   }
 }
 
@@ -120,69 +112,3 @@ export function calculateWeeklyYoY(priceData: PriceDataPoint[]): number[] {
   })
 }
 
-/**
- * 주별 52주 최고가 계산
- * 각 주차별로 최근 52주(또는 그 이하) 범위 내 최고가를 배열로 반환합니다.
- */
-export function calculateWeekly52WeekHigh(
-  priceData: PriceDataPoint[]
-): number[] {
-  if (priceData.length === 0) return []
-
-  return priceData.map((point, index) => {
-    const startIndex = Math.max(0, index - 51)
-    const rangeData = priceData.slice(startIndex, index + 1)
-    const high = Math.max(...rangeData.map(p => p.high || p.close))
-    return Math.round(high * 100) / 100
-  })
-}
-
-/**
- * 주별 52주 최저가 계산
- * 각 주차별로 최근 52주(또는 그 이하) 범위 내 최저가를 배열로 반환합니다.
- */
-export function calculateWeekly52WeekLow(
-  priceData: PriceDataPoint[]
-): number[] {
-  if (priceData.length === 0) return []
-
-  return priceData.map((point, index) => {
-    const startIndex = Math.max(0, index - 51)
-    const rangeData = priceData.slice(startIndex, index + 1)
-    const low = Math.min(...rangeData.map(p => p.low || p.close))
-    return Math.round(low * 100) / 100
-  })
-}
-
-/**
- * 가격 데이터와 트렌드 데이터를 날짜 기준으로 매칭
- * 이미 두 데이터 모두 startOfISOWeek로 정규화되어 있어 직접 매칭 가능
- * 비교 차트(ComparisonChart)용으로 사용됩니다.
- */
-export function matchPriceAndTrends(
-  priceData: PriceDataPoint[],
-  trendsData: TrendsDataPoint[]
-): Array<{ date: string; price: number; trend: number }> {
-  // 트렌드 데이터를 날짜 기준으로 매핑
-  const trendsMap = new Map<string, number>()
-  for (const point of trendsData) {
-    trendsMap.set(point.date, point.value)
-  }
-
-  // 양쪽 데이터가 모두 있는 날짜만 결합
-  const result: Array<{ date: string; price: number; trend: number }> = []
-
-  for (const point of priceData) {
-    const trend = trendsMap.get(point.date)
-
-    if (trend !== undefined) {
-      result.push({
-        date: point.date,
-        price: point.close,
-        trend,
-      })
-    }
-  }
-
-  return result
-}

@@ -51,8 +51,6 @@ export function generateExcelFile({
     ['현재 종가', formatPrice(metrics.currentPrice, ticker)],
     ['13주 이동평균', formatPrice(metrics.ma13, ticker)],
     ['전년도 대비 (%)', `${metrics.yoyChange.toFixed(2)}%`],
-    ['52주 최고가', formatPrice(metrics.week52High, ticker)],
-    ['52주 최저가', formatPrice(metrics.week52Low, ticker)],
   ]
 
   // 워크북 생성
@@ -89,7 +87,7 @@ interface TableExcelRow {
 
 /**
  * 테이블 데이터를 xlsx 파일로 생성하고 다운로드합니다.
- * 단일 시트: 일자, 종가, 검색 관심도, 13주 MA, YoY
+ * 단일 시트: 일자, 종가, 13주 MA, YoY
  */
 export function generateTableExcelFile(
   ticker: string,
@@ -107,14 +105,12 @@ export function generateTableExcelFile(
     [
       '일자',
       `종가 (${currencySymbol})`,
-      '검색 관심도 (0-100)',
       `13주 MA (${currencySymbol})`,
       'YoY (%)',
     ],
     ...tableData.map(row => [
       row.date,
       formatPrice(row.close, ticker),
-      row.trends,
       row.ma13 !== null ? formatPrice(row.ma13, ticker) : '',
       row.yoy.toFixed(2),
     ]),
@@ -128,7 +124,6 @@ export function generateTableExcelFile(
   tableSheet['!cols'] = [
     { wch: 12 },
     { wch: 12 },
-    { wch: 18 },
     { wch: 14 },
     { wch: 12 },
   ]

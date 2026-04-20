@@ -40,13 +40,15 @@ export interface SearchRecord {
   ticker: string // 종목 심볼 (예: AAPL)
   company_name: string // 회사명 (예: Apple Inc.)
   currency?: string // ISO 통화 코드 (예: 'USD', 'KRW', 'EUR')
+  // 지난주 OHLC 데이터
+  weekly_open?: number // 지난주 시가
+  weekly_high?: number // 지난주 고가
+  weekly_low?: number // 지난주 저가
   // 계산된 지표 (price_data에서 계산되므로 모두 optional)
-  current_price?: number // 현재 종가 (price_data[-1].close)
-  previous_close?: number // 이전 종가 (price_data[-2].close)
+  current_price?: number // 지난주 종가 (price_data[-1].close)
+  previous_close?: number // 그 전주 종가 (price_data[-2].close)
   ma13?: number // 13주 이동평균 (계산된 값)
-  yoy_change?: number // 연간 변화율 (%) (계산된 값)
-  week52_high?: number // 52주 최고가 (계산된 값)
-  week52_low?: number // 52주 최저가 (계산된 값)
+  yoy_change?: number // 52주 대비 변화율 (%) (계산된 값)
   // 데이터 배열 (항상 로드되어야 함)
   price_data: PriceDataPoint[] // 5년 주간 주가 배열 (필수: stock_price_data 테이블에서 로드)
   trends_data: TrendsDataPoint[] // 5년 주간 트렌드 배열 (선택: 향후 Google Trends 연동)
@@ -63,12 +65,13 @@ export interface SearchRecordRaw {
   ticker: string
   company_name: string
   currency?: string // ISO 통화 코드
+  weekly_open?: number // 지난주 시가
+  weekly_high?: number // 지난주 고가
+  weekly_low?: number // 지난주 저가
   current_price: number
   previous_close?: number
   ma13?: number
   yoy_change: number
-  week52_high?: number
-  week52_low?: number
   price_data: string // JSON 문자열
   trends_data: string // JSON 문자열
   last_updated_at: string
@@ -85,8 +88,6 @@ export interface Metrics {
   previousClose?: number
   ma13: number
   yoyChange: number // %
-  week52High: number
-  week52Low: number
 }
 
 /**

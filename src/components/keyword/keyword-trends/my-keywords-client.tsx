@@ -15,9 +15,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Container } from '@/components/layout/container'
-import { KeywordCard } from '@/components/keyword-trends/keyword-card'
-import { KeywordIndexSidebar } from '@/components/keyword-trends/keyword-index-sidebar'
-import { KeywordManageActionBar } from '@/components/keyword-trends/keyword-manage-action-bar'
+import { KeywordCard } from '@/components/keyword/keyword-trends/keyword-card'
+import { KeywordIndexSidebar } from '@/components/keyword/keyword-trends/keyword-index-sidebar'
+import { KeywordManageActionBar } from '@/components/keyword/keyword-trends/keyword-manage-action-bar'
 import {
   groupKeywordsByIndex,
   getActiveIndices,

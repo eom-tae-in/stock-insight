@@ -3,9 +3,9 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Container } from '@/components/layout/container'
-import { SearchForm } from '@/components/search-form'
-import { LoadingSkeleton } from '@/components/loading-skeleton'
-import { ProgressIndicator } from '@/components/progress-indicator'
+import { SearchForm } from '@/components/stock/search-form'
+import { LoadingSkeleton } from '@/components/shared/loading-skeleton'
+import { ProgressIndicator } from '@/components/shared/progress-indicator'
 import { Button } from '@/components/ui/button'
 import type { ProgressState, ApiResponse } from '@/types'
 

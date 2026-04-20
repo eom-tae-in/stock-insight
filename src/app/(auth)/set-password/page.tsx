@@ -5,7 +5,7 @@
  */
 
 import { Container } from '@/components/layout/container'
-import { ThemeToggle } from '@/components/theme-toggle'
+import { ThemeToggle } from '@/components/shared/theme-toggle'
 import { SetPasswordForm } from '@/components/auth/set-password-form'
 
 export default function SetPasswordPage() {

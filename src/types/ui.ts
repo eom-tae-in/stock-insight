@@ -13,10 +13,14 @@ export interface StockCardProps {
   id: string
   ticker: string
   companyName: string
-  currentPrice: number
-  previousClose?: number
-  yoyChange: number // %
-  sparklineData: PriceDataPoint[] // 최근 52주 주가 배열
+  currency?: string
+  weeklyOpen: number // 지난주 시가
+  weeklyHigh: number // 지난주 고가
+  weeklyLow: number // 지난주 저가
+  currentPrice: number // 지난주 종가
+  previousClose: number // 그 전주 종가
+  ma13: number // 최근 13주 평균
+  yoyChange: number // 52주 대비 변화율 (%)
   lastUpdatedAt: string // ISO 8601 형식
   onRefresh?: () => Promise<void>
   onDelete?: () => Promise<void>
@@ -110,13 +114,13 @@ export interface Downloadable {
 }
 
 /**
- * 통합 차트 Props (가격 + 트렌드 + YoY를 하나로)
+ * 통합 차트 Props (가격 + YoY를 하나로)
  */
 export interface UnifiedChartProps {
   ticker?: string
   currency?: string
   priceData: PriceDataPoint[]
-  trendsData: TrendsDataPoint[]
+  trendsData?: TrendsDataPoint[]
   ma13?: (number | null)[]
   metrics: Metrics
   onDownload?: () => Promise<void>

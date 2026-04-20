@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { fetchStockData } from '@/lib/services/stock-service'
 import { fetchTrendsData } from '@/lib/services/trends-service'
-import { calculateMetrics } from '@/lib/calculations'
+import { calculateMetrics, getWeeklyOHLC } from '@/lib/calculations'
 import { TickerInputSchema } from '@/lib/validation'
 import {
   getAllSearches,
@@ -118,6 +118,7 @@ export async function POST(request: NextRequest) {
 
     // 3. 지표 계산
     const metrics = calculateMetrics(stockData.priceData)
+    const weeklyOHLC = getWeeklyOHLC(stockData.priceData)
 
     // 4. DB 저장 (어댑터가 내부적으로 트랜잭션 처리)
     const now = new Date()
@@ -127,12 +128,13 @@ export async function POST(request: NextRequest) {
       ticker: validatedTicker,
       company_name: stockData.companyName,
       currency: stockData.currency,
+      weekly_open: weeklyOHLC.open,
+      weekly_high: weeklyOHLC.high,
+      weekly_low: weeklyOHLC.low,
       current_price: metrics.currentPrice,
       previous_close: metrics.previousClose,
       ma13: metrics.ma13,
       yoy_change: metrics.yoyChange,
-      week52_high: metrics.week52High,
-      week52_low: metrics.week52Low,
       price_data: stockData.priceData,
       trends_data: trendsData,
       last_updated_at: now.toISOString(),

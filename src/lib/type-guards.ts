@@ -238,8 +238,6 @@ export function parseSearchRecordRaw(
       previous_close: raw.previous_close as number | undefined,
       ma13: raw.ma13 as number | undefined,
       yoy_change: raw.yoy_change as number,
-      week52_high: raw.week52_high as number | undefined,
-      week52_low: raw.week52_low as number | undefined,
       price_data: priceData,
       trends_data: trendsData,
       last_updated_at: raw.last_updated_at as string,

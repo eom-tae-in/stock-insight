@@ -9,7 +9,7 @@
 
 import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import KeywordTrendsClient from '@/components/keyword-trends/keyword-trends-client'
+import KeywordTrendsClient from '@/components/keyword/keyword-trends/keyword-trends-client'
 
 export const metadata = {
   title: '키워드 트렌드 검색 | StockInsight',

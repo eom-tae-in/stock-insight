@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Container } from './container'
-import { ThemeToggle } from '@/components/theme-toggle'
+import { ThemeToggle } from '@/components/shared/theme-toggle'
 import { UserMenu } from '@/components/auth/user-menu'
 import { cn } from '@/lib/utils'
 
@@ -38,18 +38,7 @@ export function Header() {
                     : 'text-muted-foreground hover:bg-accent'
                 )}
               >
-                내 종목
-              </Link>
-              <Link
-                href="/search"
-                className={cn(
-                  'rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                  isActiveLink('/search')
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:bg-accent'
-                )}
-              >
-                새 종목 검색
+                종목 분석
               </Link>
               <Link
                 href="/trends"
@@ -60,7 +49,7 @@ export function Header() {
                     : 'text-muted-foreground hover:bg-accent'
                 )}
               >
-                키워드 트렌드
+                키워드 분석
               </Link>
             </nav>
           </div>

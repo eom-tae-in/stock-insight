@@ -9,7 +9,7 @@
 
 import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { OverlayDetailClient } from '@/components/overlay-detail/overlay-detail-client'
+import { OverlayDetailClient } from '@/components/overlays/overlay-detail-client'
 import { getOverlayChartTimeseries } from '@/lib/db/queries'
 import { getKeywordAnalysis } from '@/server/keyword-analyses-service'
 import { listAnalysisOverlays } from '@/server/analysis-overlays-service'

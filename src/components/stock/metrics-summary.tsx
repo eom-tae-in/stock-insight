@@ -1,6 +1,6 @@
 'use client'
 
-import { MetricsCard } from '@/components/metrics-card'
+import { MetricsCard } from '@/components/stock/metrics-card'
 import { getCurrencyFromTicker } from '@/lib/utils/currency'
 import type { MetricsSummaryProps } from '@/types/ui'
 
@@ -33,32 +33,22 @@ export function MetricsSummary({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
         <MetricsCard
-          label="현재 종가"
+          label="지난주 종가"
           value={formatPrice(metrics.currentPrice)}
           unit={currencyInfo.symbol}
         />
         <MetricsCard
-          label="13주 이동평균"
+          label="최근 13주 평균 (MA13)"
           value={formatPrice(metrics.ma13)}
           unit={currencyInfo.symbol}
         />
         <MetricsCard
-          label="52주 YoY"
+          label="1년 전 대비 수익률 (52주 YoY)"
           value={metrics.yoyChange}
           unit="%"
           isPositive={isYoYPositive}
-        />
-        <MetricsCard
-          label="52주 최고가"
-          value={formatPrice(metrics.week52High)}
-          unit={currencyInfo.symbol}
-        />
-        <MetricsCard
-          label="52주 최저가"
-          value={formatPrice(metrics.week52Low)}
-          unit={currencyInfo.symbol}
         />
       </div>
 
@@ -66,10 +56,9 @@ export function MetricsSummary({
       {lastUpdatedAt && (
         <div className="text-muted-foreground bg-muted/30 rounded-lg px-4 py-2.5 text-xs">
           <p className="leading-relaxed">
-            💡 <strong>기준점:</strong> {formatDate(lastUpdatedAt)} (이번 주
-            기준) · <strong>13주 이동평균:</strong> 최근 13주 평균 가격 ·{' '}
-            <strong>52주 YoY:</strong> 52주 전 대비 변화율 ·{' '}
-            <strong>52주 최고/최저가:</strong> 최근 52주 범위 내 극값
+            💡 <strong>기준점:</strong> {formatDate(lastUpdatedAt)} (전주 기준)
+            · <strong>최근 13주 평균:</strong> 최근 13주의 평균 종가 ·{' '}
+            <strong>52주 YoY:</strong> 1년 전 대비 변화율
           </p>
         </div>
       )}
