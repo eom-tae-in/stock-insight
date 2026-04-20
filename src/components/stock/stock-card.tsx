@@ -101,7 +101,7 @@ export function StockCard({
           onMouseLeave={() => !isEditMode && setShowOverlay(false)}
           onClick={() => !isEditMode && setShowOverlay(!showOverlay)}
         >
-          <div className="p-6">
+          <div className="px-6 pt-3 pb-3">
             {/* 헤더: 드래그 핸들 + Ticker + Company Name */}
             <div className="mb-6 flex items-baseline gap-2">
               {isEditMode && (
@@ -174,7 +174,7 @@ export function StockCard({
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-center dark:border-slate-700 dark:bg-slate-900/30">
                   <p className="text-muted-foreground text-xs">
-                    최근 13주 종가 평균
+                    최근 13주 평균
                   </p>
                   <p className="font-semibold">
                     {currencyInfo.symbol}
