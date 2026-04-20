@@ -33,7 +33,6 @@ export interface TrendsDataPoint {
  * 참고:
  * - DB: user_id, ticker, company_name, currency, created_at, searched_at
  * - stock_price_data: 별도 테이블에 저장 (조회 시 자동으로 로드됨)
- * - keyword_chart_timeseries: 키워드 기반 트렌드 데이터 (SearchRecord와 별도)
  */
 export interface SearchRecord {
   id: string // UUID
@@ -96,10 +95,12 @@ export interface Metrics {
 export type CalculatedMetrics = Metrics
 
 /**
- * 키워드 기반 검색 기록 (keyword_searches 테이블)
- * Google Trends 데이터를 키워드 기준으로 저장
+ * 키워드 목록/상세 화면에서 사용하는 키워드 레코드.
+ *
+ * DB 기준 원천은 keywords + 기본 keyword_analysis 조합이다.
+ * keyword/search_type/region 필드는 기존 UI 계약을 유지하기 위한 표현 필드다.
  */
-export interface KeywordSearchRecord {
+export interface KeywordRecord {
   id: string // UUID
   user_id: string // 사용자 UUID (OAuth 로그인한 사용자)
   keyword: string // Google Trends 검색어
@@ -113,25 +114,6 @@ export interface KeywordSearchRecord {
   created_at: string // ISO 8601 타임스탬프
   updated_at: string // ISO 8601 타임스탬프
   last_viewed_at?: string | null // 내 키워드에서 마지막으로 본 시간 (미조회 배지 판별용)
-}
-
-/**
- * DB에서 조회한 Keyword Search 레코드 (trends_data는 JSON 문자열)
- */
-export interface KeywordSearchRecordRaw {
-  id: string
-  user_id: string
-  keyword: string
-  normalized_keyword?: string
-  region: Region // 지역
-  search_type: SearchType // 검색 타입
-  ma13?: number
-  yoy_change?: number
-  trends_data: string // JSON 문자열
-  searched_at: string
-  created_at: string
-  updated_at: string
-  last_viewed_at?: string | null // 내 키워드에서 마지막으로 본 시간
 }
 
 /**
@@ -278,10 +260,10 @@ export interface KeywordAnalysisOverlay {
 }
 
 /**
- * 마이그레이션 패턴: KeywordSearchRecord → Keyword + KeywordAnalysis
+ * 마이그레이션 패턴: KeywordRecord → Keyword + KeywordAnalysis
  *
  * 기존 데이터:
- * KeywordSearchRecord {
+ * KeywordRecord {
  *   id: uuid-1,
  *   keyword: "축구",
  *   trends_data: [...],
@@ -307,7 +289,7 @@ export interface KeywordAnalysisOverlay {
  * }
  *
  * 규칙:
- * - 기존 KeywordSearchRecord는 기본값 (GLOBAL, 5Y, WEB)으로 변환
+ * - 기존 KeywordRecord는 기본값 (GLOBAL, 5Y, WEB)으로 변환
  * - UNIQUE(keyword_id, region, period, search_type) 보장
  * - 기존 오버레이는 기본 analysis_id로 재매핑
  */

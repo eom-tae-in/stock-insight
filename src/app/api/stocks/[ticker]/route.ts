@@ -1,14 +1,6 @@
 /**
- * 종목 데이터 조회 API (키워드 분석용 - DB 저장 안 함)
- * GET /api/stock-data?ticker=AAPL
- *
- * Response: {
- *   data: {
- *     ticker: string
- *     companyName: string
- *     priceData: Array<{ date: string, price: number }>
- *   }
- * }
+ * 종목 데이터 미리보기 API (DB 저장 안 함)
+ * GET /api/stocks/[ticker]
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -22,38 +14,37 @@ import { fetchCachedStockData } from '@/server/cached-stock-service'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(request: NextRequest) {
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ ticker: string }> }
+) {
   try {
-    // 인증 검증
     const supabase = await createSupabaseServerClient()
     const authResult = await validateApiAuth(supabase)
     if (authResult instanceof NextResponse) {
       return authResult
     }
 
-    const searchParams = request.nextUrl.searchParams
-    const ticker = searchParams.get('ticker')
+    const { ticker } = await params
+    const tickerUpper = ticker.trim().toUpperCase()
 
-    if (!ticker) {
+    if (!tickerUpper) {
       return createErrorResponse('INVALID_PARAMS', 'ticker은 필수입니다.', 400)
     }
 
-    const tickerUpper = ticker.toUpperCase()
-
-    // Yahoo Finance에서 5년 데이터 조회 (Redis 캐시 사용, DB 저장 안 함)
     const stockData = await fetchCachedStockData(tickerUpper)
 
-    // 응답 데이터 형성
-    const responseData = {
-      ticker: tickerUpper,
-      companyName: stockData.companyName,
-      priceData: stockData.priceData.map(p => ({
-        date: p.date,
-        price: p.close,
-      })),
-    }
-
-    return createSuccessResponse(responseData, 200)
+    return createSuccessResponse(
+      {
+        ticker: tickerUpper,
+        companyName: stockData.companyName,
+        priceData: stockData.priceData.map(point => ({
+          date: point.date,
+          price: point.close,
+        })),
+      },
+      200
+    )
   } catch (error) {
     console.error('Error fetching stock data:', error)
     return createErrorResponse(

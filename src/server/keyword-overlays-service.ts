@@ -5,7 +5,6 @@ import {
   getOverlayChartTimeseries,
   insertOverlayChartTimeseries,
   removeStockOverlay,
-  removeStockOverlaysBatch,
   updateStockOverlayOrder,
 } from '@/lib/db/queries'
 import { fetchCachedStockData } from '@/server/cached-stock-service'
@@ -203,82 +202,4 @@ export async function deleteKeywordOverlay(
   }
 
   return { success: true }
-}
-
-export async function refreshKeywordOverlay(
-  supabase: SupabaseClient,
-  keywordId: string,
-  overlayId: string
-) {
-  assertKeywordId(keywordId)
-
-  if (!overlayId) {
-    throw new ApiServiceError('INVALID_ID', '유효하지 않은 ID입니다.', 400)
-  }
-
-  const overlays = await getKeywordStockOverlays(keywordId, supabase)
-  const overlay = overlays.find(item => item.id === overlayId)
-
-  if (!overlay) {
-    throw new ApiServiceError('NOT_FOUND', '오버레이를 찾을 수 없습니다.', 404)
-  }
-
-  const stockData = await fetchCachedStockData(overlay.ticker)
-  const overlayData = normalizeOverlayData(
-    stockData.priceData.map(point => ({
-      date: point.date,
-      price: point.close,
-    }))
-  )
-
-  await insertOverlayChartTimeseries(overlayId, overlayData, supabase)
-
-  return { success: true, updated: overlayData.length }
-}
-
-export async function batchDeleteKeywordOverlays(
-  supabase: SupabaseClient,
-  keywordId: string,
-  overlayIds: string[]
-) {
-  assertKeywordId(keywordId)
-
-  if (!Array.isArray(overlayIds) || overlayIds.length === 0) {
-    throw new ApiServiceError(
-      'INVALID_REQUEST',
-      'overlayIds 배열이 필요합니다.',
-      400
-    )
-  }
-
-  if (overlayIds.length > 100) {
-    throw new ApiServiceError(
-      'INVALID_REQUEST',
-      '최대 100개까지만 삭제 가능합니다.',
-      400
-    )
-  }
-
-  const overlays = await getKeywordStockOverlays(keywordId, supabase)
-  const ownedOverlayIds = new Set(overlays.map(overlay => overlay.id))
-  const validOverlayIds = overlayIds.filter(id => ownedOverlayIds.has(id))
-
-  if (validOverlayIds.length !== overlayIds.length) {
-    throw new ApiServiceError(
-      'NOT_FOUND',
-      '삭제할 수 없는 오버레이가 포함되어 있습니다.',
-      404
-    )
-  }
-
-  const success = await removeStockOverlaysBatch(validOverlayIds, supabase)
-  if (!success) {
-    throw new ApiServiceError(
-      'DELETE_FAILED',
-      '일부 오버레이 삭제에 실패했습니다.',
-      500
-    )
-  }
-
-  return { deletedCount: validOverlayIds.length }
 }

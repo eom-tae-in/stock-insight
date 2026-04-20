@@ -8,6 +8,7 @@ import {
 import {
   buildTrendsDataWithIndicators,
   fetchInternalTrendsData,
+  TrendsProviderError,
 } from '@/server/trends-internal-service'
 import type {
   KeywordAnalysis,
@@ -159,7 +160,6 @@ export async function createKeywordAnalysisForKeyword(
   const period = input.period ?? '5Y'
   const searchType = input.search_type ?? 'WEB'
 
-  let trendsData: TrendsDataPoint[] = []
   try {
     const trendsRawData = await fetchInternalTrendsData({
       keyword,
@@ -168,28 +168,41 @@ export async function createKeywordAnalysisForKeyword(
       gprop: mapSearchTypeToGprop(searchType),
     })
 
-    trendsData = buildTrendsDataWithIndicators(trendsRawData)
+    const trendsData = buildTrendsDataWithIndicators(trendsRawData)
+    const lastTrendPoint = trendsData.at(-1)
+    const analysisId = await createKeywordAnalysis(
+      {
+        keyword_id: keywordId,
+        region,
+        period,
+        search_type: searchType,
+        trends_data: trendsData,
+        ma13_data: lastTrendPoint?.ma13Value ?? undefined,
+        yoy_data: lastTrendPoint?.yoyValue ?? undefined,
+      },
+      supabase
+    )
+
+    return {
+      id: analysisId,
+      trends_data: trendsData,
+    }
   } catch (error) {
     console.error('[keyword analyses] Trends fetch error:', error)
-  }
 
-  const lastTrendPoint = trendsData.at(-1)
-  const analysisId = await createKeywordAnalysis(
-    {
-      keyword_id: keywordId,
-      region,
-      period,
-      search_type: searchType,
-      trends_data: trendsData,
-      ma13_data: lastTrendPoint?.ma13Value ?? undefined,
-      yoy_data: lastTrendPoint?.yoyValue ?? undefined,
-    },
-    supabase
-  )
+    if (error instanceof TrendsProviderError) {
+      throw new AnalysisServiceError(
+        error.code,
+        '트렌드 데이터를 가져오지 못했습니다.',
+        error.status
+      )
+    }
 
-  return {
-    id: analysisId,
-    trends_data: trendsData,
+    throw new AnalysisServiceError(
+      'TRENDS_FETCH_FAILED',
+      '트렌드 데이터를 가져오지 못했습니다.',
+      502
+    )
   }
 }
 

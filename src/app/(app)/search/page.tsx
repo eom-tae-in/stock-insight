@@ -111,7 +111,7 @@ export default function SearchPage() {
       setIsLoading(true)
       try {
         const response = await fetch(
-          `/api/ticker-search?q=${encodeURIComponent(input)}`
+          `/api/stocks/search?q=${encodeURIComponent(input)}`
         )
 
         if (!response.ok) {

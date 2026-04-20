@@ -54,7 +54,13 @@ export async function GET(request: NextRequest) {
         .slice(0, 10)
         .map((quote: Record<string, unknown>) => ({
           ticker: String(quote.symbol || ''),
-          companyName: String(quote.shortname || quote.symbol || ''),
+          symbol: String(quote.symbol || ''),
+          companyName: String(
+            quote.longname || quote.shortname || quote.symbol || ''
+          ),
+          longname: String(
+            quote.longname || quote.shortname || quote.symbol || ''
+          ),
         }))
 
       // 로컬 저장 데이터도 함께 검색 (우선순위: Yahoo Finance 먼저)
@@ -68,7 +74,9 @@ export async function GET(request: NextRequest) {
       // 로컬 데이터를 티커 기준으로 변환
       const savedResults = (savedSearches || []).map(s => ({
         ticker: s.ticker,
+        symbol: s.ticker,
         companyName: s.company_name,
+        longname: s.company_name,
       }))
 
       // 중복 제거: 로컬 데이터가 이미 있으면 제외
@@ -94,7 +102,9 @@ export async function GET(request: NextRequest) {
 
       const results = searches.map(s => ({
         ticker: s.ticker,
+        symbol: s.ticker,
         companyName: s.company_name,
+        longname: s.company_name,
       }))
 
       return createSuccessResponse(results, 200)

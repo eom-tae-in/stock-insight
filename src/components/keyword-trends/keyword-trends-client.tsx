@@ -4,7 +4,7 @@ import { useRef, useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import type {
-  KeywordSearchRecord,
+  KeywordRecord,
   SearchRecord,
   KeywordStockOverlay,
   TrendsDataPoint,
@@ -38,7 +38,7 @@ interface KeywordTrendsState {
   fullTrendsData: TrendsDataPoint[] // 5년 전체 원본 데이터
   isLoading: boolean
   selectedSearches: SearchRecord[]
-  savedKeywords: KeywordSearchRecord[]
+  savedKeywords: KeywordRecord[]
   geo: string
   gprop: string
 }
@@ -320,7 +320,7 @@ export default function KeywordTrendsClient() {
   // P0-2: 401 처리를 apiFetchJson으로 위임
   const fetchSavedKeywords = async () => {
     try {
-      const data = await apiFetchJson<KeywordSearchRecord[]>('/api/keywords')
+      const data = await apiFetchJson<KeywordRecord[]>('/api/keywords')
       setState(prev => ({
         ...prev,
         savedKeywords: Array.isArray(data) ? data : [],

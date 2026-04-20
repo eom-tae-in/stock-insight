@@ -7,10 +7,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
-import type { KeywordSearchRecord } from '@/types/database'
+import type { KeywordRecord } from '@/types/database'
 
 interface KeywordCardProps {
-  keyword: KeywordSearchRecord
+  keyword: KeywordRecord
   isManageMode: boolean
   isSelected: boolean
   isEditing: boolean

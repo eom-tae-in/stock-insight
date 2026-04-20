@@ -75,7 +75,7 @@ Supabase Auth callback은 유지한다.
 
 ### Stocks
 
-`stock`이라는 단수 route와 `stock-data`, `stock/save`, `ticker-search`는 단계적으로 정리한다.
+저장 종목은 `/api/searches`, 외부 종목 검색은 `/api/stocks/search`, 저장 없는 주가 미리보기는 `/api/stocks/[ticker]`로 분리한다.
 
 목표:
 
@@ -134,7 +134,7 @@ Supabase Auth callback은 유지한다.
 
 legacy:
 
-- `/api/keyword-searches`
+- 제거됨. 새 코드와 클라이언트는 `/api/keywords`만 사용한다.
 
 ### Keyword Analyses
 
@@ -150,10 +150,9 @@ legacy:
 | `PATCH`  | `/api/analyses/[analysisId]`         | 분석 메타/데이터 수정 |
 | `DELETE` | `/api/analyses/[analysisId]`         | 분석 삭제             |
 
-호환 유지:
+legacy:
 
-- `/api/keyword-analysis`
-- `/api/keyword-analysis/[analysisId]`
+- 제거됨. 새 코드와 클라이언트는 `/api/keywords/[keywordId]/analyses`, `/api/analyses/[analysisId]`만 사용한다.
 
 ### Analysis Overlays
 
@@ -189,11 +188,10 @@ batch delete가 필요하면:
 
 ## 7. 단계적 마이그레이션 전략
 
-1. 기존 route는 즉시 삭제하지 않는다.
-2. 신형 RESTful route를 추가한다.
-3. 프론트 사용처를 신형 route로 이동한다.
-4. legacy route에 deprecation comment를 남긴다.
-5. 모든 사용처가 사라지면 legacy route를 제거한다.
+1. 신형 RESTful route를 추가한다.
+2. 프론트 사용처를 신형 route로 이동한다.
+3. 모든 사용처가 사라지면 legacy route를 제거한다.
+4. DB 테이블 제거는 별도 마이그레이션으로 다룬다.
 
 ## 8. 다음 작업의 기준
 

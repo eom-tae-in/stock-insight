@@ -3,7 +3,7 @@
  * 영문(A-Z) / 한글(ㄱ-ㅎ) / 기타(#)로 분류
  */
 
-import type { KeywordSearchRecord } from '@/types/database'
+import type { KeywordRecord } from '@/types/database'
 
 // 한글 유니코드: 가(0xAC00) = ㄱ + 아(0) + (받침 없음)
 // 초성 19개 (유니코드 순서)
@@ -138,12 +138,12 @@ export function getKeywordIndex(keyword: string): string {
 
 /**
  * 키워드 배열을 인덱스별로 그룹핑
- * @returns { [index: string]: KeywordSearchRecord[] }
+ * @returns { [index: string]: KeywordRecord[] }
  */
 export function groupKeywordsByIndex(
-  keywords: KeywordSearchRecord[]
-): Record<string, KeywordSearchRecord[]> {
-  const result: Record<string, KeywordSearchRecord[]> = {}
+  keywords: KeywordRecord[]
+): Record<string, KeywordRecord[]> {
+  const result: Record<string, KeywordRecord[]> = {}
 
   for (const keyword of keywords) {
     const index = getKeywordIndex(keyword.keyword)
@@ -160,7 +160,7 @@ export function groupKeywordsByIndex(
  * 실제로 키워드가 존재하는 인덱스만 반환 (사이드바 활성 탭 판별용)
  */
 export function getActiveIndices(
-  grouped: Record<string, KeywordSearchRecord[]>
+  grouped: Record<string, KeywordRecord[]>
 ): string[] {
   return ALL_INDICES.filter(idx => (grouped[idx]?.length ?? 0) > 0)
 }
@@ -169,8 +169,8 @@ export function getActiveIndices(
  * 언어별로 키워드 필터링
  */
 export function filterKeywordsByLanguage(
-  keywords: KeywordSearchRecord[],
+  keywords: KeywordRecord[],
   language: KeywordLanguage
-): KeywordSearchRecord[] {
+): KeywordRecord[] {
   return keywords.filter(k => getKeywordLanguage(k.keyword) === language)
 }

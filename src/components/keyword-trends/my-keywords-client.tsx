@@ -28,10 +28,10 @@ import {
 } from '@/lib/utils/keyword-classifier'
 import { toast } from 'sonner'
 import { apiFetchJson, apiFetch } from '@/lib/fetch-client'
-import type { KeywordSearchRecord } from '@/types/database'
+import type { KeywordRecord } from '@/types/database'
 
 interface MyKeywordsClientProps {
-  initialKeywords: KeywordSearchRecord[]
+  initialKeywords: KeywordRecord[]
 }
 
 function EmptyKeywordsState() {
@@ -76,8 +76,7 @@ function EmptyLanguageState({ language }: { language: KeywordLanguage }) {
 }
 
 export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
-  const [keywords, setKeywords] =
-    useState<KeywordSearchRecord[]>(initialKeywords)
+  const [keywords, setKeywords] = useState<KeywordRecord[]>(initialKeywords)
   const [selectedIndex, setSelectedIndex] = useState<string | null>(
     SHOW_ALL_INDEX
   )
@@ -103,7 +102,7 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
   const fetchKeywords = useCallback(async () => {
     setIsLoading(true)
     try {
-      const data = await apiFetchJson<KeywordSearchRecord[]>('/api/keywords')
+      const data = await apiFetchJson<KeywordRecord[]>('/api/keywords')
       setKeywords(Array.isArray(data) ? data : [])
     } catch {
       // 실패해도 initialKeywords 사용
@@ -154,7 +153,7 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
 
     // "전체" 선택 시: 모든 인덱스의 키워드를 합쳐서 반환
     if (selectedIndex === SHOW_ALL_INDEX) {
-      const allKeywords: KeywordSearchRecord[] = []
+      const allKeywords: KeywordRecord[] = []
       ALL_INDICES.forEach(idx => {
         const keywordsForIndex = grouped[idx] ?? []
         allKeywords.push(...keywordsForIndex)

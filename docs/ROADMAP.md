@@ -8,7 +8,7 @@
 - TRD는 아키텍처, 코드 컨벤션, 테스트 전략의 기준 문서다.
 - ROADMAP은 실행 순서와 수락 기준의 기준 문서다.
 - 새 기능보다 먼저 데이터 모델, API 계약, 테스트 기준을 안정화한다.
-- `keyword_searches` 기반 구형 모델과 `keyword_analysis` 기반 신형 모델을 동시에 확장하지 않는다.
+- `keyword_searches` 기반 구형 모델은 확장하지 않고, 신형 `keywords`/`keyword_analysis` 모델만 유지한다.
 - 각 작업은 작은 PR 단위로 완료하고, 최소 `typecheck`, `lint`, 관련 테스트를 통과해야 한다.
 
 ## Phase 0. 현상 고정 및 기준선 확보
@@ -36,7 +36,7 @@
 수락 기준:
 
 - `docs/STATUS.md` 또는 이슈 문서에 현재 위험이 정리된다.
-- `keyword_temporary_overlays`처럼 코드에서 참조하지만 마이그레이션에 없는 테이블이 식별된다.
+- legacy 테이블 제거 전 필요한 데이터 보존/이관 위험이 식별된다.
 
 ## Phase 1. 데이터 모델 통합
 
@@ -45,7 +45,7 @@
 ### Task 1.1 목표 스키마 확정
 
 - 최종 테이블을 확정한다: `keywords`, `keyword_analysis`, `keyword_stock_overlays`, `overlay_chart_timeseries`.
-- `keyword_searches`, `keyword_chart_timeseries`, `keyword_temporary_overlays`의 처리 방침을 정한다.
+- `keyword_searches`, `keyword_chart_timeseries`, `keyword_temporary_overlays` 제거 마이그레이션을 작성하고 적용 전 precheck를 둔다.
 - unique 제약, 외래키, cascade, RLS 정책을 재검토한다.
 
 수락 기준:
@@ -105,9 +105,10 @@
 
 ### Task 2.3 Trends 서비스 단일화
 
-- `api/trends.py`, `src/lib/get_trends.py`, `/api/trends-internal`, `/api/trends`의 역할을 재정의한다.
-- 로컬/배포 공통으로 사용할 Trends provider 인터페이스를 만든다.
-- `TRENDS_API_URL` 포트와 실행 스크립트를 일치시킨다.
+- `src/server/trends-internal-service.ts`를 Trends 수집 진입점으로 유지한다.
+- 로컬은 `.venv/bin/python3 src/lib/get_trends.py`를 직접 실행한다.
+- Vercel은 `api/pytrends.py` Python serverless function이 같은 `src/lib/get_trends.py` 로직을 import해서 사용한다.
+- Flask/TRENDS_API_URL 기반 경로는 기본 실행 흐름에서 제외한다.
 
 수락 기준:
 
@@ -117,7 +118,7 @@
 
 ### Task 2.4 키워드 분석 API 재작성
 
-- `GET/POST /api/keyword-analysis`를 목표 스키마 기준으로 정리한다.
+- legacy `/api/keyword-analysis...` route는 제거하고 RESTful route만 유지한다.
 - 분석 생성은 keyword upsert 후 analysis upsert 흐름으로 처리한다.
 - 필터 변경 시 분석 조회/생성 규칙을 명확히 한다.
 
