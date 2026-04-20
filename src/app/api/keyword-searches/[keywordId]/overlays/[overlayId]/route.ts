@@ -1,25 +1,26 @@
 /**
- * Overlay 단건 삭제 API
- * DELETE /api/keyword-searches/[keywordId]/overlays/[overlayId]
+ * Legacy keyword overlay delete route.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import {
   createErrorResponse,
-  validateApiAuth,
   createSuccessResponse,
+  validateApiAuth,
 } from '@/lib/api-helpers'
-import { getKeywordStockOverlays, removeStockOverlay } from '@/lib/db/queries'
+import {
+  ApiServiceError,
+  deleteKeywordOverlay,
+} from '@/server/keyword-overlays-service'
 
 export const dynamic = 'force-dynamic'
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ keywordId: string; overlayId: string }> }
 ) {
   try {
-    // 인증 검증
     const supabase = await createSupabaseServerClient()
     const authResult = await validateApiAuth(supabase)
     if (authResult instanceof NextResponse) {
@@ -27,34 +28,13 @@ export async function DELETE(
     }
 
     const { keywordId, overlayId } = await params
-
-    if (!keywordId || !overlayId || overlayId.length === 0) {
-      return createErrorResponse('INVALID_ID', '유효하지 않은 ID입니다.', 400)
-    }
-
-    const overlays = await getKeywordStockOverlays(keywordId, supabase)
-    const targetOverlay = overlays.find(overlay => overlay.id === overlayId)
-
-    if (!targetOverlay) {
-      return createErrorResponse(
-        'NOT_FOUND',
-        '오버레이를 찾을 수 없습니다.',
-        404
-      )
-    }
-
-    const deleted = await removeStockOverlay(overlayId, supabase)
-
-    if (!deleted) {
-      return createErrorResponse(
-        'DELETE_FAILED',
-        '오버레이를 삭제하지 못했습니다.',
-        500
-      )
-    }
-
-    return createSuccessResponse({ success: true }, 200)
+    const result = await deleteKeywordOverlay(supabase, keywordId, overlayId)
+    return createSuccessResponse(result, 200)
   } catch (error) {
+    if (error instanceof ApiServiceError) {
+      return createErrorResponse(error.code, error.message, error.status)
+    }
+
     console.error('Error deleting overlay:', error)
     return createErrorResponse(
       'DB_ERROR',

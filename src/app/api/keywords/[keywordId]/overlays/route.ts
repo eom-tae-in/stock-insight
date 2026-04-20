@@ -1,9 +1,9 @@
 /**
- * Legacy keyword overlay route.
+ * RESTful keyword overlay route.
  *
- * Compatibility entrypoint for /api/keyword-searches/[keywordId]/overlays.
- * The implementation delegates to the keyword overlay service used by the
- * RESTful /api/keywords routes.
+ * GET /api/keywords/[keywordId]/overlays
+ * POST /api/keywords/[keywordId]/overlays
+ * PATCH /api/keywords/[keywordId]/overlays
  */
 
 import { NextRequest, NextResponse } from 'next/server'

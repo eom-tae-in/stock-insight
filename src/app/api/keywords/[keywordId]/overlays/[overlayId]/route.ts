@@ -1,5 +1,5 @@
 /**
- * Legacy keyword overlay refresh route.
+ * RESTful keyword overlay delete route.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -11,12 +11,12 @@ import {
 } from '@/lib/api-helpers'
 import {
   ApiServiceError,
-  refreshKeywordOverlay,
+  deleteKeywordOverlay,
 } from '@/server/keyword-overlays-service'
 
 export const dynamic = 'force-dynamic'
 
-export async function POST(
+export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ keywordId: string; overlayId: string }> }
 ) {
@@ -28,17 +28,17 @@ export async function POST(
     }
 
     const { keywordId, overlayId } = await params
-    const result = await refreshKeywordOverlay(supabase, keywordId, overlayId)
+    const result = await deleteKeywordOverlay(supabase, keywordId, overlayId)
     return createSuccessResponse(result, 200)
   } catch (error) {
     if (error instanceof ApiServiceError) {
       return createErrorResponse(error.code, error.message, error.status)
     }
 
-    console.error('Error refreshing overlay:', error)
+    console.error('Error deleting overlay:', error)
     return createErrorResponse(
-      'REFRESH_FAILED',
-      '최신화 중 오류가 발생했습니다.',
+      'DB_ERROR',
+      '오버레이 삭제 중 오류가 발생했습니다.',
       500
     )
   }

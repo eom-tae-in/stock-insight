@@ -25,8 +25,8 @@
 
 import { NextRequest } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getKeywordSearchById } from '@/lib/db/queries'
-import { fetchStockData } from '@/lib/services/stock-service'
+import { fetchCachedStockData } from '@/server/cached-stock-service'
+import { getKeywordAnalysis } from '@/server/keyword-analyses-service'
 import { createSuccessResponse, createErrorResponse } from '@/lib/api-helpers'
 import type { TrendsDataPoint } from '@/types'
 import type { StockDataResult } from '@/lib/services/stock-service'
@@ -76,25 +76,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log(
-      `[/api/keyword-batch] 배치 조회 시작: keywordId=${keywordId}, symbols=${symbols.length}개`
-    )
-
-    // 1. 키워드 트렌드 데이터 조회
+    // 1. 기본 키워드 분석 트렌드 데이터 조회
     let trendsData: TrendsDataPoint[] = []
     try {
-      const keywordSearch = await getKeywordSearchById(keywordId)
-      if (!keywordSearch) {
+      const analysis = await getKeywordAnalysis(supabase, user.id, keywordId)
+      if (!analysis) {
         return createErrorResponse(
           'KEYWORD_NOT_FOUND',
           '키워드를 찾을 수 없습니다.',
           404
         )
       }
-      trendsData = keywordSearch.trends_data
-      console.log(
-        `[/api/keyword-batch] 트렌드 데이터 조회 완료: ${trendsData.length}개`
-      )
+      trendsData = analysis.trends_data
     } catch (error) {
       console.error('[/api/keyword-batch] 트렌드 데이터 조회 실패:', error)
       return createErrorResponse(
@@ -112,9 +105,8 @@ export async function POST(request: NextRequest) {
     await Promise.all(
       symbols.map(async symbol => {
         try {
-          const stockData = await fetchStockData(symbol)
+          const stockData = await fetchCachedStockData(symbol)
           stockResults[symbol] = stockData
-          console.log(`[/api/keyword-batch] ${symbol} 주가 조회 완료`)
         } catch (error) {
           const message =
             error instanceof Error ? error.message : 'Unknown error'
@@ -147,10 +139,6 @@ export async function POST(request: NextRequest) {
       trends: trendsData,
       stocks: stockResults,
     }
-
-    console.log(
-      `[/api/keyword-batch] 배치 조회 완료: 트렌드 ${trendsData.length}개, 종목 ${Object.keys(stockResults).length}개`
-    )
 
     return createSuccessResponse(response, 200)
   } catch (error) {

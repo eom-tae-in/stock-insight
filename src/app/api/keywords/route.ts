@@ -1,10 +1,3 @@
-/**
- * Legacy keyword route.
- *
- * Compatibility entrypoint for /api/keyword-searches. New code should use
- * /api/keywords. This route does not write to legacy keyword_searches tables.
- */
-
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import {
@@ -13,9 +6,9 @@ import {
   validateApiAuth,
 } from '@/lib/api-helpers'
 import {
-  deleteKeyword,
   getKeywords,
   upsertKeyword,
+  updateKeyword,
 } from '@/server/keywords-service'
 import {
   addStockOverlay,
@@ -25,27 +18,6 @@ import {
 import type { Period, Region, SearchType } from '@/types/database'
 
 export const dynamic = 'force-dynamic'
-
-type KeywordSaveBody = {
-  keyword?: string
-  region?: Region
-  search_type?: SearchType
-  chartData?: Array<{
-    date: string
-    trendsValue: number
-    ma13Value: number | null
-    yoyValue: number | null
-  }>
-  overlays?: Array<{
-    ticker: string
-    companyName: string
-    overlayData: Array<{
-      date: string
-      normalizedPrice: number
-      rawPrice: number
-    }>
-  }>
-}
 
 export async function GET() {
   try {
@@ -58,7 +30,7 @@ export async function GET() {
     const keywords = await getKeywords(supabase, authResult.userId)
     return createSuccessResponse(keywords, 200)
   } catch (error) {
-    console.error('Error fetching legacy keyword searches:', error)
+    console.error('Error fetching keywords:', error)
     return createErrorResponse(
       'DB_ERROR',
       '키워드 목록을 불러오지 못했습니다.',
@@ -75,7 +47,27 @@ export async function POST(request: NextRequest) {
       return authResult
     }
 
-    const body = (await request.json()) as KeywordSaveBody
+    const body: {
+      keyword?: string
+      region?: Region
+      search_type?: SearchType
+      chartData?: Array<{
+        date: string
+        trendsValue: number
+        ma13Value: number | null
+        yoyValue: number | null
+      }>
+      overlays?: Array<{
+        ticker: string
+        companyName: string
+        overlayData: Array<{
+          date: string
+          normalizedPrice: number
+          rawPrice: number
+        }>
+      }>
+    } = await request.json()
+
     const keyword = await upsertKeyword(
       supabase,
       authResult.userId,
@@ -138,7 +130,7 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('INVALID_INPUT', '키워드가 필요합니다.', 400)
     }
 
-    console.error('Error creating legacy keyword search:', error)
+    console.error('Error creating keyword:', error)
     return createErrorResponse(
       'DB_ERROR',
       '키워드 저장 중 오류가 발생했습니다.',
@@ -147,7 +139,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function DELETE(request: NextRequest) {
+export async function PATCH(request: NextRequest) {
   try {
     const supabase = await createSupabaseServerClient()
     const authResult = await validateApiAuth(supabase)
@@ -155,15 +147,21 @@ export async function DELETE(request: NextRequest) {
       return authResult
     }
 
-    const { searchParams } = new URL(request.url)
-    const id = searchParams.get('id')
+    const body = await request.json()
+    const { id, keyword } = body
 
     if (!id) {
       return createErrorResponse('INVALID_ID', '유효하지 않은 ID입니다.', 400)
     }
 
-    const deleted = await deleteKeyword(supabase, authResult.userId, id)
-    if (!deleted) {
+    const updatedKeyword = await updateKeyword(
+      supabase,
+      authResult.userId,
+      id,
+      keyword
+    )
+
+    if (!updatedKeyword) {
       return createErrorResponse(
         'NOT_FOUND',
         '해당 키워드를 찾을 수 없습니다.',
@@ -171,12 +169,16 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    return createSuccessResponse({ id }, 200)
+    return createSuccessResponse(updatedKeyword, 200)
   } catch (error) {
-    console.error('Error deleting legacy keyword search:', error)
+    if (error instanceof Error && error.message === 'KEYWORD_REQUIRED') {
+      return createErrorResponse('INVALID_INPUT', '키워드가 필요합니다.', 400)
+    }
+
+    console.error('Error updating keyword:', error)
     return createErrorResponse(
       'DB_ERROR',
-      '키워드 삭제 중 오류가 발생했습니다.',
+      '키워드 수정 중 오류가 발생했습니다.',
       500
     )
   }

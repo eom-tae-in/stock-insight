@@ -6,15 +6,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { execFile } from 'child_process'
-import { promisify } from 'util'
-import path from 'path'
+import { fetchInternalTrendsData } from '@/server/trends-internal-service'
 import { normalizeKeywordSpacing } from '@/lib/utils/keyword-normalization'
 
-const execFileAsync = promisify(execFile)
-
 /**
- * Python 스크립트 실행
+ * Python 스크립트 기반 Google Trends 조회
  */
 async function getTrendsData(
   keyword: string,
@@ -22,42 +18,13 @@ async function getTrendsData(
   timeframe: string,
   gprop: string
 ) {
-  try {
-    const pythonPath = path.join(process.cwd(), '.venv', 'bin', 'python3')
-    const scriptPath = path.join(process.cwd(), 'src', 'lib', 'get_trends.py')
-
-    const { stdout, stderr } = await execFileAsync(pythonPath, [
-      scriptPath,
-      keyword,
-      geo,
-      timeframe,
-      gprop,
-    ])
-
-    // stderr 확인
-    if (stderr) {
-      console.warn(`Python stderr: ${stderr}`)
-    }
-
-    // stdout 파싱
-    try {
-      const trendsData = JSON.parse(stdout)
-      return NextResponse.json(trendsData, { status: 200 })
-    } catch (parseError) {
-      console.error('JSON parse error:', parseError)
-      console.error('stdout content:', stdout)
-      return NextResponse.json([], { status: 200 })
-    }
-  } catch (pythonError) {
-    console.error(
-      `Python execution failed: ${pythonError instanceof Error ? pythonError.message : 'Unknown error'}`
-    )
-    if (pythonError instanceof Error && 'stderr' in pythonError) {
-      const errorWithStderr = pythonError as Error & { stderr?: string }
-      console.error('stderr:', errorWithStderr.stderr)
-    }
-    return NextResponse.json([], { status: 200 })
-  }
+  const trendsData = await fetchInternalTrendsData({
+    keyword,
+    geo,
+    timeframe,
+    gprop,
+  })
+  return NextResponse.json(trendsData, { status: 200 })
 }
 
 export async function GET(request: NextRequest) {

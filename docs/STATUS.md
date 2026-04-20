@@ -105,25 +105,23 @@ API/스크립트:
 
 - `GET /api/trends`
 - `GET/POST /api/trends-internal`
-- `api/trends.py`
 - `src/lib/get_trends.py`
 - `src/lib/services/trends-service.ts`
 
 환경:
 
-- `.env.example`의 `TRENDS_API_URL=http://localhost:5000/api/trends`
-- `package.json`의 Flask 실행 포트는 `5001`
+- `package.json`의 기본 `npm run dev`는 Next.js만 실행한다.
+- Trends 조회는 별도 Flask 서버 없이 `.venv/bin/python3 src/lib/get_trends.py`를 직접 실행한다.
 
 현재 흐름:
 
-- `/api/trends`는 `TRENDS_API_URL`로 POST 요청을 보낸다.
-- `/api/trends-internal`은 `.venv/bin/python3 src/lib/get_trends.py`를 직접 실행한다.
-- `api/trends.py`는 Flask 로컬 서버와 Vercel Python handler 역할을 동시에 가진다.
+- `/api/trends`는 `src/lib/services/trends-service.ts`를 통해 Python Trends 스크립트를 직접 실행한다.
+- `/api/trends-internal`은 서버 서비스 함수를 통해 같은 Python Trends 스크립트를 직접 실행한다.
+- `api/trends.py`는 더 이상 기본 로컬 개발 실행 경로가 아니다.
 
 개선 필요:
 
-- 포트 불일치가 있다. 기본 env는 `5000`, dev script는 `5001`.
-- Trends provider가 3개 경로로 분산되어 있다.
+- `api/trends.py`의 유지/삭제 여부를 별도로 결정해야 한다.
 - 실패 시 빈 배열을 성공처럼 반환하는 경로가 있다.
 - 목표는 단일 `TrendsProvider` 인터페이스와 단일 API 계약이다.
 
@@ -139,32 +137,53 @@ API/스크립트:
 
 API:
 
-- `GET /api/keyword-searches`
-- `POST /api/keyword-searches`
-- `DELETE /api/keyword-searches?id=...`
-- `GET /api/keyword-searches/[keywordId]/overlays`
-- `POST /api/keyword-searches/[keywordId]/overlays`
-- `PATCH /api/keyword-searches/[keywordId]/overlays`
-- `DELETE /api/keyword-searches/[keywordId]/overlays/[overlayId]`
-- `POST /api/keyword-searches/[keywordId]/overlays/[overlayId]/refresh`
-- `POST /api/keyword-searches/[keywordId]/overlays/batch-delete`
+- `GET /api/keywords`
+- `POST /api/keywords`
+- `GET /api/keywords/[keywordId]`
+- `DELETE /api/keywords/[keywordId]`
+- `GET /api/keywords/[keywordId]/overlays`
+- `POST /api/keywords/[keywordId]/overlays`
+- `PATCH /api/keywords/[keywordId]/overlays`
+- `DELETE /api/keywords/[keywordId]/overlays/[overlayId]`
+- `POST /api/keywords/[keywordId]/overlays/[overlayId]/refresh`
+- `POST /api/keywords/[keywordId]/overlays/batch-delete`
+- `GET /api/keywords/[keywordId]/analyses`
+- `POST /api/keywords/[keywordId]/analyses`
+- `GET /api/analyses/[analysisId]`
+- `PATCH /api/analyses/[analysisId]`
+- `DELETE /api/analyses/[analysisId]`
+- `GET /api/analyses/[analysisId]/overlays`
+- `POST /api/analyses/[analysisId]/overlays`
+- `PATCH /api/analyses/[analysisId]/overlays`
+- `DELETE /api/analyses/[analysisId]/overlays/[overlayId]`
+- legacy 호환: `/api/keyword-searches...`
+- legacy 호환: `/api/keyword-analysis...`
 
 DB 테이블:
 
-- `keyword_searches`
-- `keyword_chart_timeseries`
+- 호환 ID 해석 전용: `keyword_searches`
+- 정리 대상: `keyword_chart_timeseries`
 - `keyword_stock_overlays`
 - `overlay_chart_timeseries`
 
 현재 상태:
 
-- legacy route는 유지하지만 내부 저장/조회는 신형 `keyword_analysis`, `keyword_stock_overlays`, `overlay_chart_timeseries`를 사용한다.
+- 클라이언트 직접 호출은 `/api/keywords` 계열로 이전됐다.
+- `GET/POST/PATCH /api/keywords`와 `GET/DELETE /api/keywords/[keywordId]`는 `keyword_searches` route 재수출이 아니라 `keywords` 테이블 기반 서비스 함수를 직접 호출한다.
+- `/api/keywords/[keywordId]/overlays...` 하위 route도 legacy route 재수출을 제거했고, `src/server/keyword-overlays-service.ts`의 공통 구현을 직접 호출한다.
+- `/api/keywords/[keywordId]/analyses`, `/api/analyses/[analysisId]`, `/api/analyses/[analysisId]/overlays...` route를 추가했고 클라이언트 분석/오버레이 호출을 해당 route로 이전했다.
+- `/api/keyword-analysis...` 계열은 legacy 호환 route로 유지하지만 내부 구현은 `src/server/keyword-analyses-service.ts`, `src/server/analysis-overlays-service.ts`를 공유한다.
+- `/api/keyword-searches` 계열은 legacy 호환 route로 유지하지만 root route도 legacy 테이블에 쓰지 않고 `keywords`/`keyword_analysis` 기반 service를 호출한다.
+- legacy route는 유지하지만 내부 저장/조회는 RESTful route와 같은 service 함수를 통해 신형 `keyword_analysis`, `keyword_stock_overlays`, `overlay_chart_timeseries`를 사용한다.
+- `src/app/api/keyword-batch/route.ts`는 더 이상 `keyword_searches` 조회 함수를 사용하지 않고 기본 `keyword_analysis`를 읽으며, 주가 조회는 Redis 캐시 경로를 사용한다.
+- `src/app/(app)/keywords/[keywordId]/overlays/[overlayId]/page.tsx`는 더 이상 `keyword_chart_timeseries`를 읽지 않고 `keyword_analysis.trends_data`에서 차트 데이터를 구성한다.
+- `src/lib/db/queries.ts`, `src/lib/adapters/db.ts`에서 사용되지 않는 legacy `keyword_searches` CRUD와 `keyword_chart_timeseries` 함수 정의를 제거했다.
 - `keyword_temporary_overlays` 직접 코드 참조는 제거됐다.
 - 삭제/배치 삭제/최신화 API는 요청한 keyword의 overlay인지 확인한 뒤 신형 테이블을 조작한다.
 
 남은 문제:
 
-- legacy route가 계속 신규 기능처럼 사용되고 있다.
+- legacy route 구현을 완전히 제거하려면 외부 호출자/북마크/테스트 의존성을 확인해야 한다.
 - 오버레이 API/타입/DB 계약에서는 `search_id`를 사용하지 않는다.
 
 결론:
@@ -182,15 +201,16 @@ DB 테이블:
 
 API:
 
-- `GET /api/keyword-analysis`
-- `POST /api/keyword-analysis`
-- `GET /api/keyword-analysis/[analysisId]`
-- `PATCH /api/keyword-analysis/[analysisId]`
-- `DELETE /api/keyword-analysis/[analysisId]`
-- `GET /api/keyword-analysis/[analysisId]/overlays`
-- `POST /api/keyword-analysis/[analysisId]/overlays`
-- `PATCH /api/keyword-analysis/[analysisId]/overlays`
-- `DELETE /api/keyword-analysis/[analysisId]/overlays/[overlayId]`
+- `GET /api/keywords/[keywordId]/analyses`
+- `POST /api/keywords/[keywordId]/analyses`
+- `GET /api/analyses/[analysisId]`
+- `PATCH /api/analyses/[analysisId]`
+- `DELETE /api/analyses/[analysisId]`
+- `GET /api/analyses/[analysisId]/overlays`
+- `POST /api/analyses/[analysisId]/overlays`
+- `PATCH /api/analyses/[analysisId]/overlays`
+- `DELETE /api/analyses/[analysisId]/overlays/[overlayId]`
+- legacy 호환: `/api/keyword-analysis...`
 
 DB 테이블:
 
@@ -202,17 +222,18 @@ DB 테이블:
 현재 흐름:
 
 1. 키워드 상세 페이지에서 region/searchType 조건을 선택한다.
-2. `GET /api/keyword-analysis`로 조건별 analysis를 조회한다.
-3. 없으면 `POST /api/keyword-analysis`로 생성한다.
-4. 생성 과정에서 `/api/trends-internal`을 서버에서 다시 호출한다.
-5. analysis별 overlay는 `keyword_stock_overlays.analysis_id` 기준으로 저장한다.
+2. `GET /api/keywords/[keywordId]/analyses`로 조건별 analysis를 조회한다.
+3. 없으면 `POST /api/keywords/[keywordId]/analyses`로 생성한다.
+4. 생성 과정에서 서버 서비스 함수로 Google Trends 데이터를 조회한다.
+5. Google Trends와 Yahoo Finance 주간 데이터는 월요일 week key로 정규화하고, 완료된 전주까지만 포함한다.
+6. analysis별 overlay는 `keyword_stock_overlays.analysis_id` 기준으로 저장한다.
+7. 주가 5년 주간 데이터는 선택적으로 Upstash Redis REST 캐시를 사용한다. 캐시 키는 ticker와 완료된 전주 week key를 포함하고, 기본 TTL은 24시간이다.
+8. analysis overlay 저장 API는 프론트가 `price_data`를 보내지 않아도 서버에서 Redis/Yahoo를 통해 주가 데이터를 확보해 저장한다.
+9. 오버레이 상세 페이지와 keyword batch API도 기본 analysis 기준으로 동작한다.
 
 개선 필요:
 
-- `keywordId`는 실제로 legacy `keyword_searches.id`와 new `keywords.id` 의미가 섞일 수 있다.
-- `keyword-detail-client.tsx`에 console debug 로그와 unused handler가 많다.
-- `POST /api/keyword-analysis`가 내부 HTTP로 `/api/trends-internal`을 호출한다. service 함수 호출로 바꿔야 한다.
-- overlay API는 신형 모델에 맞지만 repository/service 레이어 없이 route에서 직접 Supabase를 조작한다.
+- legacy `/api/keyword-analysis...` route 제거 여부는 외부 호출자/북마크/테스트 의존성을 확인한 뒤 결정한다.
 - 키워드 분석 오버레이는 저장 종목(`searches`)과 독립되어 있다.
 
 ## 3. 현재 DB 모델 상태
@@ -234,9 +255,10 @@ DB 테이블:
 
 ### 즉시 확인해야 할 스키마 위험
 
-1. legacy route 이름은 아직 `/api/keyword-searches`에 남아 있다.
-2. 키워드 공백 정규화 unique 마이그레이션은 작성됐고, DB 적용 전에는 새 컬럼을 사용할 수 없다.
-3. `docs/sql/20260421_keyword_normalized_names_precheck.sql`로 기존 중복 후보를 먼저 확인한다.
+1. legacy route `/api/keyword-searches`는 호환용으로 남아 있지만 클라이언트는 `/api/keywords`를 사용한다.
+2. 앱 실행 경로는 `keyword_chart_timeseries`를 읽지 않는다. 테이블 자체 제거는 DB 마이그레이션 계획을 따로 잡아야 한다.
+3. 키워드 공백 정규화 unique 마이그레이션은 작성됐고, DB 적용 전에는 새 컬럼을 사용할 수 없다.
+4. `docs/sql/20260421_keyword_normalized_names_precheck.sql`로 기존 중복 후보를 먼저 확인한다.
 
 ## 4. 현재 라우트 구조 문제
 
@@ -266,14 +288,13 @@ DB 테이블:
 - `SUPABASE_KEY`
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `TRENDS_API_URL`
-- `TRENDS_API_TIMEOUT`
+- `UPSTASH_REDIS_REST_URL`
+- `UPSTASH_REDIS_REST_TOKEN`
+- `STOCK_DATA_CACHE_TTL_SECONDS`
 
 문제:
 
-- `src/env.d.ts`에는 `NEXT_PUBLIC_*`, `TRENDS_API_*` 타입 선언이 없다.
-- `src/lib/env.ts`는 Supabase만 검증한다.
-- `TRENDS_API_URL` 기본 포트와 dev script 포트가 다르다.
+- `api/trends.py`는 기본 실행 경로에서 빠졌고, 삭제 여부는 별도 확인이 필요하다.
 
 ## 6. 우선 리팩터링 순서
 

@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   LineChart,
@@ -436,9 +435,6 @@ export function KeywordDetailClient({
   keyword,
   initialSearchParams,
 }: KeywordDetailClientProps) {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-
   // 필터 상태 (URL 동기화)
   const [region, setRegion] = useState<Region>(initialSearchParams.region)
   const [searchType, setSearchType] = useState<SearchType>(
@@ -476,17 +472,91 @@ export function KeywordDetailClient({
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [isCreatingAnalysis, setIsCreatingAnalysis] = useState(false)
 
+  const loadOverlays = useCallback(async (analysisId: string) => {
+    try {
+      const response = await fetch(`/api/analyses/${analysisId}/overlays`)
+      if (!response.ok) throw new Error('Failed to load overlays')
+
+      const apiResponse = await response.json()
+      const overlayList = apiResponse.data
+
+      if (!Array.isArray(overlayList) || overlayList.length === 0) {
+        setOverlays([])
+        return
+      }
+
+      // 모든 가격 데이터 수집하여 min/max 계산
+      let minPrice = Infinity
+      let maxPrice = -Infinity
+
+      for (const overlay of overlayList) {
+        if (Array.isArray(overlay.chart_data)) {
+          for (const point of overlay.chart_data) {
+            if (typeof point.rawPrice === 'number') {
+              minPrice = Math.min(minPrice, point.rawPrice)
+              maxPrice = Math.max(maxPrice, point.rawPrice)
+            }
+          }
+        }
+      }
+
+      // 정규화된 overlays 구성
+      const convertedOverlays: OverlayItem[] = overlayList
+        .map(overlay => {
+          if (!Array.isArray(overlay.chart_data)) {
+            return null
+          }
+
+          const priceData = overlay.chart_data as Array<{
+            date: string
+            rawPrice: number | null
+          }>
+          const priceRange = maxPrice - minPrice
+
+          const chartData = priceData
+            .filter(
+              (point): point is { date: string; rawPrice: number } =>
+                typeof point.rawPrice === 'number'
+            )
+            .map(point => {
+              const normalizedPrice =
+                priceRange > 0
+                  ? ((point.rawPrice - minPrice) / priceRange) * 100
+                  : 50
+
+              return {
+                date: point.date,
+                normalizedPrice: Math.max(0, Math.min(100, normalizedPrice)),
+                rawPrice: point.rawPrice,
+              }
+            })
+
+          return {
+            id: overlay.id,
+            ticker: overlay.ticker,
+            companyName: overlay.company_name,
+            displayOrder: overlay.display_order,
+            chartData,
+          } as OverlayItem
+        })
+        .filter((o): o is OverlayItem => o !== null)
+
+      setOverlays(convertedOverlays)
+    } catch (error) {
+      console.error('Failed to load overlays:', error)
+      setOverlays([])
+    }
+  }, [])
+
   // 새로운 분석 생성 및 바로 이동
   const handleCreateNewAnalysis = useCallback(async () => {
     setIsCreatingAnalysis(true)
     try {
       // 1. 분석 생성 (현재 조건 기반, trends_data 함께 저장)
-      const createRes = await fetch('/api/keyword-analysis', {
+      const createRes = await fetch(`/api/keywords/${keywordId}/analyses`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          keyword_id: keywordId,
-          keyword: keyword.keyword,
           region,
           period,
           search_type: searchType,
@@ -543,14 +613,14 @@ export function KeywordDetailClient({
     } finally {
       setIsCreatingAnalysis(false)
     }
-  }, [keywordId, keyword, region, searchType])
+  }, [keywordId, loadOverlays, period, region, searchType])
 
   const loadAnalysis = useCallback(async () => {
     setIsLoadingAnalysis(true)
     setAnalysisNotFound(false)
     try {
       const response = await fetch(
-        `/api/keyword-analysis?keywordId=${keywordId}&region=${region}&period=${period}&searchType=${searchType}`
+        `/api/keywords/${keywordId}/analyses?region=${region}&period=${period}&searchType=${searchType}`
       )
       if (!response.ok) throw new Error('Analysis not found')
 
@@ -594,7 +664,7 @@ export function KeywordDetailClient({
     } finally {
       setIsLoadingAnalysis(false)
     }
-  }, [keywordId, region, period, searchType])
+  }, [keywordId, loadOverlays, period, region, searchType])
 
   // 필터 변경 시 URL 동기화 + 데이터 로드
   useEffect(() => {
@@ -610,105 +680,6 @@ export function KeywordDetailClient({
     loadAnalysis()
   }, [region, searchType, keywordId, loadAnalysis])
 
-  const loadOverlays = async (analysisId: string) => {
-    try {
-      const response = await fetch(
-        `/api/keyword-analysis/${analysisId}/overlays`
-      )
-      if (!response.ok) throw new Error('Failed to load overlays')
-
-      const apiResponse = await response.json()
-      const overlayList = apiResponse.data
-
-      console.log('[loadOverlays] overlayList:', overlayList)
-      console.log('[loadOverlays] analysisId:', analysisId, ', region:', region)
-
-      if (!Array.isArray(overlayList) || overlayList.length === 0) {
-        console.log('[loadOverlays] No overlays found')
-        setOverlays([])
-        return
-      }
-
-      // 모든 가격 데이터 수집하여 min/max 계산
-      let minPrice = Infinity
-      let maxPrice = -Infinity
-
-      for (const overlay of overlayList) {
-        if (Array.isArray(overlay.chart_data)) {
-          for (const point of overlay.chart_data) {
-            if (typeof point.rawPrice === 'number') {
-              minPrice = Math.min(minPrice, point.rawPrice)
-              maxPrice = Math.max(maxPrice, point.rawPrice)
-            }
-          }
-        }
-      }
-
-      console.log('[loadOverlays] minPrice:', minPrice, ', maxPrice:', maxPrice)
-
-      // 정규화된 overlays 구성
-      const convertedOverlays: OverlayItem[] = overlayList
-        .map(overlay => {
-          if (!Array.isArray(overlay.chart_data)) {
-            console.log(
-              '[loadOverlays] No chartData for overlay:',
-              overlay.ticker
-            )
-            return null
-          }
-
-          const priceData = overlay.chart_data as Array<{
-            date: string
-            rawPrice: number | null
-          }>
-          const priceRange = maxPrice - minPrice
-
-          const chartData = priceData
-            .filter(
-              (point): point is { date: string; rawPrice: number } =>
-                typeof point.rawPrice === 'number'
-            )
-            .map(point => {
-              const normalizedPrice =
-                priceRange > 0
-                  ? ((point.rawPrice - minPrice) / priceRange) * 100
-                  : 50
-
-              return {
-                date: point.date,
-                normalizedPrice: Math.max(0, Math.min(100, normalizedPrice)),
-                rawPrice: point.rawPrice,
-              }
-            })
-
-          console.log(
-            '[loadOverlays] overlay chartData for',
-            overlay.ticker,
-            '- count:',
-            chartData.length,
-            ', first:',
-            chartData[0],
-            ', last:',
-            chartData[chartData.length - 1]
-          )
-
-          return {
-            id: overlay.id,
-            ticker: overlay.ticker,
-            companyName: overlay.company_name,
-            displayOrder: overlay.display_order,
-            chartData,
-          } as OverlayItem
-        })
-        .filter((o): o is OverlayItem => o !== null)
-
-      console.log('[loadOverlays] convertedOverlays:', convertedOverlays)
-      setOverlays(convertedOverlays)
-    } catch (error) {
-      console.error('Failed to load overlays:', error)
-      setOverlays([])
-    }
-  }
   const [selectedStock, setSelectedStock] = useState<{
     ticker: string
     companyName: string
@@ -743,7 +714,6 @@ export function KeywordDetailClient({
   // 카드 관리 모드 (normal: 기본, delete: 선택 삭제, reorder: 위치 변경)
   const [mode, setMode] = useState<'normal' | 'delete' | 'reorder'>('normal')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [isRefreshing, setIsRefreshing] = useState(false)
   const [reorderBackup, setReorderBackup] = useState<OverlayItem[] | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
 
@@ -763,30 +733,11 @@ export function KeywordDetailClient({
     keywordData: typeof chartData,
     overlayData: OverlayItem['chartData']
   ) => {
-    console.log(
-      '[mergeChartData] keywordData length:',
-      keywordData.length,
-      ', overlayData length:',
-      overlayData.length
-    )
-    console.log(
-      '[mergeChartData] keywordData dates sample:',
-      keywordData.slice(0, 3).map(d => d.date)
-    )
-    console.log(
-      '[mergeChartData] overlayData dates sample:',
-      overlayData.slice(0, 3).map(d => d.date)
-    )
-
     const keywordMap = new Map(keywordData.map(d => [d.date, d]))
 
     // overlayData에서 keywordMap에 있는 date만 필터링
     const filteredOverlayData = overlayData.filter(point =>
       keywordMap.has(point.date)
-    )
-    console.log(
-      '[mergeChartData] filteredOverlayData length:',
-      filteredOverlayData.length
     )
 
     const merged = filteredOverlayData.map(point => ({
@@ -797,42 +748,8 @@ export function KeywordDetailClient({
       yoyValue: keywordMap.get(point.date)?.yoyValue ?? null,
     }))
 
-    console.log('[mergeChartData] merged length:', merged.length)
-    console.log('[mergeChartData] merged sample (first 3):', merged.slice(0, 3))
-    console.log('[mergeChartData] merged sample (last 3):', merged.slice(-3))
-
     // 마지막 52개만 (1년)
-    const sliced = merged.slice(Math.max(0, merged.length - 52))
-    console.log('[mergeChartData] sliced length:', sliced.length)
-    console.log('[mergeChartData] sliced sample:', sliced.slice(0, 2))
-
-    return sliced
-  }
-
-  // 개별 삭제 (일반 모드에서만)
-  const handleDelete = async (overlayId: string) => {
-    if (!currentAnalysis) {
-      toast.error('분석 데이터를 먼저 로드해주세요')
-      return
-    }
-
-    setDeletingId(overlayId)
-    try {
-      const res = await fetch(
-        `/api/keyword-analysis/${currentAnalysis.id}/overlays/${overlayId}`,
-        { method: 'DELETE' }
-      )
-
-      if (!res.ok) throw new Error('Delete failed')
-
-      setOverlays(prev => prev.filter(o => o.id !== overlayId))
-      toast.success('종목이 삭제되었습니다')
-    } catch (error) {
-      console.error('Delete error:', error)
-      toast.error('삭제에 실패했습니다')
-    } finally {
-      setDeletingId(null)
-    }
+    return merged.slice(Math.max(0, merged.length - 52))
   }
 
   // 모드 전환
@@ -892,12 +809,9 @@ export function KeywordDetailClient({
       // Phase 5-B: 개별 삭제를 병렬로 실행
       // (새로운 batch-delete API는 Phase 6에서 추가 예정)
       const deletePromises = selectedArray.map(overlayId =>
-        fetch(
-          `/api/keyword-analysis/${currentAnalysis.id}/overlays/${overlayId}`,
-          {
-            method: 'DELETE',
-          }
-        )
+        fetch(`/api/analyses/${currentAnalysis.id}/overlays/${overlayId}`, {
+          method: 'DELETE',
+        })
       )
 
       const results = await Promise.all(deletePromises)
@@ -940,19 +854,16 @@ export function KeywordDetailClient({
       const finalOrder = overlays.length > 0 ? overlays : reorderBackup || []
 
       // Phase 6: Analysis 기준 batch reorder API
-      const res = await fetch(
-        `/api/keyword-analysis/${currentAnalysis.id}/overlays`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            overlays: finalOrder.map((o, index) => ({
-              id: o.id,
-              display_order: index + 1, // 1부터 시작
-            })),
-          }),
-        }
-      )
+      const res = await fetch(`/api/analyses/${currentAnalysis.id}/overlays`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          overlays: finalOrder.map((o, index) => ({
+            id: o.id,
+            display_order: index + 1, // 1부터 시작
+          })),
+        }),
+      })
 
       if (!res.ok) throw new Error('Order update failed')
 
@@ -965,82 +876,6 @@ export function KeywordDetailClient({
       if (reorderBackup) {
         setOverlays(reorderBackup)
       }
-    }
-  }
-
-  // 전체 최신화
-  const handleRefreshAll = async () => {
-    if (overlays.length === 0) {
-      toast.error('최신화할 종목이 없습니다')
-      return
-    }
-
-    setIsRefreshing(true)
-
-    try {
-      const searchPromises = overlays.map(overlay =>
-        fetch(`/api/stock-data?ticker=${overlay.ticker}`)
-          .then(res => (res.ok ? res.json().then(apiRes => apiRes.data) : null))
-          .catch(() => null)
-      )
-
-      const searchResults = await Promise.all(searchPromises)
-
-      // 모든 가격 데이터 수집하여 min/max 계산
-      let minPrice = Infinity
-      let maxPrice = -Infinity
-
-      for (const result of searchResults) {
-        if (result?.priceData && Array.isArray(result.priceData)) {
-          for (const point of result.priceData) {
-            if (typeof point.price === 'number') {
-              minPrice = Math.min(minPrice, point.price)
-              maxPrice = Math.max(maxPrice, point.price)
-            }
-          }
-        }
-      }
-
-      // overlays 업데이트
-      setOverlays(prev =>
-        prev.map((overlay, index) => {
-          const searchData = searchResults[index]
-          if (!searchData?.priceData || searchData.priceData.length === 0) {
-            return overlay
-          }
-
-          const priceData = searchData.priceData as Array<{
-            date: string
-            price: number
-          }>
-          const priceRange = maxPrice - minPrice
-
-          const newChartData = priceData.map(pricePoint => {
-            const normalizedPrice =
-              priceRange > 0
-                ? ((pricePoint.price - minPrice) / priceRange) * 100
-                : 50
-
-            return {
-              date: pricePoint.date,
-              normalizedPrice: Math.max(0, Math.min(100, normalizedPrice)),
-              rawPrice: pricePoint.price,
-            }
-          })
-
-          return {
-            ...overlay,
-            chartData: newChartData,
-          }
-        })
-      )
-
-      toast.success(`${overlays.length}개 종목 데이터가 최신화되었습니다`)
-    } catch (error) {
-      console.error('Refresh error:', error)
-      toast.error('최신화에 실패했습니다')
-    } finally {
-      setIsRefreshing(false)
     }
   }
 
@@ -1139,20 +974,6 @@ export function KeywordDetailClient({
     }
   }
 
-  // 차트 데이터 필터링 (기간별)
-  const getFilteredChartData = () => {
-    if (timeframeType === 'weeks') {
-      const weeksToShow = Math.round(timeframeValue)
-      return chartData.slice(-weeksToShow)
-    } else {
-      // 년 단위는 대략 52주 = 1년
-      const weeksToShow = Math.round(timeframeValue * 52)
-      return chartData.slice(-weeksToShow)
-    }
-  }
-
-  const filteredChartData = getFilteredChartData()
-
   // 종목 필터링 및 정렬
   const getFilteredAndSortedOverlays = () => {
     let result = [...overlays]
@@ -1210,6 +1031,7 @@ export function KeywordDetailClient({
 
   // 자동완성 항목 선택 (클릭 시)
   const handleSelectAutocomplete = (ticker: string, companyName: string) => {
+    void companyName
     setStockSearchInput(ticker)
     setShowAutocomplete(false)
     setAutocompleteResults([])
@@ -1218,6 +1040,7 @@ export function KeywordDetailClient({
 
   // 자동완성 항목 선택 후 즉시 검색 (Enter 시)
   const handleSelectAndSearch = async (ticker: string, companyName: string) => {
+    void companyName
     setStockSearchInput(ticker)
     setShowAutocomplete(false)
     setAutocompleteResults([])
@@ -1329,14 +1152,13 @@ export function KeywordDetailClient({
     setIsSavingCustomChart(true)
     try {
       const overlayRes = await fetch(
-        `/api/keyword-analysis/${currentAnalysis.id}/overlays`,
+        `/api/analyses/${currentAnalysis.id}/overlays`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             ticker: selectedStock.ticker,
             company_name: selectedStock.companyName,
-            price_data: selectedStock.priceData,
           }),
         }
       )

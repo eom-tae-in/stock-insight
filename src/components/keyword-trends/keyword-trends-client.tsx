@@ -1,9 +1,8 @@
 'use client'
 
-import { useRef, useState, useEffect, useMemo } from 'react'
+import { useRef, useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { format } from 'date-fns'
 import type {
   KeywordSearchRecord,
   SearchRecord,
@@ -94,6 +93,55 @@ export default function KeywordTrendsClient() {
   const [customWeeks, setCustomWeeks] = useState(26)
   const [customWeeksInput, setCustomWeeksInput] = useState('26')
 
+  // 키워드로 트렌드 조회 - URL 파라미터에서 받은 값으로 검색 수행
+  const performSearch = useCallback(
+    async (keyword: string, geo: string, gprop: string) => {
+      const trimmedKeyword = normalizeKeywordSpacing(keyword)
+      if (!trimmedKeyword) return
+
+      setState(prev => ({ ...prev, isLoading: true }))
+
+      try {
+        const params = new URLSearchParams({
+          keyword: trimmedKeyword,
+          geo,
+          timeframe: '5y',
+          gprop,
+        })
+
+        const res = await apiFetch(`/api/trends?${params.toString()}`)
+        if (!res.ok) {
+          throw new Error(`API 응답 오류: ${res.status}`)
+        }
+
+        const data = await res.json()
+
+        const raw = data?.data?.trendsData
+        if (!Array.isArray(raw)) {
+          throw new Error('Invalid response format: trendsData is not an array')
+        }
+
+        setState(prev => ({
+          ...prev,
+          fullTrendsData: raw as TrendsDataPoint[],
+          selectedSearches: [],
+          isLoading: false,
+        }))
+
+        toast.success('트렌드 데이터를 가져왔습니다')
+      } catch (error) {
+        console.error('[performSearch] 에러:', error)
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : '트렌드 데이터를 가져오지 못했습니다'
+        )
+        setState(prev => ({ ...prev, isLoading: false }))
+      }
+    },
+    []
+  )
+
   // URL 파라미터에서 초기 상태 파싱 및 자동 검색 (F033: URL 파라미터 기반 상태 관리)
   useEffect(() => {
     const keyword = searchParams.get('keyword') || ''
@@ -119,8 +167,12 @@ export default function KeywordTrendsClient() {
         performSearch(keyword, geo, gprop)
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams.get('keyword')])
+  }, [
+    performSearch,
+    searchParams,
+    state.fullTrendsData.length,
+    state.isLoading,
+  ])
 
   // keywordId 파라미터로 저장된 키워드 복원
   useEffect(() => {
@@ -137,9 +189,7 @@ export default function KeywordTrendsClient() {
         if (!keywordSearch) throw new Error('Keyword not found')
 
         // 1단계: 오버레이 데이터 로드
-        const overlayRes = await apiFetch(
-          `/api/keyword-searches/${keywordId}/overlays`
-        )
+        const overlayRes = await apiFetch(`/api/keywords/${keywordId}/overlays`)
         if (!overlayRes.ok) throw new Error('Failed to fetch overlays')
 
         const overlayData = await overlayRes.json()
@@ -201,17 +251,10 @@ export default function KeywordTrendsClient() {
     setCustomWeeksInput(String(customWeeks))
   }, [customWeeks])
 
-  const [availableSearches, setAvailableSearches] = useState<SearchRecord[]>([])
-  const [isSaving, setIsSaving] = useState(false)
   const [deleteDialogId, setDeleteDialogId] = useState<string | null>(null)
-  const [downloadingTimeframes, setDownloadingTimeframes] = useState<
-    Set<string>
-  >(new Set())
-  const [searchFilter, setSearchFilter] = useState('')
 
   // 페이지 진입 시: 저장된 종목 목록 + 저장된 키워드 목록 로드
   useEffect(() => {
-    fetchAvailableSearches()
     fetchSavedKeywords()
   }, [])
 
@@ -275,21 +318,9 @@ export default function KeywordTrendsClient() {
   }, [trendsData])
 
   // P0-2: 401 처리를 apiFetchJson으로 위임
-  const fetchAvailableSearches = async () => {
-    try {
-      const data = await apiFetchJson<SearchRecord[]>('/api/searches')
-      setAvailableSearches(Array.isArray(data) ? data : [])
-    } catch (error) {
-      console.error('Error fetching searches:', error)
-      toast.error('저장된 종목을 불러오지 못했습니다')
-    }
-  }
-
   const fetchSavedKeywords = async () => {
     try {
-      const data = await apiFetchJson<KeywordSearchRecord[]>(
-        '/api/keyword-searches'
-      )
+      const data = await apiFetchJson<KeywordSearchRecord[]>('/api/keywords')
       setState(prev => ({
         ...prev,
         savedKeywords: Array.isArray(data) ? data : [],
@@ -297,58 +328,6 @@ export default function KeywordTrendsClient() {
     } catch (error) {
       console.error('Error fetching saved keywords:', error)
       toast.error('저장된 키워드를 불러오지 못했습니다')
-    }
-  }
-
-  // 키워드로 트렌드 조회 — 아키텍처 변경: 5y 단일 fetch
-  // URL 파라미터에서 받은 값으로 검색 수행 (자동 검색용)
-  const performSearch = async (keyword: string, geo: string, gprop: string) => {
-    const trimmedKeyword = normalizeKeywordSpacing(keyword)
-    if (!trimmedKeyword) return
-
-    setState(prev => ({ ...prev, isLoading: true }))
-
-    try {
-      console.log(`[performSearch] 검색 시작: ${trimmedKeyword}`)
-
-      const params = new URLSearchParams({
-        keyword: trimmedKeyword,
-        geo,
-        timeframe: '5y', // 최대 기간만 한 번에 조회
-        gprop,
-      })
-
-      const res = await apiFetch(`/api/trends?${params.toString()}`)
-      if (!res.ok) {
-        throw new Error(`API 응답 오류: ${res.status}`)
-      }
-
-      const data = await res.json()
-      console.log(`[performSearch] API 응답:`, data)
-
-      const raw = data?.data?.trendsData
-      if (!Array.isArray(raw)) {
-        throw new Error('Invalid response format: trendsData is not an array')
-      }
-
-      console.log(`[performSearch] 데이터 설정: ${raw.length}개 포인트`)
-
-      setState(prev => ({
-        ...prev,
-        fullTrendsData: raw as TrendsDataPoint[],
-        selectedSearches: [],
-        isLoading: false,
-      }))
-
-      toast.success('트렌드 데이터를 가져왔습니다')
-    } catch (error) {
-      console.error('[performSearch] 에러:', error)
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : '트렌드 데이터를 가져오지 못했습니다'
-      )
-      setState(prev => ({ ...prev, isLoading: false }))
     }
   }
 
@@ -368,8 +347,6 @@ export default function KeywordTrendsClient() {
     setState(prev => ({ ...prev, isLoading: true }))
 
     try {
-      console.log(`[handleSaveKeyword] 저장 시작: ${trimmedKeyword}`)
-
       // chartData 형식으로 변환 (fullTrendsData → chartData)
       // API에서 이미 계산된 ma13Value, yoyValue 사용
       const chartData = state.fullTrendsData.map((point, idx) => ({
@@ -380,7 +357,7 @@ export default function KeywordTrendsClient() {
         yoyValue: point.yoyValue,
       }))
 
-      const res = await apiFetchJson('/api/keyword-searches', {
+      await apiFetchJson('/api/keywords', {
         method: 'POST',
         body: JSON.stringify({
           keyword: trimmedKeyword,
@@ -392,7 +369,6 @@ export default function KeywordTrendsClient() {
         }),
       })
 
-      console.log(`[handleSaveKeyword] 저장 완료:`, res)
       toast.success(`"${trimmedKeyword}" 키워드가 저장되었습니다`)
 
       // 저장된 키워드 목록 새로고침
@@ -404,551 +380,6 @@ export default function KeywordTrendsClient() {
       )
     } finally {
       setState(prev => ({ ...prev, isLoading: false }))
-    }
-  }
-
-  // 키워드 + 종목 조합 저장 (차트 데이터 포함)
-  const handleSaveCustomChart = async () => {
-    const trimmedKeyword = normalizeKeywordSpacing(state.keyword)
-    if (!trimmedKeyword) {
-      toast.error('키워드를 입력하세요')
-      return
-    }
-
-    if (state.fullTrendsData.length === 0) {
-      toast.error('먼저 키워드를 검색해주세요')
-      return
-    }
-
-    if (state.selectedSearches.length === 0) {
-      toast.error('저장할 종목을 추가하세요')
-      return
-    }
-
-    setState(prev => ({ ...prev, isLoading: true }))
-
-    try {
-      console.log(
-        `[handleSaveCustomChart] 저장 시작: ${trimmedKeyword} + ${state.selectedSearches.length}개 종목`
-      )
-
-      // chartData 형식으로 변환
-      // API에서 이미 계산된 ma13Value, yoyValue 사용
-      const chartData = state.fullTrendsData.map((point, idx) => ({
-        weekIndex: idx,
-        date: point.date,
-        trendsValue: point.value,
-        ma13Value: point.ma13Value,
-        yoyValue: point.yoyValue,
-      }))
-
-      // 1단계: 키워드 + 차트 데이터 저장
-      const keywordRes = (await apiFetchJson('/api/keyword-searches', {
-        method: 'POST',
-        body: JSON.stringify({
-          keyword: trimmedKeyword,
-          region: 'GLOBAL',
-          search_type: 'WEB',
-          geo: state.geo,
-          gprop: state.gprop,
-          chartData, // 차트 데이터 포함
-        }),
-      })) as { data: { id: string } }
-
-      const keywordId = keywordRes.data.id
-      console.log(`[handleSaveCustomChart] 키워드 저장 완료: ${keywordId}`)
-
-      // 2단계: 각 종목을 오버레이로 추가
-      for (const search of state.selectedSearches) {
-        try {
-          const overlayRes = await apiFetchJson(
-            `/api/keyword-searches/${keywordId}/overlays`,
-            {
-              method: 'POST',
-              body: JSON.stringify({
-                ticker: search.ticker,
-                company_name: search.company_name,
-              }),
-            }
-          )
-          console.log(
-            `[handleSaveCustomChart] 오버레이 추가 완료: ${search.ticker}`
-          )
-        } catch (error) {
-          console.error(
-            `[handleSaveCustomChart] 오버레이 추가 실패: ${search.ticker}`,
-            error
-          )
-          throw error
-        }
-      }
-
-      toast.success('커스텀 차트가 저장되었습니다')
-
-      // 저장된 키워드 목록 새로고침
-      await fetchSavedKeywords()
-    } catch (error) {
-      console.error('[handleSaveCustomChart] 에러:', error)
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : '커스텀 차트 저장에 실패했습니다'
-      )
-    } finally {
-      setState(prev => ({ ...prev, isLoading: false }))
-    }
-  }
-
-  const handleSearchKeyword = async () => {
-    const trimmedKeyword = normalizeKeywordSpacing(state.keyword)
-    if (!trimmedKeyword) {
-      toast.error('키워드를 입력하세요')
-      return
-    }
-
-    setState(prev => ({ ...prev, isLoading: true }))
-
-    try {
-      const params = new URLSearchParams({
-        keyword: trimmedKeyword,
-        geo: state.geo,
-        timeframe: '5y', // 최대 기간만 한 번에 조회
-        gprop: state.gprop,
-      })
-
-      const res = await apiFetch(`/api/trends?${params.toString()}`)
-      if (!res.ok) throw new Error('Failed to fetch trends')
-
-      const data = await res.json()
-      const raw = data?.data?.trendsData
-      if (!Array.isArray(raw)) throw new Error('Invalid response format')
-
-      setState(prev => ({
-        ...prev,
-        keyword: trimmedKeyword,
-        fullTrendsData: raw as TrendsDataPoint[],
-        selectedSearches: [],
-        isLoading: false,
-      }))
-
-      // URL 파라미터 업데이트
-      const urlParams = new URLSearchParams({
-        keyword: trimmedKeyword,
-        geo: state.geo,
-        timeframe: DEFAULT_TIMEFRAME,
-        gprop: state.gprop,
-      })
-      router.push(`/trends/search?${urlParams.toString()}`)
-
-      toast.success('트렌드 데이터를 가져왔습니다')
-    } catch (error) {
-      console.error('Error fetching trends:', error)
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : '트렌드 데이터를 가져오지 못했습니다'
-      )
-      setState(prev => ({ ...prev, isLoading: false }))
-    }
-  }
-
-  // 오버레이할 주식 추가 (F026: 최대 1개)
-  const handleAddOverlay = (searchId: string) => {
-    const search = availableSearches.find(s => s.id === searchId)
-    if (!search) return
-
-    if (state.selectedSearches.length >= 1) {
-      toast.error('최대 1개까지만 추가할 수 있습니다')
-      return
-    }
-
-    if (state.selectedSearches.some(s => s.id === searchId)) {
-      toast.error('이미 추가된 종목입니다')
-      return
-    }
-
-    setState(prev => ({
-      ...prev,
-      selectedSearches: [...prev.selectedSearches, search],
-    }))
-
-    toast.success(`${search.ticker} 오버레이를 추가했습니다`)
-  }
-
-  // 오버레이 제거
-  const handleRemoveOverlay = (searchId: string) => {
-    setState(prev => ({
-      ...prev,
-      selectedSearches: prev.selectedSearches.filter(s => s.id !== searchId),
-    }))
-  }
-
-  // 새로운 종목 추가 (ticker-search에서 선택된 종목)
-  // ⚠️ "내 종목" 페이지에는 추가하지 않고, 차트 오버레이로만 추가
-  const handleAddTickerOverlay = async (
-    ticker: string,
-    companyName?: string
-  ) => {
-    try {
-      const params = new URLSearchParams({
-        ticker,
-        ...(companyName && { companyName }),
-      })
-      const response = await apiFetch(`/api/stock?${params.toString()}`)
-      if (!response.ok) throw new Error('종목 데이터를 가져오지 못했습니다')
-
-      const data = await response.json()
-      // /api/stock은 StockDataResult를 반환 (조회용)
-      const stockData = data.data
-
-      // StockDataResult → 임시 SearchRecord로 변환 (오버레이용)
-      // 실제 DB 저장은 handleSaveToMyStocks에서 /api/stock/save 호출
-      const search: SearchRecord = {
-        id: `overlay_${Math.random().toString(36).substr(2, 9)}`, // 임시 ID
-        user_id: '', // 오버레이용 (DB 미저장)
-        ticker: ticker.toUpperCase(),
-        company_name: stockData.companyName,
-        currency: stockData.currency,
-        current_price: stockData.currentPrice,
-        previous_close: stockData.previousClose,
-        price_data: stockData.priceData,
-        trends_data: [], // 오버레이용이므로 trends_data 불필요
-        searched_at: new Date().toISOString(),
-      }
-
-      // 검증: 이미 추가된 종목인지 확인 (ticker로 비교)
-      if (state.selectedSearches.some(s => s.ticker === search.ticker)) {
-        toast.error('이미 추가된 종목입니다')
-        return
-      }
-
-      // 최대 1개까지만 추가 가능
-      if (state.selectedSearches.length >= 1) {
-        toast.error('최대 1개까지만 추가할 수 있습니다')
-        return
-      }
-
-      // ✅ selectedSearches에만 추가 (오버레이 임시 데이터)
-      // DB 저장은 별도의 "My Stocks에 저장" 버튼에서 /api/stock/save 호출
-      setState(prev => ({
-        ...prev,
-        selectedSearches: [...prev.selectedSearches, search],
-      }))
-
-      toast.success(`${ticker} 종목을 차트에 추가했습니다`)
-    } catch (error) {
-      console.error('Error adding ticker overlay:', error)
-      toast.error('종목을 추가하지 못했습니다')
-    }
-  }
-
-  // 현재 키워드 + 오버레이 조합 저장 (재설계: 모든 차트 데이터를 한 번에 저장)
-  const handleSaveCombo = async () => {
-    if (!state.keyword || trendsData.length === 0) {
-      toast.error('먼저 트렌드를 조회해주세요')
-      return
-    }
-
-    setIsSaving(true)
-
-    try {
-      // 1. 차트 시계열 데이터 구성 (trends + ma13 + yoy)
-      const chartData = trendsData.map((point, index) => ({
-        weekIndex: index,
-        date: point.date,
-        trendsValue: point.value,
-        ma13Value: ma13Values[index] ?? null,
-        yoyValue: yoyValuesArray?.[index] ?? null,
-      }))
-
-      // 2. 오버레이 시계열 데이터 구성 (정규화된 주가)
-      const overlaysData = state.selectedSearches.map(search => {
-        // 이 종목의 주가 데이터
-        const prices = search.price_data?.map(p => p.close) ?? []
-        if (prices.length === 0) {
-          return {
-            searchId: search.id,
-            ticker: search.ticker,
-            companyName: search.company_name,
-            overlayData: [],
-          }
-        }
-
-        const minPrice = Math.min(...prices)
-        const maxPrice = Math.max(...prices)
-        const range = maxPrice - minPrice
-
-        // 주간별로 주가 그룹화 (Google Trends와 일치)
-        const weeklyPrices = new Map<string, number[]>()
-        search.price_data?.forEach(p => {
-          const date = new Date(p.date)
-          const year = date.getFullYear()
-          const weekNum = Math.ceil((date.getDate() + date.getDay()) / 7)
-          const weekKey = `${year}-W${String(weekNum).padStart(2, '0')}`
-
-          if (!weeklyPrices.has(weekKey)) {
-            weeklyPrices.set(weekKey, [])
-          }
-          weeklyPrices.get(weekKey)!.push(p.close)
-        })
-
-        // 차트의 각 날짜와 매칭
-        const overlayData = chartData.map(chartPoint => {
-          const date = new Date(chartPoint.date)
-          const year = date.getFullYear()
-          const weekNum = Math.ceil((date.getDate() + date.getDay()) / 7)
-          const weekKey = `${year}-W${String(weekNum).padStart(2, '0')}`
-
-          const pricesInWeek = weeklyPrices.get(weekKey) ?? []
-          if (pricesInWeek.length === 0) {
-            return {
-              date: chartPoint.date,
-              normalizedPrice: 0,
-              rawPrice: 0,
-            }
-          }
-
-          const avgPrice =
-            pricesInWeek.reduce((a, b) => a + b) / pricesInWeek.length
-          const normalized =
-            range === 0 ? 50 : ((avgPrice - minPrice) / range) * 100
-
-          return {
-            date: chartPoint.date,
-            normalizedPrice: Math.round(normalized * 100) / 100,
-            rawPrice: Math.round(avgPrice * 100) / 100,
-          }
-        })
-
-        return {
-          searchId: search.id,
-          ticker: search.ticker,
-          companyName: search.company_name,
-          overlayData,
-        }
-      })
-
-      console.log('[handleSaveCombo] Saving data:', {
-        keyword: state.keyword,
-        chartDataLength: chartData.length,
-        overlaysLength: overlaysData.length,
-      })
-
-      // 3. 한 번에 모든 데이터 저장
-      const res = await apiFetch('/api/keyword-searches', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          keyword: state.keyword,
-          region: 'GLOBAL',
-          search_type: 'WEB',
-          chartData,
-          overlays: overlaysData,
-        }),
-      })
-
-      if (!res.ok) {
-        const error = await res.json()
-        throw new Error(error.message || 'Failed to save keyword')
-      }
-
-      const createData = await res.json()
-      console.log(
-        '[handleSaveCombo] Keyword saved with ID:',
-        createData.data.id
-      )
-
-      toast.success('키워드와 오버레이 조합을 저장했습니다')
-      await fetchSavedKeywords()
-    } catch (error) {
-      console.error('Error saving combo:', error)
-      toast.error(
-        error instanceof Error ? error.message : '저장에 실패했습니다'
-      )
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  // 저장된 키워드 복원 — 아키텍처 변경: 5y 단일 fetch
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleRestoreKeyword = async (keywordSearch: KeywordSearchRecord) => {
-    setState(prev => ({ ...prev, isLoading: true }))
-
-    try {
-      // 1단계: 오버레이 데이터 로드
-      const overlayRes = await apiFetch(
-        `/api/keyword-searches/${keywordSearch.id}/overlays`
-      )
-      if (!overlayRes.ok) throw new Error('Failed to fetch overlays')
-
-      const overlayData = await overlayRes.json()
-      const overlays = overlayData.data as KeywordOverlayResponse[]
-
-      const overlaySearches = overlays.map(overlayToSearchRecord)
-
-      // 2단계: 5y 데이터 재조회
-      const params = new URLSearchParams({
-        keyword: keywordSearch.keyword,
-        geo: '',
-        timeframe: '5y',
-        gprop: '',
-      })
-
-      const res = await apiFetch(`/api/trends?${params.toString()}`)
-      if (!res.ok) throw new Error('Failed to fetch trends')
-
-      const data = await res.json()
-      const raw = data?.data?.trendsData
-      if (!Array.isArray(raw)) throw new Error('Invalid response format')
-
-      setState(prev => ({
-        ...prev,
-        keyword: keywordSearch.keyword,
-        fullTrendsData: raw as TrendsDataPoint[],
-        selectedSearches: overlaySearches,
-        isLoading: false,
-      }))
-      setTimeframe(DEFAULT_TIMEFRAME)
-
-      // URL 업데이트
-      const urlParams = new URLSearchParams({
-        keyword: keywordSearch.keyword,
-        geo: '',
-        timeframe: DEFAULT_TIMEFRAME,
-        gprop: '',
-      })
-      router.push(`/trends/search?${urlParams.toString()}`)
-
-      toast.success(`"${keywordSearch.keyword}" 데이터를 복원했습니다`)
-    } catch (error) {
-      console.error('Error loading overlays:', error)
-      setState(prev => ({ ...prev, isLoading: false }))
-      toast.error('오버레이 데이터를 불러오지 못했습니다')
-    }
-  }
-
-  // P0-3: PNG 메모리 누수 수정 - toBlob + URL.revokeObjectURL
-  // P2-12: html-to-image 동적 임포트
-  // F027: timeframe 파라미터로 개별 차트 다운로드 지원 (타임프레임별 상태 분리)
-  const handleDownloadPNG = async (timeframe: Timeframe | 'custom') => {
-    const chartRef = chartRefs.current[timeframe]
-    if (!chartRef || !state.keyword) {
-      toast.error('차트가 준비되지 않았습니다')
-      return
-    }
-
-    setDownloadingTimeframes(prev => new Set(prev).add(timeframe))
-    try {
-      const { toBlob } = await import('html-to-image')
-      const blob = await toBlob(chartRef)
-      if (!blob) throw new Error('이미지 생성에 실패했습니다')
-
-      const objectUrl = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = objectUrl
-      const timeframeLabel =
-        timeframe === 'custom'
-          ? `${customWeeks}w`
-          : TIMEFRAME_LABELS[timeframe] || timeframe
-      link.download = `${state.keyword}-trends-${timeframeLabel}-${format(new Date(), 'yyyyMMdd')}.png`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(objectUrl)
-
-      toast.success(`${timeframeLabel} 차트를 PNG로 다운로드했습니다`)
-    } catch (error) {
-      console.error('Error downloading chart:', error)
-      toast.error('차트 다운로드에 실패했습니다')
-    } finally {
-      setDownloadingTimeframes(prev => {
-        const next = new Set(prev)
-        next.delete(timeframe)
-        return next
-      })
-    }
-  }
-
-  // P0-4: Excel 오버레이 시트 Map 최적화 (이미 chart에서 동일 패턴 적용됨)
-  // P2-12: xlsx 동적 임포트
-  const handleDownloadExcel = async () => {
-    if (!state.keyword || trendsData.length === 0) {
-      toast.error('먼저 트렌드를 조회해주세요')
-      return
-    }
-
-    try {
-      const { write, utils } = await import('xlsx')
-      const wb = utils.book_new()
-
-      // Sheet 1: 트렌드 데이터 (P1-9: ma13Values는 이미 useMemo로 계산됨)
-      const trendsSheet = trendsData.map((point, idx) => ({
-        날짜: point.date,
-        트렌드지수: point.value,
-        MA13: ma13Values[idx] ?? null,
-      }))
-      utils.book_append_sheet(
-        wb,
-        utils.json_to_sheet(trendsSheet),
-        '트렌드 데이터'
-      )
-
-      // Sheet 2~: 종목별 시트 (Map 기반 O(n+m) 최적화)
-      state.selectedSearches.forEach(search => {
-        const prices = search.price_data?.map(p => p.close) ?? []
-        const min = prices.length > 0 ? Math.min(...prices) : 0
-        const max = prices.length > 0 ? Math.max(...prices) : 0
-        const range = max - min
-
-        // 날짜 → 가격 Map 생성
-        const priceMap = new Map<string, number>()
-        search.price_data?.forEach(p => priceMap.set(p.date, p.close))
-
-        const overlaySheet = trendsData.map(trendPoint => {
-          const close = priceMap.get(trendPoint.date)
-          const normalized =
-            close !== undefined
-              ? range === 0
-                ? 50
-                : Math.round(((close - min) / range) * 10000) / 100
-              : null
-
-          return {
-            날짜: trendPoint.date,
-            [search.ticker]: close ?? null,
-            정규화가격: normalized,
-          }
-        })
-
-        utils.book_append_sheet(
-          wb,
-          utils.json_to_sheet(overlaySheet),
-          search.ticker
-        )
-      })
-
-      const excelBuffer = write(wb, {
-        bookType: 'xlsx',
-        type: 'array',
-        bookSST: false,
-      })
-      const blob = new Blob([excelBuffer], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `${state.keyword}-trends-${format(new Date(), 'yyyyMMdd')}.xlsx`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
-
-      toast.success('트렌드 데이터를 Excel로 다운로드했습니다')
-    } catch (error) {
-      console.error('Error downloading Excel:', error)
-      toast.error('Excel 다운로드에 실패했습니다')
     }
   }
 
@@ -973,12 +404,9 @@ export default function KeywordTrendsClient() {
   // 저장된 키워드 삭제 (확인 다이얼로그)
   const handleConfirmDelete = async (keywordSearchId: string) => {
     try {
-      const res = await apiFetch(
-        `/api/keyword-searches?id=${keywordSearchId}`,
-        {
-          method: 'DELETE',
-        }
-      )
+      const res = await apiFetch(`/api/keywords/${keywordSearchId}`, {
+        method: 'DELETE',
+      })
 
       if (!res.ok) throw new Error('Failed to delete keyword')
 

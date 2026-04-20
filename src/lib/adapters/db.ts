@@ -4,8 +4,8 @@
  * 새로운 스키마:
  * - searches: 종목 저장소
  * - stock_price_data: 5년 일일 주가
- * - keyword_searches: 키워드 저장 기록
- * - keyword_chart_timeseries: 차트 전체 시계열 (trends, ma13, yoy)
+ * - keywords: 키워드 저장소
+ * - keyword_analysis: 조건별 키워드 분석
  * - keyword_stock_overlays: 키워드-종목 매핑
  * - overlay_chart_timeseries: 정규화된 주가 시계열
  */
@@ -13,7 +13,6 @@
 import type {
   SearchRecord,
   PriceDataPoint,
-  KeywordSearchRecord,
   KeywordStockOverlay,
   KeywordAnalysis,
   KeywordAnalysisRaw,
@@ -56,40 +55,6 @@ export interface DbAdapter {
     client?: SupabaseClient
   ): Promise<PriceDataPoint[]>
 
-  // ============ keyword_searches (키워드 - 기존 호환성) ============
-  upsertKeywordSearch(
-    record: KeywordSearchRecord,
-    client?: SupabaseClient
-  ): Promise<string>
-  getKeywordSearch(
-    keywordSearchId: string,
-    client?: SupabaseClient
-  ): Promise<KeywordSearchRecord | null>
-  getKeywordSearchByKeyword(
-    keyword: string,
-    client?: SupabaseClient
-  ): Promise<KeywordSearchRecord | null>
-  getAllKeywordSearches(client?: SupabaseClient): Promise<KeywordSearchRecord[]>
-  deleteKeywordSearch(
-    keywordSearchId: string,
-    client?: SupabaseClient
-  ): Promise<boolean>
-  markKeywordAsViewed(
-    keywordSearchId: string,
-    client?: SupabaseClient
-  ): Promise<boolean>
-
-  updateKeywordSearchTrendsData(
-    keywordSearchId: string,
-    trendsData: Array<{
-      date: string
-      value: number
-      ma13Value: number | null
-      yoyValue: number | null
-    }>,
-    client?: SupabaseClient
-  ): Promise<boolean>
-
   // ============ keywords & keyword_analysis (조건 조합 기반) ============
   getKeywordAnalysisByFilters(
     keywordId: string,
@@ -120,32 +85,6 @@ export interface DbAdapter {
     id: string,
     client?: SupabaseClient
   ): Promise<boolean>
-
-  // ============ keyword_chart_timeseries (차트 시계열 - 핵심) ============
-  insertKeywordChartTimeseries(
-    keywordSearchId: string,
-    chartData: Array<{
-      weekIndex: number
-      date: string
-      trendsValue: number
-      ma13Value: number | null
-      yoyValue: number | null
-    }>,
-    client?: SupabaseClient
-  ): Promise<void>
-
-  getKeywordChartTimeseries(
-    keywordSearchId: string,
-    client?: SupabaseClient
-  ): Promise<
-    Array<{
-      weekIndex: number
-      date: string
-      trendsValue: number
-      ma13Value: number | null
-      yoyValue: number | null
-    }>
-  >
 
   // ============ keyword_stock_overlays (오버레이) ============
   addStockOverlay(
@@ -205,16 +144,103 @@ export interface DbAdapter {
 // ============================================================================
 
 class SupabaseDbAdapter implements DbAdapter {
+  private async getOrCreateKeyword(
+    userId: string,
+    keywordName: string,
+    preferredId: string,
+    client?: SupabaseClient
+  ): Promise<string> {
+    const supabase = client ?? getSupabaseClient()
+
+    const { data: existingKeyword, error: existingError } = await supabase
+      .from('keywords')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('normalized_name', keywordName)
+      .single()
+
+    if (existingError && existingError.code !== 'PGRST116') {
+      throw existingError
+    }
+
+    if (existingKeyword) return existingKeyword.id
+
+    const { data: createdKeyword, error: createError } = await supabase
+      .from('keywords')
+      .insert({
+        id: preferredId,
+        user_id: userId,
+        name: keywordName,
+        normalized_name: keywordName,
+      })
+      .select('id')
+      .single()
+
+    if (createError?.code === '23505') {
+      const { data: racedKeyword, error: racedError } = await supabase
+        .from('keywords')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('normalized_name', keywordName)
+        .single()
+
+      if (racedError) throw racedError
+      return racedKeyword.id
+    }
+
+    if (createError) throw createError
+    return createdKeyword.id
+  }
+
+  private async resolveKeywordId(
+    keywordIdOrKeywordSearchId: string,
+    client?: SupabaseClient
+  ): Promise<string> {
+    const supabase = client ?? getSupabaseClient()
+
+    const { data: keyword, error: keywordError } = await supabase
+      .from('keywords')
+      .select('id')
+      .eq('id', keywordIdOrKeywordSearchId)
+      .single()
+
+    if (keywordError && keywordError.code !== 'PGRST116') {
+      throw keywordError
+    }
+
+    if (keyword) return keyword.id
+
+    const { data: keywordSearch, error: keywordSearchError } = await supabase
+      .from('keyword_searches')
+      .select('user_id, keyword, normalized_keyword')
+      .eq('id', keywordIdOrKeywordSearchId)
+      .single()
+
+    if (keywordSearchError) throw keywordSearchError
+
+    const keywordName = normalizeKeywordSpacing(
+      keywordSearch.normalized_keyword ?? keywordSearch.keyword
+    )
+
+    return this.getOrCreateKeyword(
+      keywordSearch.user_id,
+      keywordName,
+      keywordIdOrKeywordSearchId,
+      supabase
+    )
+  }
+
   private async getDefaultKeywordAnalysisId(
     keywordId: string,
     client?: SupabaseClient
   ): Promise<string> {
     const supabase = client ?? getSupabaseClient()
+    const resolvedKeywordId = await this.resolveKeywordId(keywordId, supabase)
 
     const { data: existingAnalysis, error: existingError } = await supabase
       .from('keyword_analysis')
       .select('id')
-      .eq('keyword_id', keywordId)
+      .eq('keyword_id', resolvedKeywordId)
       .eq('region', 'GLOBAL')
       .eq('period', '5Y')
       .eq('search_type', 'WEB')
@@ -229,7 +255,7 @@ class SupabaseDbAdapter implements DbAdapter {
     const { data: createdAnalysis, error: createError } = await supabase
       .from('keyword_analysis')
       .insert({
-        keyword_id: keywordId,
+        keyword_id: resolvedKeywordId,
         region: 'GLOBAL',
         period: '5Y',
         search_type: 'WEB',
@@ -242,7 +268,7 @@ class SupabaseDbAdapter implements DbAdapter {
       const { data: racedAnalysis, error: racedError } = await supabase
         .from('keyword_analysis')
         .select('id')
-        .eq('keyword_id', keywordId)
+        .eq('keyword_id', resolvedKeywordId)
         .eq('region', 'GLOBAL')
         .eq('period', '5Y')
         .eq('search_type', 'WEB')
@@ -457,246 +483,6 @@ class SupabaseDbAdapter implements DbAdapter {
       high: row.high,
       low: row.low,
       volume: row.volume,
-    }))
-  }
-
-  // ============ keyword_searches ============
-
-  async upsertKeywordSearch(
-    record: KeywordSearchRecord,
-    client?: SupabaseClient
-  ): Promise<string> {
-    const supabase = client ?? getSupabaseClient()
-    const keywordName = normalizeKeywordSpacing(record.keyword)
-
-    const { data, error } = await supabase
-      .from('keyword_searches')
-      .upsert(
-        {
-          user_id: record.user_id,
-          keyword: keywordName,
-          normalized_keyword: keywordName,
-          region: record.region,
-          search_type: record.search_type,
-          searched_at: record.searched_at,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id,normalized_keyword,region,search_type' }
-      )
-      .select('id')
-      .single()
-
-    if (error) throw error
-
-    const { error: keywordError } = await supabase.from('keywords').upsert(
-      {
-        id: data.id,
-        user_id: record.user_id,
-        name: keywordName,
-        normalized_name: keywordName,
-      },
-      { onConflict: 'id' }
-    )
-
-    if (keywordError) throw keywordError
-
-    return data.id
-  }
-
-  async getKeywordSearch(
-    keywordSearchId: string,
-    client?: SupabaseClient
-  ): Promise<KeywordSearchRecord | null> {
-    const supabase = client ?? getSupabaseClient()
-
-    const { data, error } = await supabase
-      .from('keyword_searches')
-      .select('*')
-      .eq('id', keywordSearchId)
-      .single()
-
-    if (error) return null
-
-    return {
-      id: data.id,
-      user_id: data.user_id,
-      keyword: data.keyword,
-      region: data.region || 'GLOBAL',
-      search_type: data.search_type || 'WEB',
-      trends_data: [],
-      searched_at: data.searched_at,
-      created_at: data.created_at,
-      updated_at: data.updated_at,
-      last_viewed_at: data.last_viewed_at,
-    }
-  }
-
-  async getKeywordSearchByKeyword(
-    keyword: string,
-    client?: SupabaseClient
-  ): Promise<KeywordSearchRecord | null> {
-    const supabase = client ?? getSupabaseClient()
-    const normalizedKeyword = normalizeKeywordSpacing(keyword)
-
-    const { data, error } = await supabase
-      .from('keyword_searches')
-      .select('*')
-      .eq('normalized_keyword', normalizedKeyword)
-      .single()
-
-    if (error) return null
-
-    return {
-      id: data.id,
-      user_id: data.user_id,
-      keyword: data.keyword,
-      region: data.region || 'GLOBAL',
-      search_type: data.search_type || 'WEB',
-      trends_data: [],
-      searched_at: data.searched_at,
-      created_at: data.created_at,
-      updated_at: data.updated_at,
-      last_viewed_at: data.last_viewed_at,
-    }
-  }
-
-  async getAllKeywordSearches(
-    client?: SupabaseClient
-  ): Promise<KeywordSearchRecord[]> {
-    const supabase = client ?? getSupabaseClient()
-
-    const { data, error } = await supabase
-      .from('keyword_searches')
-      .select('*')
-      .order('searched_at', { ascending: false })
-
-    if (error) throw error
-
-    return (data || []).map(row => ({
-      id: row.id,
-      user_id: row.user_id,
-      keyword: row.keyword,
-      region: row.region || 'GLOBAL',
-      search_type: row.search_type || 'WEB',
-      trends_data: [],
-      searched_at: row.searched_at,
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-      last_viewed_at: row.last_viewed_at,
-    }))
-  }
-
-  async deleteKeywordSearch(
-    keywordSearchId: string,
-    client?: SupabaseClient
-  ): Promise<boolean> {
-    const supabase = client ?? getSupabaseClient()
-
-    const { error } = await supabase
-      .from('keyword_searches')
-      .delete()
-      .eq('id', keywordSearchId)
-
-    return !error
-  }
-
-  async markKeywordAsViewed(
-    keywordSearchId: string,
-    client?: SupabaseClient
-  ): Promise<boolean> {
-    const supabase = client ?? getSupabaseClient()
-
-    const { error } = await supabase
-      .from('keyword_searches')
-      .update({ last_viewed_at: new Date().toISOString() })
-      .eq('id', keywordSearchId)
-
-    return !error
-  }
-
-  async updateKeywordSearchTrendsData(
-    keywordSearchId: string,
-    trendsData: Array<{
-      date: string
-      value: number
-      ma13Value: number | null
-      yoyValue: number | null
-    }>,
-    client?: SupabaseClient
-  ): Promise<boolean> {
-    const supabase = client ?? getSupabaseClient()
-
-    const { error } = await supabase
-      .from('keyword_searches')
-      .update({
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', keywordSearchId)
-
-    return !error
-  }
-
-  // ============ keyword_chart_timeseries ============
-
-  async insertKeywordChartTimeseries(
-    keywordSearchId: string,
-    chartData: Array<{
-      weekIndex: number
-      date: string
-      trendsValue: number
-      ma13Value: number | null
-      yoyValue: number | null
-    }>,
-    client?: SupabaseClient
-  ): Promise<void> {
-    if (chartData.length === 0) return
-
-    const supabase = client ?? getSupabaseClient()
-
-    const records = chartData.map(row => ({
-      keyword_search_id: keywordSearchId,
-      week_index: row.weekIndex,
-      date: row.date,
-      trends_value: row.trendsValue,
-      ma13_value: row.ma13Value,
-      yoy_value: row.yoyValue,
-    }))
-
-    const { error } = await supabase
-      .from('keyword_chart_timeseries')
-      .insert(records)
-
-    if (error) throw error
-  }
-
-  async getKeywordChartTimeseries(
-    keywordSearchId: string,
-    client?: SupabaseClient
-  ): Promise<
-    Array<{
-      weekIndex: number
-      date: string
-      trendsValue: number
-      ma13Value: number | null
-      yoyValue: number | null
-    }>
-  > {
-    const supabase = client ?? getSupabaseClient()
-
-    const { data, error } = await supabase
-      .from('keyword_chart_timeseries')
-      .select('*')
-      .eq('keyword_search_id', keywordSearchId)
-      .order('date', { ascending: true })
-
-    if (error) throw error
-
-    return (data || []).map(row => ({
-      weekIndex: row.week_index,
-      date: row.date,
-      trendsValue: row.trends_value,
-      ma13Value: row.ma13_value,
-      yoyValue: row.yoy_value,
     }))
   }
 

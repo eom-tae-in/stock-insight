@@ -1,5 +1,5 @@
 /**
- * Legacy keyword overlay refresh route.
+ * RESTful keyword overlay batch delete route.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -11,14 +11,14 @@ import {
 } from '@/lib/api-helpers'
 import {
   ApiServiceError,
-  refreshKeywordOverlay,
+  batchDeleteKeywordOverlays,
 } from '@/server/keyword-overlays-service'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(
-  _request: NextRequest,
-  { params }: { params: Promise<{ keywordId: string; overlayId: string }> }
+  request: NextRequest,
+  { params }: { params: Promise<{ keywordId: string }> }
 ) {
   try {
     const supabase = await createSupabaseServerClient()
@@ -27,18 +27,24 @@ export async function POST(
       return authResult
     }
 
-    const { keywordId, overlayId } = await params
-    const result = await refreshKeywordOverlay(supabase, keywordId, overlayId)
+    const { keywordId } = await params
+    const { overlayIds } = (await request.json()) as { overlayIds: string[] }
+    const result = await batchDeleteKeywordOverlays(
+      supabase,
+      keywordId,
+      overlayIds
+    )
+
     return createSuccessResponse(result, 200)
   } catch (error) {
     if (error instanceof ApiServiceError) {
       return createErrorResponse(error.code, error.message, error.status)
     }
 
-    console.error('Error refreshing overlay:', error)
+    console.error('[batch-delete] Error:', error)
     return createErrorResponse(
-      'REFRESH_FAILED',
-      '최신화 중 오류가 발생했습니다.',
+      'BATCH_DELETE_FAILED',
+      '배치 삭제 중 오류가 발생했습니다.',
       500
     )
   }

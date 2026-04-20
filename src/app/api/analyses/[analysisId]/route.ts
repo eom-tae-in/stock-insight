@@ -1,8 +1,9 @@
 /**
- * Legacy keyword analysis detail route.
+ * RESTful analysis detail route.
  *
- * Compatibility entrypoint for /api/keyword-analysis/[analysisId]. New code
- * should use /api/analyses/[analysisId].
+ * GET /api/analyses/[analysisId]
+ * PATCH /api/analyses/[analysisId]
+ * DELETE /api/analyses/[analysisId]
  */
 
 import { NextRequest, NextResponse } from 'next/server'

@@ -1,5 +1,5 @@
 /**
- * Legacy keyword overlay refresh route.
+ * RESTful analysis overlay detail route.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -10,15 +10,15 @@ import {
   validateApiAuth,
 } from '@/lib/api-helpers'
 import {
-  ApiServiceError,
-  refreshKeywordOverlay,
-} from '@/server/keyword-overlays-service'
+  AnalysisOverlayServiceError,
+  deleteAnalysisOverlay,
+} from '@/server/analysis-overlays-service'
 
 export const dynamic = 'force-dynamic'
 
-export async function POST(
+export async function DELETE(
   _request: NextRequest,
-  { params }: { params: Promise<{ keywordId: string; overlayId: string }> }
+  { params }: { params: Promise<{ analysisId: string; overlayId: string }> }
 ) {
   try {
     const supabase = await createSupabaseServerClient()
@@ -27,19 +27,21 @@ export async function POST(
       return authResult
     }
 
-    const { keywordId, overlayId } = await params
-    const result = await refreshKeywordOverlay(supabase, keywordId, overlayId)
+    const { analysisId, overlayId } = await params
+    const result = await deleteAnalysisOverlay(
+      supabase,
+      authResult.userId,
+      analysisId,
+      overlayId
+    )
+
     return createSuccessResponse(result, 200)
   } catch (error) {
-    if (error instanceof ApiServiceError) {
+    if (error instanceof AnalysisOverlayServiceError) {
       return createErrorResponse(error.code, error.message, error.status)
     }
 
-    console.error('Error refreshing overlay:', error)
-    return createErrorResponse(
-      'REFRESH_FAILED',
-      '최신화 중 오류가 발생했습니다.',
-      500
-    )
+    console.error('Overlay 삭제에 실패했습니다.', error)
+    return createErrorResponse('DB_ERROR', 'Overlay 삭제에 실패했습니다.', 500)
   }
 }

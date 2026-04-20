@@ -1,8 +1,8 @@
 /**
- * Legacy keyword analysis route.
+ * RESTful keyword analyses route.
  *
- * Compatibility entrypoint for /api/keyword-analysis. New code should use
- * /api/keywords/[keywordId]/analyses.
+ * GET /api/keywords/[keywordId]/analyses?region=GLOBAL&period=5Y&searchType=WEB
+ * POST /api/keywords/[keywordId]/analyses
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -30,7 +30,10 @@ function handleAnalysisError(error: unknown, fallbackMessage: string) {
   return createErrorResponse('DB_ERROR', fallbackMessage, 500)
 }
 
-export async function GET(request: NextRequest) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ keywordId: string }> }
+) {
   try {
     const supabase = await createSupabaseServerClient()
     const authResult = await validateApiAuth(supabase)
@@ -38,11 +41,12 @@ export async function GET(request: NextRequest) {
       return authResult
     }
 
+    const { keywordId } = await params
     const { searchParams } = request.nextUrl
     const analysis = await getKeywordAnalysis(
       supabase,
       authResult.userId,
-      searchParams.get('keywordId') ?? '',
+      keywordId,
       (searchParams.get('region') as Region) || 'GLOBAL',
       (searchParams.get('period') as Period) || '5Y',
       (searchParams.get('searchType') as SearchType) || 'WEB'
@@ -54,7 +58,10 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ keywordId: string }> }
+) {
   try {
     const supabase = await createSupabaseServerClient()
     const authResult = await validateApiAuth(supabase)
@@ -62,11 +69,12 @@ export async function POST(request: NextRequest) {
       return authResult
     }
 
+    const { keywordId } = await params
     const body = await request.json()
     const result = await createKeywordAnalysisForKeyword(
       supabase,
       authResult.userId,
-      body.keyword_id,
+      keywordId,
       {
         keyword: body.keyword,
         region: body.region,
