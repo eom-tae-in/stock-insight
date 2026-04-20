@@ -7,10 +7,10 @@ import {
   SHOW_ALL_INDEX,
   type KeywordLanguage,
 } from '@/lib/utils/keyword-classifier'
-import type { KeywordSearchRecord } from '@/types/database'
+import type { KeywordRecord } from '@/types/database'
 
 interface KeywordIndexSidebarProps {
-  grouped: Record<string, KeywordSearchRecord[]>
+  grouped: Record<string, KeywordRecord[]>
   selectedIndex: string | null
   onSelect: (index: string) => void
   languageTab: KeywordLanguage

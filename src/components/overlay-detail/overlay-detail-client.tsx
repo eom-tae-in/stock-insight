@@ -12,11 +12,11 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts'
-import type { KeywordSearchRecord } from '@/types/database'
+import type { KeywordRecord } from '@/types/database'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface OverlayDetailClientProps {
-  keyword: KeywordSearchRecord
+  keyword: KeywordRecord
   overlay: {
     id: string
     ticker: string

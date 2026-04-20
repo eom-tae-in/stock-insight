@@ -108,7 +108,7 @@ export function SearchForm({
       setIsSearching(true)
       try {
         const response = await fetch(
-          `/api/ticker-search?q=${encodeURIComponent(query)}`
+          `/api/stocks/search?q=${encodeURIComponent(query)}`
         )
 
         if (response.ok) {

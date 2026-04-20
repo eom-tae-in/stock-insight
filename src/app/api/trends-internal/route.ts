@@ -6,7 +6,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { fetchInternalTrendsData } from '@/server/trends-internal-service'
+import {
+  fetchInternalTrendsData,
+  TrendsProviderError,
+} from '@/server/trends-internal-service'
 import { normalizeKeywordSpacing } from '@/lib/utils/keyword-normalization'
 
 /**
@@ -46,7 +49,15 @@ export async function GET(request: NextRequest) {
     return await getTrendsData(normalizedKeyword, geo, timeframe, gprop)
   } catch (error) {
     console.error('trends-internal GET error:', error)
-    return NextResponse.json([], { status: 200 })
+    const status = error instanceof TrendsProviderError ? error.status : 502
+    const code =
+      error instanceof TrendsProviderError ? error.code : 'TRENDS_FETCH_FAILED'
+    const message =
+      error instanceof Error
+        ? error.message
+        : '트렌드 데이터를 가져오지 못했습니다.'
+
+    return NextResponse.json({ error: message, code }, { status })
   }
 }
 
@@ -67,6 +78,14 @@ export async function POST(request: NextRequest) {
     return await getTrendsData(normalizedKeyword, geo, timeframe, gprop)
   } catch (error) {
     console.error('trends-internal POST error:', error)
-    return NextResponse.json([], { status: 200 })
+    const status = error instanceof TrendsProviderError ? error.status : 502
+    const code =
+      error instanceof TrendsProviderError ? error.code : 'TRENDS_FETCH_FAILED'
+    const message =
+      error instanceof Error
+        ? error.message
+        : '트렌드 데이터를 가져오지 못했습니다.'
+
+    return NextResponse.json({ error: message, code }, { status })
   }
 }

@@ -1,11 +1,13 @@
 """
-Vercel Python Serverless Function: Google Trends 데이터 수집
+Vercel Python Serverless Function: Google Trends data provider
 
-- Vercel 배포 환경에서만 호출됨 (로컬은 src/lib/get_trends.py 를 직접 spawn).
-- Trends fetch 로직은 src/lib/get_trends.py 의 get_trends() 를 단일 진실로 재사용.
-- POST /api/trends
-  body: { keyword, geo?, timeframe?, gprop? }
-  resp: { success, data?: [{date, value}], error?, code? }
+- Local development runs src/lib/get_trends.py directly from Next.js.
+- Vercel runtime calls this function from src/server/trends-internal-service.ts.
+- The actual Trends fetch logic is shared with src/lib/get_trends.py.
+
+POST /api/pytrends
+body: { keyword, geo?, timeframe?, gprop? }
+resp: { success, data?: [{date, value}], error?, code? }
 """
 
 import json
@@ -14,7 +16,6 @@ import sys
 import traceback
 from http.server import BaseHTTPRequestHandler
 
-# src/lib 을 import path 에 추가하여 단일 진실(get_trends.py) 재사용
 _SRC_LIB_DIR = os.path.join(os.path.dirname(__file__), '..', 'src', 'lib')
 if _SRC_LIB_DIR not in sys.path:
     sys.path.insert(0, _SRC_LIB_DIR)
@@ -52,6 +53,14 @@ class handler(BaseHTTPRequestHandler):
                 return
 
             data = get_trends(keyword, geo, timeframe, gprop)
+            if not data:
+                self._send_json(502, {
+                    'success': False,
+                    'error': 'No trends data returned',
+                    'code': 'NO_TRENDS_DATA',
+                })
+                return
+
             self._send_json(200, {'success': True, 'data': data})
 
         except json.JSONDecodeError:

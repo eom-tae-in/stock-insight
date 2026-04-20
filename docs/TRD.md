@@ -176,7 +176,7 @@ export interface StockProvider {
 - `keyword_chart_timeseries`
 - `keyword_temporary_overlays`
 
-마이그레이션 기간에는 legacy read만 허용하고, 신규 write는 목표 테이블로만 수행한다.
+앱 실행 경로에서는 legacy read/write를 허용하지 않는다. 테이블 제거는 별도 DB 마이그레이션으로 처리한다.
 
 ### 3.3 날짜와 시계열
 
@@ -340,9 +340,6 @@ PR 수락 기준:
 
 ## 9. 현재 코드에서 우선 해결할 기술 부채
 
-- `TRENDS_API_URL` 포트와 Flask 실행 포트 불일치.
-- Trends 수집 경로가 Python script, Flask, Next API로 분산.
-- legacy route 이름이 `/api/keyword-searches`에 남아 있음.
 - 키워드 정규화 정책 적용 후 Supabase migration 반영 필요.
 - 일부 DB 조회가 코드상 `user_id` 필터를 명시하지 않음.
 - React hook dependency 경고와 unused handler가 누적됨.

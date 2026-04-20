@@ -17,6 +17,7 @@ const PUBLIC_PATHS = [
   '/signup',
   '/api/auth/callback',
   '/api/health',
+  '/api/pytrends',
   '/api/trends-internal',
 ]
 

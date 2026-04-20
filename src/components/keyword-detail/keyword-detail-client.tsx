@@ -32,7 +32,7 @@ import {
 } from '@dnd-kit/sortable'
 import { DragOverlay } from '@dnd-kit/core'
 import type {
-  KeywordSearchRecord,
+  KeywordRecord,
   KeywordAnalysis,
   Region,
   Period,
@@ -88,7 +88,7 @@ type OverlayItem = {
 
 interface KeywordDetailClientProps {
   keywordId: string
-  keyword: KeywordSearchRecord
+  keyword: KeywordRecord
   initialSearchParams: {
     region: Region
     period: Period
@@ -806,8 +806,7 @@ export function KeywordDetailClient({
     setDeletingId('batch')
 
     try {
-      // Phase 5-B: 개별 삭제를 병렬로 실행
-      // (새로운 batch-delete API는 Phase 6에서 추가 예정)
+      // 분석 overlay는 개별 DELETE route를 병렬 호출해 선택 삭제한다.
       const deletePromises = selectedArray.map(overlayId =>
         fetch(`/api/analyses/${currentAnalysis.id}/overlays/${overlayId}`, {
           method: 'DELETE',
@@ -1048,7 +1047,7 @@ export function KeywordDetailClient({
 
     // 즉시 종목 데이터 가져오기 (임시 조회, DB 저장 안 함)
     try {
-      const res = await fetch(`/api/stock-data?ticker=${ticker}`)
+      const res = await fetch(`/api/stocks/${ticker}`)
 
       if (!res.ok) {
         if (res.status === 404) {
@@ -1118,7 +1117,7 @@ export function KeywordDetailClient({
 
     try {
       // API에서 종목 데이터 조회 (임시 조회, DB 저장 안 함)
-      const res = await fetch(`/api/stock-data?ticker=${stockSearchInput}`)
+      const res = await fetch(`/api/stocks/${stockSearchInput}`)
 
       if (!res.ok) {
         if (res.status === 404) {

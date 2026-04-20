@@ -11,7 +11,7 @@ import {
   DEFAULT_TIMEFRAME,
   type Timeframe,
 } from '@/lib/constants/trends'
-import type { KeywordSearchRecord } from '@/types/database'
+import type { KeywordRecord } from '@/types/database'
 import { normalizeKeywordSpacing } from '@/lib/utils/keyword-normalization'
 
 export default function KeywordSearchPageClient() {
@@ -46,7 +46,7 @@ export default function KeywordSearchPageClient() {
       }
 
       const existingKeyword = keywords.find(
-        (k: KeywordSearchRecord) =>
+        (k: KeywordRecord) =>
           normalizeKeywordSpacing(k.keyword) === trimmedKeyword
       )
 

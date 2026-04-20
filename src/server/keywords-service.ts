@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { KeywordSearchRecord } from '@/types/database'
+import type { KeywordRecord } from '@/types/database'
 import { normalizeKeywordSpacing } from '@/lib/utils/keyword-normalization'
 
 type KeywordRow = {
@@ -9,8 +9,6 @@ type KeywordRow = {
   normalized_name: string | null
   created_at: string
 }
-
-type KeywordRecord = KeywordSearchRecord
 
 function toKeywordRecord(row: KeywordRow): KeywordRecord {
   return {

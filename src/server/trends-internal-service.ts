@@ -19,6 +19,22 @@ export interface FetchInternalTrendsDataParams {
   gprop?: string
 }
 
+export class TrendsProviderError extends Error {
+  constructor(
+    public code: string,
+    message: string,
+    public status: number = 502
+  ) {
+    super(message)
+  }
+}
+
+interface TrendsProvider {
+  fetch(
+    params: Required<FetchInternalTrendsDataParams>
+  ): Promise<RawTrendsDataPoint[]>
+}
+
 function toRawTrendsDataPoint(point: unknown): RawTrendsDataPoint | null {
   if (typeof point !== 'object' || point === null) return null
 
@@ -36,81 +52,107 @@ function isVercelRuntime(): boolean {
   return process.env.VERCEL === '1'
 }
 
-async function fetchTrendsViaLocalSpawn(
-  keyword: string,
-  geo: string,
-  timeframe: string,
-  gprop: string
-): Promise<RawTrendsDataPoint[]> {
-  const pythonPath = path.join(process.cwd(), '.venv', 'bin', 'python3')
-  const scriptPath = path.join(process.cwd(), 'src', 'lib', 'get_trends.py')
+function parseRawTrendsData(data: unknown, source: string) {
+  if (!Array.isArray(data)) {
+    throw new TrendsProviderError(
+      'INVALID_TRENDS_RESPONSE',
+      `${source} Trends response is not an array`
+    )
+  }
 
-  const { stdout, stderr } = await execFileAsync(pythonPath, [
-    scriptPath,
+  const trendsData = data
+    .map(toRawTrendsDataPoint)
+    .filter((point): point is RawTrendsDataPoint => point !== null)
+
+  if (trendsData.length === 0) {
+    throw new TrendsProviderError(
+      'NO_TRENDS_DATA',
+      'No valid Trends data points returned'
+    )
+  }
+
+  return trendsData
+}
+
+class LocalSpawnTrendsProvider implements TrendsProvider {
+  async fetch({
     keyword,
     geo,
     timeframe,
     gprop,
-  ])
+  }: Required<FetchInternalTrendsDataParams>) {
+    const pythonPath = path.join(process.cwd(), '.venv', 'bin', 'python3')
+    const scriptPath = path.join(process.cwd(), 'src', 'lib', 'get_trends.py')
 
-  if (stderr) {
-    console.warn(`Python stderr: ${stderr}`)
+    const { stdout, stderr } = await execFileAsync(pythonPath, [
+      scriptPath,
+      keyword,
+      geo,
+      timeframe,
+      gprop,
+    ])
+
+    if (stderr) {
+      console.warn(`Python stderr: ${stderr}`)
+    }
+
+    return parseRawTrendsData(JSON.parse(stdout), 'Local Python')
   }
-
-  const parsed = JSON.parse(stdout)
-  if (!Array.isArray(parsed)) {
-    console.warn('Invalid trends data format: response is not an array')
-    return []
-  }
-
-  return parsed
-    .map(toRawTrendsDataPoint)
-    .filter((point): point is RawTrendsDataPoint => point !== null)
 }
 
-async function fetchTrendsViaVercelPython(
-  keyword: string,
-  geo: string,
-  timeframe: string,
-  gprop: string
-): Promise<RawTrendsDataPoint[]> {
-  const vercelUrl = process.env.VERCEL_URL
-  if (!vercelUrl) {
-    throw new Error('VERCEL_URL is not set; cannot reach /api/trends')
-  }
+class VercelPythonTrendsProvider implements TrendsProvider {
+  async fetch({
+    keyword,
+    geo,
+    timeframe,
+    gprop,
+  }: Required<FetchInternalTrendsDataParams>) {
+    const vercelUrl = process.env.VERCEL_URL
+    if (!vercelUrl) {
+      throw new TrendsProviderError(
+        'VERCEL_URL_MISSING',
+        'VERCEL_URL is not set; cannot reach /api/pytrends',
+        500
+      )
+    }
 
-  const response = await fetch(`https://${vercelUrl}/api/trends`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ keyword, geo, timeframe, gprop }),
-  })
+    const response = await fetch(`https://${vercelUrl}/api/pytrends`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keyword, geo, timeframe, gprop }),
+    })
 
-  if (!response.ok) {
-    console.error(
-      `Vercel /api/trends failed: ${response.status} ${response.statusText}`
+    if (!response.ok) {
+      throw new TrendsProviderError(
+        'PYTRENDS_FUNCTION_FAILED',
+        `Vercel /api/pytrends failed: ${response.status} ${response.statusText}`,
+        response.status
+      )
+    }
+
+    const json: unknown = await response.json()
+    if (
+      typeof json !== 'object' ||
+      json === null ||
+      (json as { success?: unknown }).success !== true
+    ) {
+      throw new TrendsProviderError(
+        'PYTRENDS_FUNCTION_FAILED',
+        'Vercel /api/pytrends returned unsuccessful payload'
+      )
+    }
+
+    return parseRawTrendsData(
+      (json as { data?: unknown }).data,
+      'Vercel /api/pytrends'
     )
-    return []
   }
+}
 
-  const json: unknown = await response.json()
-  if (
-    typeof json !== 'object' ||
-    json === null ||
-    (json as { success?: unknown }).success !== true
-  ) {
-    console.warn('Vercel /api/trends returned unsuccessful payload')
-    return []
-  }
-
-  const data = (json as { data?: unknown }).data
-  if (!Array.isArray(data)) {
-    console.warn('Vercel /api/trends data is not an array')
-    return []
-  }
-
-  return data
-    .map(toRawTrendsDataPoint)
-    .filter((point): point is RawTrendsDataPoint => point !== null)
+function getTrendsProvider(): TrendsProvider {
+  return isVercelRuntime()
+    ? new VercelPythonTrendsProvider()
+    : new LocalSpawnTrendsProvider()
 }
 
 export async function fetchInternalTrendsData({
@@ -125,36 +167,12 @@ export async function fetchInternalTrendsData({
     throw new Error('Keyword is required')
   }
 
-  try {
-    if (isVercelRuntime()) {
-      return await fetchTrendsViaVercelPython(
-        normalizedKeyword,
-        geo,
-        timeframe,
-        gprop
-      )
-    }
-
-    return await fetchTrendsViaLocalSpawn(
-      normalizedKeyword,
-      geo,
-      timeframe,
-      gprop
-    )
-  } catch (error) {
-    console.error(
-      `Trends fetch failed: ${
-        error instanceof Error ? error.message : 'Unknown error'
-      }`
-    )
-
-    if (error instanceof Error && 'stderr' in error) {
-      const errorWithStderr = error as Error & { stderr?: string }
-      console.error('stderr:', errorWithStderr.stderr)
-    }
-
-    return []
-  }
+  return getTrendsProvider().fetch({
+    keyword: normalizedKeyword,
+    geo,
+    timeframe,
+    gprop,
+  })
 }
 
 export function buildTrendsDataWithIndicators(

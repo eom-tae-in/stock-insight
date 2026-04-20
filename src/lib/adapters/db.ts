@@ -105,11 +105,6 @@ export interface DbAdapter {
     client?: SupabaseClient
   ): Promise<boolean>
 
-  removeStockOverlaysBatch(
-    overlayIds: string[],
-    client?: SupabaseClient
-  ): Promise<boolean>
-
   updateStockOverlayOrder(
     overlayId: string,
     newDisplayOrder: number,
@@ -566,22 +561,6 @@ class SupabaseDbAdapter implements DbAdapter {
       .from('keyword_stock_overlays')
       .delete()
       .eq('id', overlayId)
-
-    return !error
-  }
-
-  async removeStockOverlaysBatch(
-    overlayIds: string[],
-    client?: SupabaseClient
-  ): Promise<boolean> {
-    if (overlayIds.length === 0) return true
-
-    const supabase = client ?? getSupabaseClient()
-
-    const { error } = await supabase
-      .from('keyword_stock_overlays')
-      .delete()
-      .in('id', overlayIds)
 
     return !error
   }

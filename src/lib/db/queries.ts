@@ -83,11 +83,6 @@ export const removeStockOverlay = async (
   client?: SupabaseClient
 ): Promise<boolean> => db.removeStockOverlay(overlayId, client)
 
-export const removeStockOverlaysBatch = async (
-  overlayIds: string[],
-  client?: SupabaseClient
-): Promise<boolean> => db.removeStockOverlaysBatch(overlayIds, client)
-
 export const updateStockOverlayOrder = async (
   overlayId: string,
   newDisplayOrder: number,

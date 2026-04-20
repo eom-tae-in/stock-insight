@@ -1,13 +1,13 @@
 'use client'
 
 import { format, parseISO } from 'date-fns'
-import type { KeywordSearchRecord } from '@/types/database'
+import type { KeywordRecord } from '@/types/database'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
 interface KeywordSearchListProps {
-  keywords: KeywordSearchRecord[]
-  onRestore: (keyword: KeywordSearchRecord) => void
+  keywords: KeywordRecord[]
+  onRestore: (keyword: KeywordRecord) => void
   onDelete: (keywordSearchId: string) => void
 }
 
