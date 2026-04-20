@@ -329,21 +329,32 @@ removeKeywordAnalysisOverlay(overlayId: string): Promise<boolean>
 
 ---
 
-## 🐍 Trends 데이터 수집 (Python 직접 실행)
+## 🐍 Trends 데이터 수집 (환경 분기)
 
-**위치**: `src/lib/get_trends.py`
+**단일 진실**: `src/lib/get_trends.py` (week-sync, isPartial 처리 포함)
 
-**현행 흐름**:
+**진입점**: `src/server/trends-internal-service.ts` 의 `fetchInternalTrendsData()`
 
-- `/api/trends`, `/api/trends-internal`은 모두 `src/lib/services/trends-service.ts` → `src/server/trends-internal-service.ts`를 통해 `.venv/bin/python3 src/lib/get_trends.py`를 직접 실행한다.
-- Flask 서버(`api/trends.py`)는 **기본 실행 경로에서 빠져 있음**. 유지/삭제 여부는 별도 결정.
-- `npm run dev`는 Next.js 단독 실행이며, Flask 서버는 자동으로 띄우지 않는다.
+**환경 분기 (이 파일에서만 분기, 호출 측은 1개 인터페이스만 알아야 함)**:
+
+| 환경   | 판별                         | 실행 방식                                                                   |
+| ------ | ---------------------------- | --------------------------------------------------------------------------- |
+| 로컬   | `process.env.VERCEL !== '1'` | `child_process.execFile('.venv/bin/python3', [src/lib/get_trends.py, ...])` |
+| Vercel | `process.env.VERCEL === '1'` | `fetch('https://${VERCEL_URL}/api/trends', POST)`                           |
+
+**Vercel Python serverless** (`api/trends.py`):
+
+- BaseHTTPRequestHandler `handler` 클래스 형식 (Vercel 자동 함수화).
+- `sys.path` 에 `src/lib` 를 추가한 뒤 `from get_trends import get_trends` 로 단일 진실을 재사용한다.
+- 의존성: `requirements.txt` 에 `pytrends` 만 명시, Python 버전은 `.python-version` 의 `3.12`.
+- 번들 최적화: `vercel.json` 의 `functions.api/**/*.py.excludeFiles` 로 `__pycache__`, `*.pyc`, `.venv/**` 를 제외.
 
 **필수**:
 
-1. 외부 호출은 service 함수 1곳에서만 발생 (HTTP self-call 금지)
-2. 실패 시 빈 배열을 성공처럼 반환하지 않음
-3. 에러 발생 시 명확한 응답 코드 반환
+1. 외부 Python 호출은 `trends-internal-service.ts` 1곳에서만 발생 (다른 곳에서 spawn/fetch 금지)
+2. 실패 시 빈 배열을 성공처럼 반환하지 않음 (현재 일부 경로는 빈 배열 반환 → 추가 정리 대상)
+3. `api/trends.py` 와 `src/lib/get_trends.py` 의 fetch 로직을 다시 분기시키지 않는다 (단일 진실 유지)
+4. Vercel Python function 의 입력은 항상 POST + JSON body `{ keyword, geo?, timeframe?, gprop? }`
 
 ---
 

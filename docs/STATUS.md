@@ -103,27 +103,31 @@ DB 테이블:
 
 API/스크립트:
 
-- `GET /api/trends`
-- `GET/POST /api/trends-internal`
-- `src/lib/get_trends.py`
+- `GET /api/trends` — Vercel Python serverless (`api/trends.py`)
+- `GET/POST /api/trends-internal` — Next.js route, 환경 분기 호출
+- `src/lib/get_trends.py` — pytrends 호출 단일 진실
 - `src/lib/services/trends-service.ts`
+- `src/server/trends-internal-service.ts` — 환경 분기 (local spawn / Vercel fetch)
 
 환경:
 
 - `package.json`의 기본 `npm run dev`는 Next.js만 실행한다.
-- Trends 조회는 별도 Flask 서버 없이 `.venv/bin/python3 src/lib/get_trends.py`를 직접 실행한다.
+- 로컬: `.venv/bin/python3 src/lib/get_trends.py`를 `child_process` spawn 으로 직접 실행한다.
+- Vercel: `api/trends.py` Python serverless function 으로 실행되며, Next.js route는 `https://${VERCEL_URL}/api/trends`로 fetch 한다.
 
 현재 흐름:
 
-- `/api/trends`는 `src/lib/services/trends-service.ts`를 통해 Python Trends 스크립트를 직접 실행한다.
-- `/api/trends-internal`은 서버 서비스 함수를 통해 같은 Python Trends 스크립트를 직접 실행한다.
-- `api/trends.py`는 더 이상 기본 로컬 개발 실행 경로가 아니다.
+- `src/server/trends-internal-service.ts` 의 `fetchInternalTrendsData()`가 단일 진입점이다.
+  - `process.env.VERCEL === '1'` 이면 Vercel Python function 호출 (fetch).
+  - 그 외(로컬)에서는 `.venv/bin/python3 src/lib/get_trends.py` 를 spawn.
+- `api/trends.py` 는 `src/lib/get_trends.py.get_trends()` 를 sys.path 확장 후 import 하여 동일 로직을 재사용한다 (코드 중복 없음).
+- `requirements.txt` 는 `pytrends` 만 명시하고, `.python-version` 은 `3.12` 로 고정한다.
+- `vercel.json` 은 `functions.api/**/*.py.excludeFiles` 로 `__pycache__`, `*.pyc`, `.venv` 를 번들에서 제외한다.
 
 개선 필요:
 
-- `api/trends.py`의 유지/삭제 여부를 별도로 결정해야 한다.
 - 실패 시 빈 배열을 성공처럼 반환하는 경로가 있다.
-- 목표는 단일 `TrendsProvider` 인터페이스와 단일 API 계약이다.
+- 목표는 단일 `TrendsProvider` 인터페이스와 단일 API 계약이다 (현재 함수 분기로 1차 통합 완료).
 
 ### 2.4 키워드 검색 legacy 흐름
 
@@ -292,9 +296,14 @@ DB 테이블:
 - `UPSTASH_REDIS_REST_TOKEN`
 - `STOCK_DATA_CACHE_TTL_SECONDS`
 
+Vercel 환경에서 자동 주입되는 변수 (검증/타입만 명시, .env 작성 X):
+
+- `VERCEL` (`1` 이면 Vercel 런타임)
+- `VERCEL_URL` (현재 deployment hostname, scheme 없음)
+
 문제:
 
-- `api/trends.py`는 기본 실행 경로에서 빠졌고, 삭제 여부는 별도 확인이 필요하다.
+- 없음. `api/trends.py` 는 Vercel Python serverless function 으로 정착되었다.
 
 ## 6. 우선 리팩터링 순서
 
