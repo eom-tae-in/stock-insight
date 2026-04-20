@@ -7,7 +7,7 @@
 
 import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getKeywordSearchById } from '@/lib/db/queries'
+import { getKeyword } from '@/server/keywords-service'
 import { KeywordDetailClient } from '@/components/keyword-detail/keyword-detail-client'
 import type { Region, Period, SearchType } from '@/types/database'
 
@@ -40,7 +40,7 @@ export default async function KeywordDetailPage({
   const resolvedSearchParams = await searchParams
 
   // 1. 키워드 정보 조회 (기존 데이터 - 호환성)
-  const keyword = await getKeywordSearchById(keywordId, supabase)
+  const keyword = await getKeyword(supabase, user.id, keywordId)
   if (!keyword) {
     redirect('/trends')
   }

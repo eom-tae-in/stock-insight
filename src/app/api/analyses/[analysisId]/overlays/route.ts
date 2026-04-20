@@ -1,8 +1,9 @@
 /**
- * Legacy keyword analysis detail route.
+ * RESTful analysis overlay route.
  *
- * Compatibility entrypoint for /api/keyword-analysis/[analysisId]. New code
- * should use /api/analyses/[analysisId].
+ * GET /api/analyses/[analysisId]/overlays
+ * POST /api/analyses/[analysisId]/overlays
+ * PATCH /api/analyses/[analysisId]/overlays
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -13,16 +14,16 @@ import {
   validateApiAuth,
 } from '@/lib/api-helpers'
 import {
-  AnalysisServiceError,
-  deleteOwnedAnalysis,
-  getOwnedAnalysis,
-  updateOwnedAnalysis,
-} from '@/server/keyword-analyses-service'
+  AnalysisOverlayServiceError,
+  createAnalysisOverlay,
+  listAnalysisOverlays,
+  updateAnalysisOverlayOrder,
+} from '@/server/analysis-overlays-service'
 
 export const dynamic = 'force-dynamic'
 
-function handleAnalysisError(error: unknown, fallbackMessage: string) {
-  if (error instanceof AnalysisServiceError) {
+function handleOverlayError(error: unknown, fallbackMessage: string) {
+  if (error instanceof AnalysisOverlayServiceError) {
     return createErrorResponse(error.code, error.message, error.status)
   }
 
@@ -42,23 +43,40 @@ export async function GET(
     }
 
     const { analysisId } = await params
-    const analysis = await getOwnedAnalysis(
+    const overlays = await listAnalysisOverlays(
       supabase,
       authResult.userId,
       analysisId
     )
 
-    if (!analysis) {
-      return createErrorResponse(
-        'NOT_FOUND',
-        'Analysis를 찾을 수 없습니다.',
-        404
-      )
+    return createSuccessResponse(overlays, 200)
+  } catch (error) {
+    return handleOverlayError(error, 'Overlays를 조회하지 못했습니다.')
+  }
+}
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ analysisId: string }> }
+) {
+  try {
+    const supabase = await createSupabaseServerClient()
+    const authResult = await validateApiAuth(supabase)
+    if (authResult instanceof NextResponse) {
+      return authResult
     }
 
-    return createSuccessResponse(analysis, 200)
+    const { analysisId } = await params
+    const overlay = await createAnalysisOverlay(
+      supabase,
+      authResult.userId,
+      analysisId,
+      await request.json()
+    )
+
+    return createSuccessResponse(overlay, 201)
   } catch (error) {
-    return handleAnalysisError(error, 'Analysis를 조회하지 못했습니다.')
+    return handleOverlayError(error, 'Overlay 추가에 실패했습니다.')
   }
 }
 
@@ -74,39 +92,16 @@ export async function PATCH(
     }
 
     const { analysisId } = await params
-    const result = await updateOwnedAnalysis(
+    const { overlays } = (await request.json()) as { overlays: unknown[] }
+    const result = await updateAnalysisOverlayOrder(
       supabase,
       authResult.userId,
       analysisId,
-      await request.json()
+      overlays
     )
 
     return createSuccessResponse(result, 200)
   } catch (error) {
-    return handleAnalysisError(error, 'Analysis 업데이트에 실패했습니다.')
-  }
-}
-
-export async function DELETE(
-  _request: NextRequest,
-  { params }: { params: Promise<{ analysisId: string }> }
-) {
-  try {
-    const supabase = await createSupabaseServerClient()
-    const authResult = await validateApiAuth(supabase)
-    if (authResult instanceof NextResponse) {
-      return authResult
-    }
-
-    const { analysisId } = await params
-    const result = await deleteOwnedAnalysis(
-      supabase,
-      authResult.userId,
-      analysisId
-    )
-
-    return createSuccessResponse(result, 200)
-  } catch (error) {
-    return handleAnalysisError(error, 'Analysis 삭제에 실패했습니다.')
+    return handleOverlayError(error, 'Overlay 순서 변경에 실패했습니다.')
   }
 }

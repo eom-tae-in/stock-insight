@@ -17,5 +17,20 @@ declare namespace NodeJS {
 
     /** Supabase 공개 API 키 (anon key, 필수) */
     SUPABASE_KEY: string
+
+    /** 클라이언트에서 접근하는 Supabase URL (필수) */
+    NEXT_PUBLIC_SUPABASE_URL: string
+
+    /** 클라이언트에서 접근하는 Supabase anon key (필수) */
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: string
+
+    /** Upstash Redis REST URL (선택, 주가 데이터 캐시용) */
+    UPSTASH_REDIS_REST_URL?: string
+
+    /** Upstash Redis REST 토큰 (선택, 주가 데이터 캐시용) */
+    UPSTASH_REDIS_REST_TOKEN?: string
+
+    /** 주가 데이터 Redis 캐시 TTL 초 단위 (기본 86400) */
+    STOCK_DATA_CACHE_TTL_SECONDS?: string
   }
 }

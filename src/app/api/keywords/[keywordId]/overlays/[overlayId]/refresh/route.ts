@@ -1,5 +1,5 @@
 /**
- * Legacy keyword overlay refresh route.
+ * RESTful keyword overlay refresh route.
  */
 
 import { NextRequest, NextResponse } from 'next/server'

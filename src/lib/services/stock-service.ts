@@ -10,6 +10,7 @@
 import YahooFinance from 'yahoo-finance2'
 import { subYears, startOfISOWeek, format } from 'date-fns'
 import type { PriceDataPoint } from '@/types'
+import { getLastCompletedWeekStart } from '@/lib/utils/week-sync'
 
 const yf = new YahooFinance()
 
@@ -73,7 +74,8 @@ export async function fetchStockData(ticker: string): Promise<StockDataResult> {
 
   // 2. 5년 주간 종가 데이터 수집
   const endDate = new Date()
-  const startDate = subYears(endDate, 5)
+  const lastCompletedWeekStart = getLastCompletedWeekStart(endDate)
+  const startDate = subYears(lastCompletedWeekStart, 5)
 
   let historicalData: Array<{
     date: Date
@@ -105,6 +107,10 @@ export async function fetchStockData(ticker: string): Promise<StockDataResult> {
 
     // 날짜 정규화: 금요일(또는 다른 weekday) → 월요일(ISO week start)
     const normalizedDate = startOfISOWeek(quote.date)
+    if (normalizedDate > lastCompletedWeekStart) {
+      continue
+    }
+
     const dateStr = format(normalizedDate, 'yyyy-MM-dd')
 
     // 중복 날짜 제거 (중복이 있으면 마지막 값 사용)

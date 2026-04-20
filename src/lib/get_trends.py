@@ -8,6 +8,26 @@ import sys
 from datetime import datetime, timedelta
 from pytrends.request import TrendReq
 
+def get_last_completed_week_start(now: datetime) -> datetime:
+    """
+    Return the Monday of the most recent fully completed ISO week.
+    """
+    current_week_start = now - timedelta(days=now.weekday())
+    return current_week_start - timedelta(days=7)
+
+def normalize_to_week_start(date: datetime) -> datetime:
+    """
+    Normalize Google Trends weekly labels to the Monday week key used by charts.
+
+    Google Trends commonly labels weekly data with Sunday. For those rows,
+    use the following Monday so the label matches the Monday-Sunday chart week.
+    For other dates, fall back to ISO week start.
+    """
+    if date.weekday() == 6:
+        return date + timedelta(days=1)
+
+    return date - timedelta(days=date.weekday())
+
 def get_trends(keyword: str, geo: str = '', timeframe: str = '5y', gprop: str = '') -> list:
     """
     Google Trends에서 데이터 수집
@@ -24,6 +44,8 @@ def get_trends(keyword: str, geo: str = '', timeframe: str = '5y', gprop: str = 
     try:
         # 기간 계산 (Critical: 2y, 4y, w 분기 추가 + 커스텀 주 지원)
         end_date = datetime.now()
+        last_completed_week_start = get_last_completed_week_start(end_date)
+        request_end_date = last_completed_week_start + timedelta(days=6)
 
         # 커스텀 주 형식 처리 (예: '26w', '52w')
         if timeframe.endswith('w') and timeframe[:-1].isdigit():
@@ -42,14 +64,14 @@ def get_trends(keyword: str, geo: str = '', timeframe: str = '5y', gprop: str = 
         else:  # '5y' or default
             days = 365 * 5
 
-        start_date = end_date - timedelta(days=days)
+        start_date = request_end_date - timedelta(days=days)
 
         # pytrends 요청
         pytrends = TrendReq(hl='ko_KR', tz=0)
         pytrends.build_payload(
             kw_list=[keyword],
             cat=0,
-            timeframe=f'{start_date.strftime("%Y-%m-%d")} {end_date.strftime("%Y-%m-%d")}',
+            timeframe=f'{start_date.strftime("%Y-%m-%d")} {request_end_date.strftime("%Y-%m-%d")}',
             geo=geo,
             gprop=gprop
         )
@@ -60,19 +82,26 @@ def get_trends(keyword: str, geo: str = '', timeframe: str = '5y', gprop: str = 
         if interest_over_time.empty:
             return []
 
-        # 데이터 정규화
-        trends_data = []
+        # 데이터 정규화: 완료된 전주까지만 월요일 week key로 저장
+        trends_by_week = {}
         for date, row in interest_over_time.iterrows():
-            # date는 datetime 객체
-            date_str = date.strftime('%Y-%m-%d')
+            if bool(row.get('isPartial', False)):
+                continue
+
+            trend_date = date.to_pydatetime() if hasattr(date, 'to_pydatetime') else date
+            week_start = normalize_to_week_start(trend_date)
+            if week_start.date() > last_completed_week_start.date():
+                continue
+
+            date_str = week_start.strftime('%Y-%m-%d')
             value = int(row[keyword])
 
-            trends_data.append({
+            trends_by_week[date_str] = {
                 'date': date_str,
                 'value': value
-            })
+            }
 
-        return trends_data
+        return [trends_by_week[key] for key in sorted(trends_by_week.keys())]
 
     except Exception as e:
         print(f"Error: {str(e)}", file=sys.stderr)

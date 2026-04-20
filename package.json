@@ -3,7 +3,7 @@
   "version": "1.0.1",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"next dev --turbopack\" \".venv/bin/python -m flask --app api.trends run --port 5001\"",
+    "dev": "next dev --turbopack",
     "dev:node": "next dev --turbopack",
     "dev:trends": ".venv/bin/python -m flask --app api.trends run --port 5001",
     "build": "next build --turbopack",

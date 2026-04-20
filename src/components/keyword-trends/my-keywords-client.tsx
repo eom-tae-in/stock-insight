@@ -103,9 +103,7 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
   const fetchKeywords = useCallback(async () => {
     setIsLoading(true)
     try {
-      const data = await apiFetchJson<KeywordSearchRecord[]>(
-        '/api/keyword-searches'
-      )
+      const data = await apiFetchJson<KeywordSearchRecord[]>('/api/keywords')
       setKeywords(Array.isArray(data) ? data : [])
     } catch {
       // 실패해도 initialKeywords 사용
@@ -245,7 +243,7 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
       // 병렬로 삭제 요청
       await Promise.all(
         idsToDelete.map(deleteId =>
-          apiFetch(`/api/keyword-searches?id=${deleteId}`, {
+          apiFetch(`/api/keywords/${deleteId}`, {
             method: 'DELETE',
           })
         )
@@ -286,7 +284,7 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
   // 키워드 수정 저장
   const handleEditSave = async (id: string, newKeyword: string) => {
     try {
-      const response = await apiFetch('/api/keyword-searches', {
+      const response = await apiFetch('/api/keywords', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, keyword: newKeyword }),

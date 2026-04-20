@@ -8,7 +8,7 @@
 
 import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getAllKeywordSearches } from '@/lib/db/queries'
+import { getKeywords } from '@/server/keywords-service'
 import { MyKeywordsClient } from '@/components/keyword-trends/my-keywords-client'
 
 export const metadata = {
@@ -28,7 +28,7 @@ export default async function TrendsPage() {
   }
 
   // 저장된 키워드 목록 조회
-  const initialKeywords = await getAllKeywordSearches(supabase)
+  const initialKeywords = await getKeywords(supabase, user.id)
 
   return (
     <main className="flex-1">

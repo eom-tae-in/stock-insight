@@ -18,7 +18,7 @@ import {
   validateApiAuth,
   createSuccessResponse,
 } from '@/lib/api-helpers'
-import { fetchStockData } from '@/lib/services/stock-service'
+import { fetchCachedStockData } from '@/server/cached-stock-service'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,11 +40,8 @@ export async function GET(request: NextRequest) {
 
     const tickerUpper = ticker.toUpperCase()
 
-    // Yahoo Finance에서 5년 데이터 조회 (임시 조회, DB 저장 안 함)
-    console.log(
-      `[KeywordAnalysis] Fetching stock data from Yahoo Finance for ${tickerUpper}`
-    )
-    const stockData = await fetchStockData(tickerUpper)
+    // Yahoo Finance에서 5년 데이터 조회 (Redis 캐시 사용, DB 저장 안 함)
+    const stockData = await fetchCachedStockData(tickerUpper)
 
     // 응답 데이터 형성
     const responseData = {

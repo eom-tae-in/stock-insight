@@ -76,12 +76,9 @@ export default function KeywordTrendsChart({
     () =>
       overlays.map((search, searchIdx) => {
         const prices = search.price_data?.map(p => p.close) ?? []
-        console.log(
-          `[overlayMaps] 종목 ${searchIdx} (${search.ticker}): price_data 길이=${search.price_data?.length || 0}`
-        )
         if (prices.length === 0) {
           console.warn(
-            `[overlayMaps] 경고: ${search.ticker}에 price_data가 없습니다!`
+            `[overlayMaps] 경고: ${searchIdx} ${search.ticker}에 price_data가 없습니다!`
           )
           return new Map<string, number>()
         }
@@ -114,16 +111,9 @@ export default function KeywordTrendsChart({
           map.set(weekKey, Math.round(normalized * 100) / 100)
         })
 
-        console.log(
-          `[overlayMaps] ${search.ticker} weeklyPrices Map 크기: ${map.size}`
-        )
         if (map.size === 0) {
           console.warn(
             `[overlayMaps] 경고: ${search.ticker}의 weeklyPrices Map이 비어있습니다!`
-          )
-          console.log(
-            `[overlayMaps] price_data 샘플:`,
-            search.price_data?.slice(0, 3)
           )
         }
 
