@@ -16,7 +16,9 @@ interface AnalysisPageProps {
 
 export const dynamic = 'force-dynamic'
 
-export default async function AnalysisPage({ params }: AnalysisPageProps) {
+export default async function StockAnalysisDetailPage({
+  params,
+}: AnalysisPageProps) {
   const { id } = await params
 
   // 인증된 서버 클라이언트로 종목 데이터 조회 (RLS 적용됨)
@@ -99,7 +101,7 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
 
         {/* 표로 보기 버튼 */}
         <section className="mb-8">
-          <Link href={`/analysis/${record.id}/table`}>
+          <Link href={`/stock-analysis/${record.id}/table`}>
             <div className="group cursor-pointer">
               <div className="rounded-2xl border border-blue-500/20 bg-gradient-to-br from-blue-500/10 to-blue-500/5 p-8 transition-all hover:border-blue-500/40 hover:from-blue-500/15 hover:to-blue-500/10 hover:shadow-lg">
                 <div className="flex items-center gap-4">

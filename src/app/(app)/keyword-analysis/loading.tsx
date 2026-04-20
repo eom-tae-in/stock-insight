@@ -1,11 +1,11 @@
 import { Skeleton } from '@/components/ui/skeleton'
 
 /**
- * /trends 경로 로딩 상태 (내 키워드 사전 레이아웃)
+ * /keyword-analysis 경로 로딩 상태 (내 키워드 사전 레이아웃)
  * - Supabase 인증 확인 중 표시
  * - Skeleton 기반 체감 성능 개선
  */
-export default function TrendsLoading() {
+export default function KeywordAnalysisLoading() {
   return (
     <div className="bg-background flex min-h-screen flex-col">
       {/* Header Skeleton */}

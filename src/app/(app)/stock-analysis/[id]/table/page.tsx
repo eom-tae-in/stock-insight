@@ -56,7 +56,7 @@ export default async function TablePage({ params }: TablePageProps) {
         {/* 뒤로가기 버튼 */}
         <div className="mb-6">
           <Button variant="outline" size="sm" asChild>
-            <Link href={`/analysis/${id}`}>
+            <Link href={`/stock-analysis/${id}`}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               차트로 보기
             </Link>

@@ -86,7 +86,7 @@ export function StockCard({
   return (
     <>
       <Link
-        href={isEditMode ? '#' : `/analysis/${id}`}
+        href={isEditMode ? '#' : `/stock-analysis/${id}`}
         onClick={e => isEditMode && e.preventDefault()}
       >
         <Card
