@@ -11,8 +11,11 @@ export function Header() {
   const pathname = usePathname()
 
   const isActiveLink = (href: string) => {
-    if (href === '/trends') {
-      return pathname.startsWith('/trends')
+    if (href === '/keyword-analysis') {
+      return pathname.startsWith('/keyword-analysis')
+    }
+    if (href === '/stock-analysis') {
+      return pathname.startsWith('/stock-analysis')
     }
     return pathname === href
   }
@@ -30,10 +33,10 @@ export function Header() {
             {/* 네비게이션 링크 */}
             <nav className="hidden space-x-1 sm:flex">
               <Link
-                href="/"
+                href="/stock-analysis"
                 className={cn(
                   'rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                  isActiveLink('/')
+                  isActiveLink('/stock-analysis')
                     ? 'bg-primary/10 text-primary'
                     : 'text-muted-foreground hover:bg-accent'
                 )}
@@ -41,10 +44,10 @@ export function Header() {
                 종목 분석
               </Link>
               <Link
-                href="/trends"
+                href="/keyword-analysis"
                 className={cn(
                   'rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                  isActiveLink('/trends')
+                  isActiveLink('/keyword-analysis')
                     ? 'bg-primary/10 text-primary'
                     : 'text-muted-foreground hover:bg-accent'
                 )}

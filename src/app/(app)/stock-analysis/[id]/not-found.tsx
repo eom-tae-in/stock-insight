@@ -18,7 +18,7 @@ export default function NotFound() {
             요청하신 종목 분석 데이터가 없습니다.
           </p>
           <Button asChild>
-            <Link href="/">대시보드로 돌아가기</Link>
+            <Link href="/stock-analysis">내 종목 목록으로 돌아가기</Link>
           </Button>
         </div>
       </Container>

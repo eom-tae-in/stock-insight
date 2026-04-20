@@ -1,6 +1,6 @@
 /**
  * 키워드 트렌드 검색 페이지
- * Route: /trends/search
+ * Route: /keyword-analysis/search
  * - 키워드 기반 Google Trends 5년 데이터 조회
  * - 13주 MA13, 52주 YoY 계산
  * - 주식 종목 오버레이 추가
@@ -16,7 +16,7 @@ export const metadata = {
   description: 'Google Trends 키워드 기반 분석과 주식 비교',
 }
 
-export default async function TrendsSearchPage() {
+export default async function KeywordAnalysisSearchPage() {
   // 인증 확인
   const supabase = await createSupabaseServerClient()
   const {

@@ -40,7 +40,7 @@ export default function AnalysisError({ error, reset }: ErrorProps) {
           >
             다시 시도
           </Button>
-          <Link href="/" className="flex-1">
+          <Link href="/stock-analysis" className="flex-1">
             <Button
               variant="outline"
               className="w-full"

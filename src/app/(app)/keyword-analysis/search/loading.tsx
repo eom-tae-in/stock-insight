@@ -2,11 +2,11 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 
 /**
- * /trends/search 경로 로딩 상태
+ * /keyword-analysis/search 경로 로딩 상태
  * - Supabase 인증 확인 중 표시
  * - Skeleton 기반 체감 성능 개선
  */
-export default function TrendsSearchLoading() {
+export default function KeywordAnalysisSearchLoading() {
   return (
     <div className="bg-background min-h-screen p-6">
       <div className="mx-auto max-w-7xl">
