@@ -8,7 +8,7 @@
  */
 
 import { Container } from '@/components/layout/container'
-import { DashboardClient } from '@/components/dashboard-client'
+import { DashboardClient } from '@/components/stock/dashboard-client'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getAllSearches } from '@/lib/db/queries'
 
@@ -42,8 +42,20 @@ export default async function DashboardPage() {
 
   return (
     <Container className="py-8">
-      <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">저장된 종목</h1>
+      {/* 데이터 수집 기준 안내 */}
+      <div className="text-muted-foreground mb-8 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/30">
+        <p className="text-sm">
+          📊 모든 데이터는 지난주(금요일)까지 수집됩니다.
+        </p>
+        <p className="text-sm">
+          전주 대비 수익률, 최근 13주 평균, 52주 전 대비 수익률은 종가 기준으로
+          계산됩니다.
+        </p>
+      </div>
+
+      {/* 저장된 종목 제목 */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold">저장된 종목</h1>
       </div>
 
       {/* Client Component에 데이터 전달 */}
