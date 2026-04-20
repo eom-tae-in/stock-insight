@@ -294,6 +294,10 @@ class SupabaseDbAdapter implements DbAdapter {
           company_name: record.company_name,
           currency: record.currency || 'USD',
           searched_at: record.searched_at,
+          current_price: record.current_price,
+          previous_close: record.previous_close,
+          ma13: record.ma13,
+          yoy_change: record.yoy_change,
         },
         { onConflict: 'user_id,ticker' }
       )
@@ -399,11 +403,10 @@ class SupabaseDbAdapter implements DbAdapter {
           ticker: row.ticker,
           company_name: row.company_name,
           currency: row.currency,
-          current_price:
-            priceData.length > 0
-              ? priceData[priceData.length - 1].close
-              : undefined,
-          yoy_change: undefined, // 대시보드에서는 간단히 표시, 상세 계산은 분석 페이지에서
+          current_price: row.current_price,
+          previous_close: row.previous_close,
+          ma13: row.ma13,
+          yoy_change: row.yoy_change,
           price_data: priceData,
           trends_data: [],
           searched_at: row.searched_at,
