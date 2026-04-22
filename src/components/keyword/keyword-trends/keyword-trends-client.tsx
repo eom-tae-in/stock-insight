@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useEffect, useMemo, useCallback } from 'react'
+import { useRef, useState, useEffect, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import type {
@@ -13,12 +13,24 @@ import { calculateTrendsMA13, calculateTrendsYoY } from '@/lib/indicators'
 import { apiFetch, apiFetchJson } from '@/lib/fetch-client'
 import { filterTrendsForTimeframe } from '@/lib/trends-filter'
 import { normalizeKeywordSpacing } from '@/lib/utils/keyword-normalization'
+import { searchKeywordWithCache } from '@/app/actions/keyword-actions'
+import { getTrendsErrorMessage } from '@/types/trends-error'
+import { createBrowserClient } from '@supabase/ssr'
 import KeywordTrendsChart from './keyword-trends-chart'
 import {
   TIMEFRAMES,
   TIMEFRAME_LABELS,
   DEFAULT_TIMEFRAME,
+  GEO_OPTIONS,
+  TIMEFRAME_OPTIONS,
+  GPROP_OPTIONS,
+  DEFAULT_GEO,
+  DEFAULT_TIMEFRAME_VALUE,
+  DEFAULT_GPROP,
   type Timeframe,
+  type TimeframeValue,
+  type GeoValue,
+  type GpropValue,
 } from '@/lib/constants/trends'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -39,8 +51,8 @@ interface KeywordTrendsState {
   isLoading: boolean
   selectedSearches: SearchRecord[]
   savedKeywords: KeywordRecord[]
-  geo: string
-  gprop: string
+  geo: GeoValue
+  gprop: GpropValue
 }
 
 type KeywordOverlayResponse = KeywordStockOverlay & {
@@ -81,8 +93,8 @@ export default function KeywordTrendsClient() {
     isLoading: false,
     selectedSearches: [],
     savedKeywords: [],
-    geo: '',
-    gprop: '',
+    geo: DEFAULT_GEO,
+    gprop: DEFAULT_GPROP,
   })
 
   // UnifiedChart 방식: timeframe/customWeeks를 별도 state로 관리
@@ -93,86 +105,111 @@ export default function KeywordTrendsClient() {
   const [customWeeks, setCustomWeeks] = useState(26)
   const [customWeeksInput, setCustomWeeksInput] = useState('26')
 
-  // 키워드로 트렌드 조회 - URL 파라미터에서 받은 값으로 검색 수행
-  const performSearch = useCallback(
-    async (keyword: string, geo: string, gprop: string) => {
-      const trimmedKeyword = normalizeKeywordSpacing(keyword)
-      if (!trimmedKeyword) return
+  // 페이지 진입 시: URL 파라미터 읽기 + Server Action으로 데이터 조회
+  // URL은 single source of truth → state 변경 시 URL 동기화 안 함
+  useEffect(() => {
+    // 1️⃣ URL 파라미터 읽기 (URL을 유일한 정보원으로 사용)
+    const keyword = searchParams.get('keyword') || ''
 
-      setState(prev => ({ ...prev, isLoading: true }))
+    const geoParam = searchParams.get('geo')
+    const geo: GeoValue =
+      geoParam && GEO_OPTIONS.some(opt => opt.value === geoParam)
+        ? (geoParam as GeoValue)
+        : DEFAULT_GEO
 
+    const timeframeParam = searchParams.get('timeframe')
+    const tfValue: TimeframeValue =
+      timeframeParam &&
+      TIMEFRAME_OPTIONS.some(opt => opt.value === timeframeParam)
+        ? (timeframeParam as TimeframeValue)
+        : DEFAULT_TIMEFRAME_VALUE
+
+    // TimeframeValue (대문자: 5Y) → Timeframe (소문자: 5y) 정규화
+    const timeframeMap: Record<TimeframeValue, Timeframe | 'custom'> = {
+      '4W': 'w',
+      '1Y': '1y',
+      '2Y': '2y',
+      '3Y': '3y',
+      '4Y': '4y',
+      '5Y': '5y',
+    }
+    const tf = timeframeMap[tfValue]
+
+    const gpropParam = searchParams.get('gprop')
+    const gprop: GpropValue =
+      gpropParam && GPROP_OPTIONS.some(opt => opt.value === gpropParam)
+        ? (gpropParam as GpropValue)
+        : DEFAULT_GPROP
+
+    if (!keyword) return
+
+    // 2️⃣ state 업데이트 (렌더링용)
+    setState(prev => ({
+      ...prev,
+      keyword,
+      geo,
+      gprop,
+    }))
+    setTimeframe(tf)
+
+    // 3️⃣ Server Action으로 데이터 조회
+    const fetchTrendsData = async () => {
       try {
-        const params = new URLSearchParams({
-          keyword: trimmedKeyword,
-          geo,
-          timeframe: '5y',
-          gprop,
-        })
+        setState(prev => ({ ...prev, isLoading: true }))
 
-        const res = await apiFetch(`/api/trends?${params.toString()}`)
-        if (!res.ok) {
-          throw new Error(`API 응답 오류: ${res.status}`)
-        }
-
-        const data = await res.json()
-
-        const raw = data?.data?.trendsData
-        if (!Array.isArray(raw)) {
-          throw new Error('Invalid response format: trendsData is not an array')
-        }
-
-        setState(prev => ({
-          ...prev,
-          fullTrendsData: raw as TrendsDataPoint[],
-          selectedSearches: [],
-          isLoading: false,
-        }))
-
-        toast.success('트렌드 데이터를 가져왔습니다')
-      } catch (error) {
-        console.error('[performSearch] 에러:', error)
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : '트렌드 데이터를 가져오지 못했습니다'
+        const supabase = createBrowserClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
         )
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+
+        if (!user?.id) {
+          toast.error('로그인이 필요합니다')
+          return
+        }
+
+        console.log(
+          `[keyword-trends-client] 데이터 조회: "${keyword}", geo="${geo}", timeframe="${tfValue}", gprop="${gprop}"`
+        )
+
+        const result = await searchKeywordWithCache(
+          keyword,
+          user.id,
+          geo,
+          tfValue,
+          gprop
+        )
+
+        if (result.status === 'error') {
+          const errorMessage = result.error
+            ? getTrendsErrorMessage(result.error)
+            : '데이터를 가져올 수 없습니다'
+          toast.error(errorMessage)
+          return
+        }
+
+        if (result.trendsData) {
+          console.log(
+            `[keyword-trends-client] 데이터 로드 성공: ${result.trendsData.length}개`
+          )
+          setState(prev => ({
+            ...prev,
+            fullTrendsData: result.trendsData ?? [],
+            selectedSearches: [],
+            isLoading: false,
+          }))
+        }
+      } catch (error) {
+        console.error('[keyword-trends-client] 에러:', error)
+        toast.error('데이터 조회 중 오류가 발생했습니다')
         setState(prev => ({ ...prev, isLoading: false }))
       }
-    },
-    []
-  )
-
-  // URL 파라미터에서 초기 상태 파싱 및 자동 검색 (F033: URL 파라미터 기반 상태 관리)
-  useEffect(() => {
-    const keyword = searchParams.get('keyword') || ''
-    const geo = searchParams.get('geo') || ''
-    const rawTimeframe = searchParams.get('timeframe')
-    const tf =
-      rawTimeframe && TIMEFRAMES.includes(rawTimeframe as Timeframe)
-        ? (rawTimeframe as Timeframe)
-        : DEFAULT_TIMEFRAME
-    const gprop = searchParams.get('gprop') || ''
-
-    if (keyword) {
-      setState(prev => ({
-        ...prev,
-        keyword,
-        geo,
-        gprop,
-      }))
-      setTimeframe(tf)
-
-      // 자동 검색 트리거 (이미 데이터가 있으면 스킵)
-      if (!state.fullTrendsData.length && !state.isLoading) {
-        performSearch(keyword, geo, gprop)
-      }
     }
-  }, [
-    performSearch,
-    searchParams,
-    state.fullTrendsData.length,
-    state.isLoading,
-  ])
+
+    fetchTrendsData()
+  }, [searchParams])
 
   // keywordId 파라미터로 저장된 키워드 복원
   useEffect(() => {
@@ -233,7 +270,7 @@ export default function KeywordTrendsClient() {
           timeframe: DEFAULT_TIMEFRAME,
           gprop: '',
         })
-        router.push(`/trends/search?${urlParams.toString()}`)
+        router.push(`/keyword-analysis/search?${urlParams.toString()}`)
 
         toast.success(`"${keywordSearch.keyword}" 데이터를 복원했습니다`)
       } catch (error) {
@@ -265,28 +302,6 @@ export default function KeywordTrendsClient() {
       filterTrendsForTimeframe(state.fullTrendsData, timeframe, customWeeks),
     [state.fullTrendsData, timeframe, customWeeks]
   )
-
-  // Medium: URL 동기화 - geo/gprop 변경만 감지 (timeframe은 state 기반만)
-  // timeframe/customWeeks 변경 시 router 호출 안 함 → 스크롤 점프 방지
-  // (UnifiedChart와 동일한 방식)
-  useEffect(() => {
-    if (state.keyword && state.fullTrendsData.length > 0) {
-      const params = new URLSearchParams({
-        keyword: state.keyword,
-        geo: state.geo,
-        timeframe: DEFAULT_TIMEFRAME, // 기본값만 저장
-        gprop: state.gprop,
-      })
-      router.replace(`/trends/search?${params.toString()}`, { scroll: false })
-    }
-  }, [
-    state.geo,
-    state.gprop,
-    state.keyword,
-    state.fullTrendsData.length, // 원본 데이터만 감시 (필터된 데이터 아님)
-    router,
-    // timeframe, customWeeks 제거 ← state 기반 필터링만
-  ])
 
   // P1-9: ma13 / yoyChange 를 useMemo로 파생 (단일 calculateTrendsMA13 호출)
   const ma13Values = useMemo(
@@ -361,8 +376,6 @@ export default function KeywordTrendsClient() {
         method: 'POST',
         body: JSON.stringify({
           keyword: trimmedKeyword,
-          region: 'GLOBAL',
-          search_type: 'WEB',
           geo: state.geo,
           gprop: state.gprop,
           chartData, // 차트 데이터 포함
@@ -383,10 +396,50 @@ export default function KeywordTrendsClient() {
     }
   }
 
-  // 기간 변경 시 스크롤 위치 유지 (강화된 복원 로직)
-  // 기간 변경 — 아키텍처 변경으로 API 호출 없음 (스크롤 점프 제거)
+  // 필터 변경 시 URL 직접 변경 (사용자 액션 → URL 변경 → GET 발생)
+  const updateUrlIfChanged = (
+    newKeyword: string,
+    newGeo: GeoValue,
+    newTimeframe: TimeframeValue,
+    newGprop: GpropValue
+  ) => {
+    const currentParams = new URLSearchParams(searchParams)
+    const newParams = new URLSearchParams({
+      keyword: newKeyword,
+      geo: newGeo,
+      timeframe: newTimeframe,
+      gprop: newGprop,
+    })
+
+    const currentUrl = currentParams.toString()
+    const newUrl = newParams.toString()
+
+    // URL이 다를 때만 라우트 변경
+    if (currentUrl !== newUrl) {
+      router.replace(`/keyword-analysis/search?${newUrl}`, { scroll: false })
+    }
+  }
+
+  const handleGeoChange = (newGeo: GeoValue) => {
+    const currentTimeframe =
+      (searchParams.get('timeframe') as TimeframeValue) ||
+      DEFAULT_TIMEFRAME_VALUE
+    const currentGprop =
+      (searchParams.get('gprop') as GpropValue) || DEFAULT_GPROP
+    updateUrlIfChanged(state.keyword, newGeo, currentTimeframe, currentGprop)
+  }
+
+  const handleGpropChange = (newGprop: GpropValue) => {
+    const currentTimeframe =
+      (searchParams.get('timeframe') as TimeframeValue) ||
+      DEFAULT_TIMEFRAME_VALUE
+    updateUrlIfChanged(state.keyword, state.geo, currentTimeframe, newGprop)
+  }
+
+  // 기간 변경 시 스크롤 위치 유지 (state만 변경, URL은 timeframe 필터링용 state로 관리)
   const handleTimeframeChange = (tf: Timeframe | 'custom') => {
     setTimeframe(tf)
+    // timeframe은 URL에 저장하지 않고 state 기반으로 필터링 (스크롤 점프 방지)
   }
 
   // 커스텀 주 수 적용 — 입력값 검증 후 확정
@@ -427,7 +480,7 @@ export default function KeywordTrendsClient() {
         <div className="mb-8 flex items-center justify-between">
           <div>
             <a
-              href="/trends"
+              href="/keyword-analysis"
               className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm transition-colors"
             >
               ← 내 키워드로 돌아가기
@@ -454,7 +507,7 @@ export default function KeywordTrendsClient() {
               {state.isLoading ? '저장중...' : '키워드 저장'}
             </Button>
             <Button
-              onClick={() => router.push('/keywords/search')}
+              onClick={() => router.push('/keyword-analysis/new')}
               className="h-10"
               variant="outline"
             >
