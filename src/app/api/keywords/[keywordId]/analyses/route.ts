@@ -16,6 +16,7 @@ import {
   AnalysisServiceError,
   createKeywordAnalysisForKeyword,
   getKeywordAnalysis,
+  getKeywordAnalysesList,
 } from '@/server/keyword-analyses-service'
 import type { Period, Region, SearchType } from '@/types/database'
 
@@ -43,13 +44,27 @@ export async function GET(
 
     const { keywordId } = await params
     const { searchParams } = request.nextUrl
+
+    const regionParam = searchParams.get('region')
+    const periodParam = searchParams.get('period')
+    const searchTypeParam = searchParams.get('searchType')
+
+    if (!regionParam || !periodParam || !searchTypeParam) {
+      const analysesList = await getKeywordAnalysesList(
+        supabase,
+        authResult.userId,
+        keywordId
+      )
+      return createSuccessResponse(analysesList, 200)
+    }
+
     const analysis = await getKeywordAnalysis(
       supabase,
       authResult.userId,
       keywordId,
-      (searchParams.get('region') as Region) || 'GLOBAL',
-      (searchParams.get('period') as Period) || '5Y',
-      (searchParams.get('searchType') as SearchType) || 'WEB'
+      regionParam as Region,
+      periodParam as Period,
+      searchTypeParam as SearchType
     )
 
     return createSuccessResponse(analysis, 200)

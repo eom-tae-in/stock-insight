@@ -21,6 +21,9 @@ type OverlayInput = {
   company_name?: unknown
   display_order?: unknown
   price_data?: unknown
+  region?: unknown
+  period?: unknown
+  search_type?: unknown
 }
 
 type OverlayOrderInput = {
@@ -145,6 +148,40 @@ export async function createAnalysisOverlay(
   input: OverlayInput
 ) {
   await assertOwnedAnalysis(supabase, analysisId, userId)
+
+  // 필터 검증: 클라이언트에서 보낸 필터와 분석의 필터가 일치하는지 확인
+  if (input.region || input.period || input.search_type) {
+    const { data: analysis, error: analysisError } = await supabase
+      .from('keyword_analysis')
+      .select('region, period, search_type')
+      .eq('id', analysisId)
+      .single()
+
+    if (analysisError) throw analysisError
+    if (!analysis) {
+      throw new AnalysisOverlayServiceError(
+        'NOT_FOUND',
+        'Analysis를 찾을 수 없습니다.',
+        404
+      )
+    }
+
+    const clientRegion = input.region as string
+    const clientPeriod = input.period as string
+    const clientSearchType = input.search_type as string
+
+    if (
+      clientRegion !== analysis.region ||
+      clientPeriod !== analysis.period ||
+      clientSearchType !== analysis.search_type
+    ) {
+      throw new AnalysisOverlayServiceError(
+        'FILTER_MISMATCH',
+        '분석 설정이 변경되었습니다. 페이지를 새로고침한 후 다시 시도하세요.',
+        409
+      )
+    }
+  }
 
   const ticker = normalizeTicker(input.ticker)
   if (

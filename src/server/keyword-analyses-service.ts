@@ -140,6 +140,26 @@ export async function getKeywordAnalysis(
   )
 }
 
+export async function getKeywordAnalysesList(
+  supabase: SupabaseClient,
+  userId: string,
+  keywordId: string
+): Promise<
+  Array<{ id: string; region: Region; period: Period; search_type: SearchType }>
+> {
+  if (!keywordId) {
+    throw new AnalysisServiceError(
+      'INVALID_REQUEST',
+      'keywordId가 필요합니다.',
+      400
+    )
+  }
+
+  const { getKeywordAnalysesByKeywordId } = await import('@/lib/db/queries')
+
+  return getKeywordAnalysesByKeywordId(keywordId, userId, supabase)
+}
+
 export async function createKeywordAnalysisForKeyword(
   supabase: SupabaseClient,
   userId: string,
@@ -156,9 +176,19 @@ export async function createKeywordAnalysisForKeyword(
 
   const keyword =
     input.keyword ?? (await getOwnedKeywordName(supabase, userId, keywordId))
-  const region = input.region ?? 'GLOBAL'
-  const period = input.period ?? '5Y'
-  const searchType = input.search_type ?? 'WEB'
+
+  // 필터값은 명시적으로 제공되어야 함 (기본값 사용 금지)
+  const region = input.region
+  const period = input.period
+  const searchType = input.search_type
+
+  if (!region || !period || !searchType) {
+    throw new AnalysisServiceError(
+      'INVALID_INPUT',
+      '분석 필터(region, period, search_type)는 필수입니다.',
+      400
+    )
+  }
 
   try {
     const trendsRawData = await fetchInternalTrendsData({
