@@ -372,12 +372,17 @@ export default function KeywordTrendsClient() {
         yoyValue: point.yoyValue,
       }))
 
+      // searchParams에서 timeframe 읽기
+      const timeframeParam =
+        searchParams.get('timeframe') || DEFAULT_TIMEFRAME_VALUE
+
       await apiFetchJson('/api/keywords', {
         method: 'POST',
         body: JSON.stringify({
           keyword: trimmedKeyword,
-          geo: state.geo,
-          gprop: state.gprop,
+          region: state.geo,
+          period: timeframeParam,
+          search_type: state.gprop,
           chartData, // 차트 데이터 포함
         }),
       })
