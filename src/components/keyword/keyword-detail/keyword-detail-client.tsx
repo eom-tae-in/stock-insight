@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { toast } from 'sonner'
 import {
@@ -84,6 +85,40 @@ type OverlayItem = {
     normalizedPrice: number
     rawPrice: number
   }>
+}
+
+// 분석 조합 타입
+type AnalysisSummary = {
+  id: string
+  region: Region
+  period: Period
+  search_type: SearchType
+}
+
+// 레이블 매핑
+const REGION_LABEL: Record<Region, string> = {
+  GLOBAL: '전세계',
+  US: '미국',
+  KR: '한국',
+  JP: '일본',
+  CN: '중국',
+}
+
+const SEARCH_TYPE_LABEL: Record<SearchType, string> = {
+  WEB: '웹',
+  YOUTUBE: '유튜브',
+}
+
+const PERIOD_LABEL: Record<Period, string> = {
+  '1Y': '1년',
+  '3Y': '3년',
+  '5Y': '5년',
+}
+
+const PERIOD_MAX_YEARS: Record<Period, number> = {
+  '1Y': 1,
+  '3Y': 3,
+  '5Y': 5,
 }
 
 interface KeywordDetailClientProps {
@@ -435,12 +470,18 @@ export function KeywordDetailClient({
   keyword,
   initialSearchParams,
 }: KeywordDetailClientProps) {
+  const router = useRouter()
+
+  // 조합 목록
+  const [analysesList, setAnalysesList] = useState<AnalysisSummary[]>([])
+  const [isLoadingList, setIsLoadingList] = useState(true)
+
   // 필터 상태 (URL 동기화)
   const [region, setRegion] = useState<Region>(initialSearchParams.region)
   const [searchType, setSearchType] = useState<SearchType>(
     initialSearchParams.searchType
   )
-  const period: Period = '5Y' // 고정값
+  const [period, setPeriod] = useState<Period>(initialSearchParams.period)
 
   // 데이터 상태
   const [chartData, setChartData] = useState<
@@ -471,6 +512,27 @@ export function KeywordDetailClient({
   const [analysisNotFound, setAnalysisNotFound] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [isCreatingAnalysis, setIsCreatingAnalysis] = useState(false)
+
+  // 조합 목록 로드 (마운트 시 1회)
+  useEffect(() => {
+    const loadAnalysesList = async () => {
+      setIsLoadingList(true)
+      try {
+        const response = await fetch(`/api/keywords/${keywordId}/analyses`)
+        if (!response.ok) throw new Error('Failed to load analyses list')
+
+        const apiResponse = await response.json()
+        setAnalysesList(apiResponse.data ?? [])
+      } catch (error) {
+        console.error('Failed to load analyses list:', error)
+        setAnalysesList([])
+      } finally {
+        setIsLoadingList(false)
+      }
+    }
+
+    loadAnalysesList()
+  }, [keywordId])
 
   const loadOverlays = useCallback(async (analysisId: string) => {
     try {
@@ -668,7 +730,7 @@ export function KeywordDetailClient({
 
   // 필터 변경 시 URL 동기화 + 데이터 로드
   useEffect(() => {
-    const newUrl = `/keywords/${keywordId}?region=${region}&searchType=${searchType}`
+    const newUrl = `/keywords/${keywordId}?region=${region}&searchType=${searchType}&period=${period}`
     window.history.replaceState(null, '', newUrl)
 
     // 분석 조건 변경 시 selectedStock 초기화 (분석별 독립성 보장)
@@ -678,7 +740,7 @@ export function KeywordDetailClient({
 
     // Analysis 조회
     loadAnalysis()
-  }, [region, searchType, keywordId, loadAnalysis])
+  }, [region, searchType, period, keywordId, loadAnalysis])
 
   const [selectedStock, setSelectedStock] = useState<{
     ticker: string
@@ -704,6 +766,17 @@ export function KeywordDetailClient({
   const [timeframeType, setTimeframeType] = useState<'weeks' | 'years'>('years')
   const [timeframeValue, setTimeframeValue] = useState(5)
   const [timeframeInput, setTimeframeInput] = useState('5')
+
+  // period 변경 시 timeframe 범위 확인
+  useEffect(() => {
+    const maxYears = PERIOD_MAX_YEARS[period]
+    const currentMax = timeframeType === 'years' ? maxYears : maxYears * 52
+
+    if (timeframeValue > currentMax) {
+      setTimeframeValue(currentMax)
+      setTimeframeInput(currentMax.toString())
+    }
+  }, [period, timeframeType, timeframeValue])
 
   // 종목 필터 및 정렬
   const [overlayFilterText, setOverlayFilterText] = useState('')
@@ -1158,26 +1231,39 @@ export function KeywordDetailClient({
           body: JSON.stringify({
             ticker: selectedStock.ticker,
             company_name: selectedStock.companyName,
+            region,
+            period,
+            search_type: searchType,
           }),
         }
       )
 
-      // 409 DUPLICATE도 오버레이 목록 새로고침 필요
-      if (overlayRes.ok || overlayRes.status === 409) {
-        if (overlayRes.status === 409) {
-          toast.info('이미 추가된 종목입니다')
-        } else {
-          toast.success('커스텀 차트가 저장되었습니다')
-        }
+      if (overlayRes.ok) {
+        toast.success('커스텀 차트가 저장되었습니다')
 
         // 상태 초기화
         setSelectedStock(null)
         setStockSearchInput('')
 
-        // 오버레이 목록 새로고침 (동일한 함수 재사용)
+        // 오버레이 목록 새로고침
         await loadOverlays(currentAnalysis.id)
+      } else if (overlayRes.status === 409) {
+        // 409 에러: DUPLICATE 또는 FILTER_MISMATCH
+        const errorData = await overlayRes.json()
+        const errorCode = errorData.error?.code
+
+        if (errorCode === 'FILTER_MISMATCH') {
+          toast.error('분석 설정이 변경되었습니다. 페이지를 새로고침해주세요.')
+        } else {
+          toast.info('이미 추가된 종목입니다')
+          // DUPLICATE는 오버레이 목록 새로고침
+          await loadOverlays(currentAnalysis.id)
+        }
       } else {
-        throw new Error('Failed to save custom chart')
+        const errorData = await overlayRes.json()
+        throw new Error(
+          errorData.error?.message || 'Failed to save custom chart'
+        )
       }
     } catch (error) {
       console.error('Save error:', error)
@@ -1222,53 +1308,83 @@ export function KeywordDetailClient({
 
         {/* 필터 섹션 */}
         <div className="bg-card mb-8 rounded-lg border p-6">
-          <div className="mb-4">
+          <div className="mb-6">
             <h3 className="text-sm font-semibold">분석 조건</h3>
             <p className="text-muted-foreground text-xs">
-              필터를 변경하면 해당 분석의 차트와 종목이 함께 전환됩니다
+              저장된 분석을 선택하면 해당 조건의 차트와 종목이 함께 전환됩니다
             </p>
           </div>
-          <div className="grid gap-4 sm:grid-cols-3">
-            {/* 지역 필터 */}
-            <div>
-              <label className="text-xs font-medium">지역</label>
-              <Select
-                value={region}
-                onValueChange={value => setRegion(value as Region)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="GLOBAL">전세계</SelectItem>
-                  <SelectItem value="US">미국</SelectItem>
-                  <SelectItem value="KR">한국</SelectItem>
-                  <SelectItem value="JP">일본</SelectItem>
-                  <SelectItem value="CN">중국</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
 
-            {/* 검색 타입 필터 */}
-            <div>
-              <label className="text-xs font-medium">검색 타입</label>
-              <Select
-                value={searchType}
-                onValueChange={value => setSearchType(value as SearchType)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="WEB">웹 검색</SelectItem>
-                  <SelectItem value="YOUTUBE">유튜브</SelectItem>
-                </SelectContent>
-              </Select>
+          {/* 존재하는 분석 조합 버튼들 */}
+          {!isLoadingList && analysesList.length > 0 ? (
+            <div className="mb-6 space-y-4">
+              <p className="text-muted-foreground text-xs font-medium">
+                저장된 분석
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {analysesList.map(analysis => {
+                  const isSelected =
+                    analysis.region === region &&
+                    analysis.search_type === searchType &&
+                    analysis.period === period
+
+                  return (
+                    <Button
+                      key={`${analysis.region}-${analysis.search_type}-${analysis.period}`}
+                      onClick={() => {
+                        setRegion(analysis.region)
+                        setSearchType(analysis.search_type)
+                        setPeriod(analysis.period)
+                      }}
+                      variant={isSelected ? 'default' : 'outline'}
+                      size="sm"
+                      className={cn(
+                        'text-xs',
+                        isSelected &&
+                          'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700'
+                      )}
+                    >
+                      <span>
+                        {REGION_LABEL[analysis.region]} ·{' '}
+                        {SEARCH_TYPE_LABEL[analysis.search_type]} ·{' '}
+                        {PERIOD_LABEL[analysis.period]}
+                      </span>
+                      {isSelected && <span className="ml-1">✓</span>}
+                    </Button>
+                  )
+                })}
+              </div>
             </div>
+          ) : !isLoadingList ? (
+            <div className="bg-muted/50 mb-6 rounded border border-dashed p-4 text-center">
+              <p className="text-muted-foreground text-xs">
+                저장된 분석이 없습니다
+              </p>
+            </div>
+          ) : (
+            <div className="bg-muted/50 mb-6 rounded border border-dashed p-4 text-center">
+              <p className="text-muted-foreground text-xs">로드 중...</p>
+            </div>
+          )}
+
+          {/* 새로운 분석 추가 버튼 */}
+          <div className="mb-6 flex">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                router.push(
+                  `/keyword-analysis/new?keyword=${encodeURIComponent(keyword.keyword)}`
+                )
+              }
+              className="text-xs"
+            >
+              + 새로운 분석 추가
+            </Button>
           </div>
 
           {/* 액션 버튼 */}
-          <div className="mt-6 flex flex-wrap gap-2 border-t pt-4">
+          <div className="flex flex-wrap gap-2 border-t pt-4">
             <Button
               variant="outline"
               size="sm"
@@ -1290,21 +1406,96 @@ export function KeywordDetailClient({
 
         {/* 분석 데이터 부재 시 Empty State */}
         {analysisNotFound && !isLoadingAnalysis && (
-          <div className="bg-muted/50 mb-12 rounded-lg border border-dashed p-8 text-center">
-            <p className="text-muted-foreground mb-4">
-              이 조건으로 저장된 분석이 없습니다
+          <div className="bg-muted/50 mb-12 rounded-lg border border-dashed p-8">
+            <p className="text-muted-foreground mb-6 text-center">
+              분석할 조건을 선택한 후 검색하세요
             </p>
-            <p className="text-muted-foreground mb-4 text-sm">
-              지역: {region === 'GLOBAL' ? '전세계' : region} | 검색:{' '}
-              {searchType === 'WEB' ? '웹' : '유튜브'}
-            </p>
-            <Button
-              onClick={handleCreateNewAnalysis}
-              disabled={isCreatingAnalysis}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              {isCreatingAnalysis ? '분석 중...' : '새로운 분석 검색'}
-            </Button>
+
+            {/* 필터 선택 UI */}
+            <div className="mb-6 space-y-4">
+              {/* 지역 선택 */}
+              <div>
+                <p className="text-muted-foreground mb-2 text-xs font-medium">
+                  지역
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {(['GLOBAL', 'US', 'KR', 'JP', 'CN'] as const).map(r => (
+                    <Button
+                      key={r}
+                      onClick={() => setRegion(r)}
+                      variant={region === r ? 'default' : 'outline'}
+                      size="sm"
+                      className={cn(
+                        'text-xs',
+                        region === r &&
+                          'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700'
+                      )}
+                    >
+                      {REGION_LABEL[r]}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 기간 선택 */}
+              <div>
+                <p className="text-muted-foreground mb-2 text-xs font-medium">
+                  기간
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {(['1Y', '3Y', '5Y'] as const).map(p => (
+                    <Button
+                      key={p}
+                      onClick={() => setPeriod(p)}
+                      variant={period === p ? 'default' : 'outline'}
+                      size="sm"
+                      className={cn(
+                        'text-xs',
+                        period === p &&
+                          'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700'
+                      )}
+                    >
+                      {p}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 검색 유형 선택 */}
+              <div>
+                <p className="text-muted-foreground mb-2 text-xs font-medium">
+                  검색 유형
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {(['WEB', 'YOUTUBE'] as const).map(st => (
+                    <Button
+                      key={st}
+                      onClick={() => setSearchType(st)}
+                      variant={searchType === st ? 'default' : 'outline'}
+                      size="sm"
+                      className={cn(
+                        'text-xs',
+                        searchType === st &&
+                          'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700'
+                      )}
+                    >
+                      {SEARCH_TYPE_LABEL[st]}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* 분석 생성 버튼 */}
+            <div className="text-center">
+              <Button
+                onClick={handleCreateNewAnalysis}
+                disabled={isCreatingAnalysis}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                {isCreatingAnalysis ? '분석 중...' : '분석 검색'}
+              </Button>
+            </div>
           </div>
         )}
 
@@ -1401,26 +1592,29 @@ export function KeywordDetailClient({
                     // 숫자만 추출
                     value = value.replace(/[^\d]/g, '')
 
+                    const maxYears = PERIOD_MAX_YEARS[period]
+
                     if (timeframeType === 'weeks') {
-                      // 주 단위: 1~260 범위 강제
+                      // 주 단위: period 기반 범위 강제
+                      const maxWeeks = maxYears * 52
                       const intValue = parseInt(value)
                       if (!isNaN(intValue)) {
                         if (intValue < 1) {
                           value = '1'
-                        } else if (intValue > 260) {
-                          value = '260'
+                        } else if (intValue > maxWeeks) {
+                          value = maxWeeks.toString()
                         } else {
                           value = intValue.toString()
                         }
                       }
                     } else {
-                      // 년 단위: 정수만, 1~5 범위 강제
+                      // 년 단위: period 기반 범위 강제
                       const intValue = parseInt(value)
                       if (!isNaN(intValue)) {
                         if (intValue < 1) {
                           value = '1'
-                        } else if (intValue > 5) {
-                          value = '5'
+                        } else if (intValue > maxYears) {
+                          value = maxYears.toString()
                         } else {
                           value = intValue.toString()
                         }
@@ -1435,7 +1629,11 @@ export function KeywordDetailClient({
                     }
                   }}
                   className="border-input bg-background w-20 rounded border px-3 py-2 text-sm"
-                  placeholder={timeframeType === 'weeks' ? '1-260' : '1-5'}
+                  placeholder={
+                    timeframeType === 'weeks'
+                      ? `1-${PERIOD_MAX_YEARS[period] * 52}`
+                      : `1-${PERIOD_MAX_YEARS[period]}`
+                  }
                 />
                 <select
                   value={timeframeType}
