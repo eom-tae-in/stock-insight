@@ -53,6 +53,18 @@ interface KeywordTrendsState {
   gprop: GpropValue
 }
 
+type TrendsFetchStatus =
+  | 'idle'
+  | 'loading'
+  | 'success'
+  | 'rate_limited'
+  | 'error'
+
+interface TrendsFetchErrorState {
+  status: TrendsFetchStatus
+  message: string | null
+}
+
 type KeywordOverlayResponse = KeywordStockOverlay & {
   companyName?: string
   displayOrder?: number
@@ -102,6 +114,11 @@ export default function KeywordTrendsClient() {
   )
   const [customWeeks, setCustomWeeks] = useState(26)
   const [customWeeksInput, setCustomWeeksInput] = useState('26')
+  const [fetchError, setFetchError] = useState<TrendsFetchErrorState>({
+    status: 'idle',
+    message: null,
+  })
+  const [reloadToken, setReloadToken] = useState(0)
 
   const searchTimeframeValue = DEFAULT_TIMEFRAME_VALUE
 
@@ -164,7 +181,13 @@ export default function KeywordTrendsClient() {
     // 3️⃣ REST API로 데이터 조회
     const fetchTrendsData = async () => {
       try {
-        setState(prev => ({ ...prev, isLoading: true }))
+        setFetchError({ status: 'loading', message: null })
+        setState(prev => ({
+          ...prev,
+          isLoading: true,
+          fullTrendsData: [],
+          selectedSearches: [],
+        }))
 
         const params = new URLSearchParams({
           keyword,
@@ -183,30 +206,43 @@ export default function KeywordTrendsClient() {
           selectedSearches: [],
           isLoading: false,
         }))
+        setFetchError({ status: 'success', message: null })
       } catch (error) {
         console.error('[keyword-trends-client] 에러:', error)
         if (
           error instanceof ApiRequestError &&
           error.code === 'PYTRENDS_RATE_LIMIT'
         ) {
-          toast.error(
+          const message =
             'Google Trends 요청이 잠시 제한되었습니다. 잠시 후 다시 시도해주세요.'
-          )
-          setState(prev => ({ ...prev, isLoading: false }))
+          toast.error(message)
+          setFetchError({ status: 'rate_limited', message })
+          setState(prev => ({
+            ...prev,
+            isLoading: false,
+            fullTrendsData: [],
+            selectedSearches: [],
+          }))
           return
         }
 
-        toast.error(
+        const message =
           error instanceof Error
             ? error.message
             : '데이터 조회 중 오류가 발생했습니다'
-        )
-        setState(prev => ({ ...prev, isLoading: false }))
+        toast.error(message)
+        setFetchError({ status: 'error', message })
+        setState(prev => ({
+          ...prev,
+          isLoading: false,
+          fullTrendsData: [],
+          selectedSearches: [],
+        }))
       }
     }
 
     fetchTrendsData()
-  }, [searchParams])
+  }, [searchParams, reloadToken])
 
   // keywordId 파라미터로 저장된 키워드 복원
   useEffect(() => {
@@ -313,6 +349,9 @@ export default function KeywordTrendsClient() {
   }, [customWeeks, maxCustomWeeks])
 
   const [deleteDialogId, setDeleteDialogId] = useState<string | null>(null)
+  const isLoadingTrends = fetchError.status === 'loading'
+  const hasFetchError =
+    fetchError.status === 'rate_limited' || fetchError.status === 'error'
 
   // 페이지 진입 시: 저장된 종목 목록 + 저장된 키워드 목록 로드
   useEffect(() => {
@@ -458,6 +497,10 @@ export default function KeywordTrendsClient() {
     }
   }
 
+  const handleRetryFetch = () => {
+    setReloadToken(prev => prev + 1)
+  }
+
   return (
     <div className="bg-background min-h-screen p-6">
       <div className="mx-auto max-w-7xl">
@@ -486,7 +529,7 @@ export default function KeywordTrendsClient() {
           <div className="flex gap-2">
             <Button
               onClick={handleSaveKeyword}
-              disabled={!state.keyword || state.isLoading}
+              disabled={!state.keyword || state.isLoading || hasFetchError}
               className="h-10"
             >
               {state.isLoading ? '저장중...' : '키워드 저장'}
@@ -637,14 +680,59 @@ export default function KeywordTrendsClient() {
             </>
           )}
 
-          {/* 빈 상태 */}
-          {state.fullTrendsData.length === 0 && !state.isLoading && (
+          {isLoadingTrends && (
             <Card>
-              <CardContent className="text-muted-foreground py-12 text-center">
-                <p>키워드를 입력하여 트렌드를 분석하세요</p>
+              <CardContent className="py-12 text-center">
+                <div className="space-y-2">
+                  <p className="text-lg font-semibold">
+                    키워드 트렌드 데이터를 조회하는 중입니다
+                  </p>
+                  <p className="text-muted-foreground text-sm">
+                    Google Trends 응답을 기다리고 있습니다. 잠시만 기다려주세요.
+                  </p>
+                </div>
               </CardContent>
             </Card>
           )}
+
+          {hasFetchError && (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <p className="text-lg font-semibold">
+                      {fetchError.status === 'rate_limited'
+                        ? '지금은 키워드 데이터를 바로 불러올 수 없습니다'
+                        : '키워드 데이터를 불러오지 못했습니다'}
+                    </p>
+                    <p className="text-muted-foreground text-sm">
+                      {fetchError.message ?? '잠시 후 다시 시도해주세요.'}
+                    </p>
+                  </div>
+                  <div className="flex justify-center gap-2">
+                    <Button onClick={handleRetryFetch}>다시 시도</Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => router.push('/keyword-analysis/new')}
+                    >
+                      다른 키워드 검색
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 빈 상태 */}
+          {state.fullTrendsData.length === 0 &&
+            !state.isLoading &&
+            fetchError.status === 'idle' && (
+              <Card>
+                <CardContent className="text-muted-foreground py-12 text-center">
+                  <p>키워드를 입력하여 트렌드를 분석하세요</p>
+                </CardContent>
+              </Card>
+            )}
         </div>
 
         {/* 키워드 삭제 확인 다이얼로그 */}
