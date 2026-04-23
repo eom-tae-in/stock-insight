@@ -24,14 +24,20 @@ declare namespace NodeJS {
     /** 클라이언트에서 접근하는 Supabase anon key (필수) */
     NEXT_PUBLIC_SUPABASE_ANON_KEY: string
 
-    /** Upstash Redis REST URL (선택, 주가 데이터 캐시용) */
+    /** Upstash Redis REST URL (선택, 주가/트렌드 데이터 캐시용) */
     UPSTASH_REDIS_REST_URL?: string
 
-    /** Upstash Redis REST 토큰 (선택, 주가 데이터 캐시용) */
+    /** Upstash Redis REST 토큰 (선택, 주가/트렌드 데이터 캐시용) */
     UPSTASH_REDIS_REST_TOKEN?: string
 
     /** 주가 데이터 Redis 캐시 TTL 초 단위 (기본 86400) */
     STOCK_DATA_CACHE_TTL_SECONDS?: string
+
+    /** pytrends 결과 Redis 캐시 TTL 초 단위 (기본 86400) */
+    TRENDS_CACHE_TTL_SECONDS?: string
+
+    /** 저장 전 종목 미리보기 Redis 캐시 TTL 초 단위 (기본 86400) */
+    PREVIEW_CACHE_TTL_SECONDS?: string
 
     /** Vercel 런타임 표시 (Vercel 환경에서 자동 주입) */
     VERCEL?: string

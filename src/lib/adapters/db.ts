@@ -70,6 +70,12 @@ export interface DbAdapter {
     client?: SupabaseClient
   ): Promise<KeywordAnalysis[]>
 
+  getKeywordAnalysesByKeywordId(
+    keywordId: string,
+    userId: string,
+    client?: SupabaseClient
+  ): Promise<Array<{ id: string; region: Region; period: Period; search_type: SearchType }>>
+
   createKeywordAnalysis(
     data: Omit<KeywordAnalysis, 'id' | 'created_at' | 'updated_at'>,
     client?: SupabaseClient
@@ -731,6 +737,39 @@ class SupabaseDbAdapter implements DbAdapter {
       yoy_data: row.yoy_data,
       created_at: row.created_at,
       updated_at: row.updated_at,
+    }))
+  }
+
+  async getKeywordAnalysesByKeywordId(
+    keywordId: string,
+    userId: string,
+    client?: SupabaseClient
+  ): Promise<Array<{ id: string; region: Region; period: Period; search_type: SearchType }>> {
+    const supabase = client ?? getSupabaseClient()
+
+    const { data: keywordOwner, error: keywordError } = await supabase
+      .from('keywords')
+      .select('id')
+      .eq('id', keywordId)
+      .eq('user_id', userId)
+      .single()
+
+    if (keywordError && keywordError.code !== 'PGRST116') throw keywordError
+    if (!keywordOwner) return []
+
+    const { data, error } = await supabase
+      .from('keyword_analysis')
+      .select('id, region, period, search_type')
+      .eq('keyword_id', keywordId)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    return (data || []).map((row) => ({
+      id: row.id,
+      region: row.region as Region,
+      period: row.period as Period,
+      search_type: row.search_type as SearchType,
     }))
   }
 

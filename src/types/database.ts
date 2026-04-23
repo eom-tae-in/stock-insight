@@ -51,7 +51,7 @@ export interface SearchRecord {
   yoy_change?: number // 52주 대비 변화율 (%) (계산된 값)
   // 데이터 배열 (항상 로드되어야 함)
   price_data: PriceDataPoint[] // 5년 주간 주가 배열 (필수: stock_price_data 테이블에서 로드)
-  trends_data: TrendsDataPoint[] // 5년 주간 트렌드 배열 (선택: 향후 Google Trends 연동)
+  trends_data?: TrendsDataPoint[] // 5년 주간 트렌드 배열 (선택: 향후 Google Trends 연동)
   last_updated_at?: string // ISO 8601 타임스탰프
   searched_at: string // ISO 8601 타임스탬프 (DB 필드)
   created_at?: string // ISO 8601 타임스탰프 (DB 필드)
@@ -114,6 +114,7 @@ export interface KeywordRecord {
   searched_at: string // ISO 8601 타임스탬프
   created_at: string // ISO 8601 타임스탬프
   updated_at: string // ISO 8601 타임스탬프
+  display_order?: number // 내 키워드 목록 정렬 순서
   last_viewed_at?: string | null // 내 키워드에서 마지막으로 본 시간 (미조회 배지 판별용)
 }
 
@@ -145,17 +146,41 @@ export interface KeywordTrendsMetrics {
 /**
  * 지역 타입
  */
-export type Region = 'GLOBAL' | 'US' | 'KR' | 'JP' | 'CN'
+export type Region =
+  | 'GLOBAL'
+  | 'US'
+  | 'KR'
+  | 'JP'
+  | 'GB'
+  | 'DE'
+  | 'FR'
+  | 'CA'
+  | 'AU'
+  | 'IN'
+  | 'BR'
+  | 'CN'
+  | 'TW'
+  | 'HK'
+  | 'SG'
 
 /**
  * 기간 타입
  */
-export type Period = '1Y' | '3Y' | '5Y'
+export type Period =
+  | '1M'
+  | '3M'
+  | '12M'
+  | '1Y'
+  | '2Y'
+  | '3Y'
+  | '4Y'
+  | '5Y'
+  | 'ALL'
 
 /**
  * 검색 타입
  */
-export type SearchType = 'WEB' | 'YOUTUBE'
+export type SearchType = 'WEB' | 'IMAGES' | 'NEWS' | 'YOUTUBE' | 'SHOPPING'
 
 /**
  * Keyword: 키워드 이름만 저장 (컨테이너)
@@ -200,9 +225,9 @@ export interface Keyword {
 export interface KeywordAnalysis {
   id: string // UUID
   keyword_id: string // keywords.id 참조
-  region: Region // 지역 (GLOBAL, US, KR, JP, CN)
-  period: Period // 기간 (1Y, 3Y, 5Y)
-  search_type: SearchType // 검색 타입 (WEB, YOUTUBE)
+  region: Region // parser 입력 지역 코드 (GLOBAL, US, KR 등)
+  period: Period // parser 입력 기간 코드 (1M, 3M, 1Y, 5Y 등)
+  search_type: SearchType // parser 입력 검색 타입 (WEB, NEWS, YOUTUBE 등)
 
   // 시계열 데이터
   trends_data: TrendsDataPoint[] // 해당 조건의 트렌드 시계열

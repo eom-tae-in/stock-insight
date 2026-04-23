@@ -29,15 +29,23 @@ const envSchema = z.object({
     .string()
     .url()
     .optional()
-    .describe('Upstash Redis REST URL - 주가 데이터 캐시용'),
+    .describe('Upstash Redis REST URL - 주가/트렌드 데이터 캐시용'),
   UPSTASH_REDIS_REST_TOKEN: z
     .string()
     .optional()
-    .describe('Upstash Redis REST 토큰 - 주가 데이터 캐시용'),
+    .describe('Upstash Redis REST 토큰 - 주가/트렌드 데이터 캐시용'),
   STOCK_DATA_CACHE_TTL_SECONDS: z
     .string()
     .optional()
     .describe('주가 데이터 Redis 캐시 TTL 초 단위'),
+  TRENDS_CACHE_TTL_SECONDS: z
+    .string()
+    .optional()
+    .describe('pytrends 결과 Redis 캐시 TTL 초 단위'),
+  PREVIEW_CACHE_TTL_SECONDS: z
+    .string()
+    .optional()
+    .describe('저장 전 종목 미리보기 Redis 캐시 TTL 초 단위'),
 })
 
 /**
@@ -55,6 +63,8 @@ function validateEnv() {
       UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
       STOCK_DATA_CACHE_TTL_SECONDS:
         process.env.STOCK_DATA_CACHE_TTL_SECONDS,
+      TRENDS_CACHE_TTL_SECONDS: process.env.TRENDS_CACHE_TTL_SECONDS,
+      PREVIEW_CACHE_TTL_SECONDS: process.env.PREVIEW_CACHE_TTL_SECONDS,
     })
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {

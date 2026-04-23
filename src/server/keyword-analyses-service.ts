@@ -10,6 +10,7 @@ import {
   fetchInternalTrendsData,
   TrendsProviderError,
 } from '@/server/trends-internal-service'
+import { parsePytrendsParams } from '@/lib/parsers/trends-parsers'
 import type {
   KeywordAnalysis,
   Period,
@@ -31,7 +32,6 @@ export class AnalysisServiceError extends Error {
 type AnalysisCreateInput = {
   keyword?: string
   region?: Region
-  period?: Period
   search_type?: SearchType
 }
 
@@ -67,27 +67,6 @@ function toAnalysis(row: AnalysisRow): KeywordAnalysis {
     created_at: row.created_at,
     updated_at: row.updated_at,
   }
-}
-
-function mapRegionToGeo(region: Region) {
-  const geoMap: Record<Region, string> = {
-    GLOBAL: '',
-    US: 'US',
-    KR: 'KR',
-    JP: 'JP',
-    CN: 'CN',
-  }
-
-  return geoMap[region]
-}
-
-function mapSearchTypeToGprop(searchType: SearchType) {
-  const gpropMap: Record<SearchType, string> = {
-    WEB: '',
-    YOUTUBE: 'youtube',
-  }
-
-  return gpropMap[searchType]
 }
 
 async function getOwnedKeywordName(
@@ -157,7 +136,13 @@ export async function getKeywordAnalysesList(
 
   const { getKeywordAnalysesByKeywordId } = await import('@/lib/db/queries')
 
-  return getKeywordAnalysesByKeywordId(keywordId, userId, supabase)
+  const analyses = await getKeywordAnalysesByKeywordId(
+    keywordId,
+    userId,
+    supabase
+  )
+
+  return analyses.filter(analysis => analysis.period === '5Y')
 }
 
 export async function createKeywordAnalysisForKeyword(
@@ -177,25 +162,32 @@ export async function createKeywordAnalysisForKeyword(
   const keyword =
     input.keyword ?? (await getOwnedKeywordName(supabase, userId, keywordId))
 
-  // 필터값은 명시적으로 제공되어야 함 (기본값 사용 금지)
+  // 분석 원본 데이터 범위는 항상 5Y로 고정한다.
+  // 화면의 기간 선택은 저장된 5Y 데이터를 잘라 보는 view filter다.
   const region = input.region
-  const period = input.period
+  const period: Period = '5Y'
   const searchType = input.search_type
 
-  if (!region || !period || !searchType) {
+  if (!region || !searchType) {
     throw new AnalysisServiceError(
       'INVALID_INPUT',
-      '분석 필터(region, period, search_type)는 필수입니다.',
+      '분석 필터(region, search_type)는 필수입니다.',
       400
     )
   }
 
   try {
-    const trendsRawData = await fetchInternalTrendsData({
+    const parsed = parsePytrendsParams({
       keyword,
-      geo: mapRegionToGeo(region),
-      timeframe: period.toLowerCase(),
-      gprop: mapSearchTypeToGprop(searchType),
+      geo: region,
+      timeframe: period,
+      gprop: searchType,
+    })
+    const trendsRawData = await fetchInternalTrendsData({
+      keyword: parsed.keyword,
+      geo: parsed.geo,
+      timeframe: parsed.timeframe,
+      gprop: parsed.gprop,
     })
 
     const trendsData = buildTrendsDataWithIndicators(trendsRawData)

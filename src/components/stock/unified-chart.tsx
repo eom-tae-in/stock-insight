@@ -17,7 +17,6 @@ import { getCurrencySymbol, formatPrice } from '@/lib/utils/currency'
 import { useChartTheme } from '@/hooks/use-chart-theme'
 import {
   ComposedChart,
-  Bar,
   Line,
   Area,
   XAxis,
@@ -93,7 +92,6 @@ export function UnifiedChart({
   ticker,
   currency,
   priceData,
-  trendsData,
   ma13,
   // metrics는 타입 정의에만 필요하고 현재 사용하지 않음
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

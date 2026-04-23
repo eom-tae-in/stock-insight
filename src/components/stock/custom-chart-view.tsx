@@ -16,7 +16,7 @@ interface CustomChartViewProps {
   ticker: string
   currency?: string
   priceData: PriceDataPoint[]
-  trendsData: TrendsDataPoint[]
+  trendsData?: TrendsDataPoint[]
   ma13?: (number | null)[]
   metrics: Metrics
 }

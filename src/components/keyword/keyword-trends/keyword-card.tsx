@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { X, Pencil, Check, Loader2 } from 'lucide-react'
+import { GripVertical, X, Pencil, Check, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -12,6 +12,7 @@ import type { KeywordRecord } from '@/types/database'
 interface KeywordCardProps {
   keyword: KeywordRecord
   isManageMode: boolean
+  mode?: 'normal' | 'delete' | 'reorder'
   isSelected: boolean
   isEditing: boolean
   onDelete?: () => void
@@ -24,6 +25,7 @@ interface KeywordCardProps {
 export function KeywordCard({
   keyword,
   isManageMode,
+  mode = isManageMode ? 'delete' : 'normal',
   isSelected,
   isEditing,
   onDelete,
@@ -97,8 +99,11 @@ export function KeywordCard({
     !keyword.last_viewed_at ||
     new Date(keyword.last_viewed_at) < new Date(keyword.searched_at)
 
+  const isDeleteMode = mode === 'delete'
+  const isReorderMode = mode === 'reorder'
+
   // 일반 모드 (비관리 모드)
-  if (!isManageMode) {
+  if (mode === 'normal') {
     return (
       <Link href={`/keywords/${keyword.id}`}>
         <div
@@ -193,23 +198,32 @@ export function KeywordCard({
     )
   }
 
-  // 관리 모드 (수정 아님)
+  // 편집 모드 (삭제/순서 변경)
   return (
     <div
       className={cn(
         'group relative rounded-xl border-2 p-4 transition-all duration-200',
-        isSelected
+        isDeleteMode && isSelected
           ? 'border-primary bg-primary/5'
-          : 'border-border/50 from-card to-card/80 bg-gradient-to-br'
+          : 'border-border/50 from-card to-card/80 bg-gradient-to-br',
+        isDeleteMode && 'cursor-pointer',
+        isReorderMode && 'cursor-grab active:cursor-grabbing'
       )}
+      onClick={isDeleteMode ? () => onToggleSelect?.(keyword.id) : undefined}
     >
       {/* 좌상단: 체크박스 + 미조회 배지 */}
       <div className="absolute top-3 left-3 flex items-center gap-2">
-        <Checkbox
-          checked={isSelected}
-          onCheckedChange={() => onToggleSelect?.(keyword.id)}
-          aria-label={`${keyword.keyword} 선택`}
-        />
+        {isDeleteMode && (
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={() => onToggleSelect?.(keyword.id)}
+            onClick={e => e.stopPropagation()}
+            aria-label={`${keyword.keyword} 선택`}
+          />
+        )}
+        {isReorderMode && (
+          <GripVertical className="text-muted-foreground h-4 w-4" />
+        )}
         {isUnviewed && <div className="bg-primary h-2 w-2 rounded-full" />}
       </div>
 
@@ -223,29 +237,30 @@ export function KeywordCard({
         <p className="text-muted-foreground text-xs">{formattedDate}</p>
       </div>
 
-      {/* 우상단: 수정/삭제 버튼 */}
-      <div className="absolute top-2 right-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground hover:text-foreground h-7 w-7 p-0"
-          onClick={handleEditStart}
-          aria-label="키워드 수정"
-        >
-          <Pencil className="h-4 w-4" />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="text-destructive hover:bg-destructive/15 h-7 w-7 p-0"
-          onClick={handleDelete}
-          aria-label="키워드 삭제"
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
+      {isDeleteMode && (
+        <div className="absolute top-2 right-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-foreground h-7 w-7 p-0"
+            onClick={handleEditStart}
+            aria-label="키워드 수정"
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-destructive hover:bg-destructive/15 h-7 w-7 p-0"
+            onClick={handleDelete}
+            aria-label="키워드 삭제"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

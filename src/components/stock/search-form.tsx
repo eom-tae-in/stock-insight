@@ -41,6 +41,7 @@ export function SearchForm({
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState<number>(-1)
+  const [inputValue, setInputValue] = useState('')
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
@@ -171,8 +172,8 @@ export function SearchForm({
       }
     }
 
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
   }, [])
 
   // Suggestions 변경 시 선택된 인덱스 초기화
@@ -180,26 +181,48 @@ export function SearchForm({
     setSelectedIndex(-1)
   }, [suggestions])
 
+  // inputValue 동기화 (form 값 변경 시)
+  useEffect(() => {
+    const subscription = form.watch(data => {
+      setInputValue(data.ticker || '')
+    })
+    return () => subscription.unsubscribe()
+  }, [form])
+
   // 키보드 네비게이션
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!showSuggestions || suggestions.length === 0) return
-
     switch (e.key) {
       case 'ArrowDown':
+        if (!showSuggestions || suggestions.length === 0) return
         e.preventDefault()
-        setSelectedIndex(prev =>
-          prev < suggestions.length - 1 ? prev + 1 : prev
-        )
+        const nextIndex =
+          selectedIndex < suggestions.length - 1
+            ? selectedIndex + 1
+            : selectedIndex
+        setSelectedIndex(nextIndex)
+        // input 필드에 선택된 항목의 symbol 반영
+        form.setValue('ticker', suggestions[nextIndex].symbol)
         break
       case 'ArrowUp':
+        if (!showSuggestions || suggestions.length === 0) return
         e.preventDefault()
-        setSelectedIndex(prev => (prev > 0 ? prev - 1 : -1))
+        const prevIndex = selectedIndex > 0 ? selectedIndex - 1 : -1
+        setSelectedIndex(prevIndex)
+        // input 필드 업데이트: -1이면 원래 입력값으로 복원
+        form.setValue(
+          'ticker',
+          prevIndex >= 0 ? suggestions[prevIndex].symbol : inputValue
+        )
         break
       case 'Enter':
         e.preventDefault()
-        if (selectedIndex >= 0) {
+        if (showSuggestions && selectedIndex >= 0) {
+          // 자동완성 목록에서 선택된 항목이 있으면 그것으로 검색
           handleSelectSuggestion(suggestions[selectedIndex].symbol)
           setSelectedIndex(-1)
+        } else {
+          // 활성화된 항목이 없으면 현재 입력값으로 검색 (form submit)
+          form.handleSubmit(handleSubmit)()
         }
         break
     }

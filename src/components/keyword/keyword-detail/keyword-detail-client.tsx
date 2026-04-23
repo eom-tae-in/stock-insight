@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { toast } from 'sonner'
 import {
   LineChart,
@@ -97,28 +97,41 @@ type AnalysisSummary = {
 
 // 레이블 매핑
 const REGION_LABEL: Record<Region, string> = {
-  GLOBAL: '전세계',
+  GLOBAL: '전체',
   US: '미국',
   KR: '한국',
   JP: '일본',
+  GB: '영국',
+  DE: '독일',
+  FR: '프랑스',
+  CA: '캐나다',
+  AU: '호주',
+  IN: '인도',
+  BR: '브라질',
   CN: '중국',
+  TW: '대만',
+  HK: '홍콩',
+  SG: '싱가포르',
 }
 
 const SEARCH_TYPE_LABEL: Record<SearchType, string> = {
-  WEB: '웹',
+  WEB: '웹 검색',
+  IMAGES: '이미지',
+  NEWS: '뉴스',
   YOUTUBE: '유튜브',
-}
-
-const PERIOD_LABEL: Record<Period, string> = {
-  '1Y': '1년',
-  '3Y': '3년',
-  '5Y': '5년',
+  SHOPPING: '쇼핑',
 }
 
 const PERIOD_MAX_YEARS: Record<Period, number> = {
+  '1M': 1,
+  '3M': 1,
+  '12M': 1,
   '1Y': 1,
+  '2Y': 2,
   '3Y': 3,
+  '4Y': 4,
   '5Y': 5,
+  ALL: 25,
 }
 
 interface KeywordDetailClientProps {
@@ -205,7 +218,7 @@ function DragOverlayComponent({
                       padding: '6px 8px',
                     }}
                   />
-                  {/* 라인1: 13주 이동평균 (주황색) */}
+                  {/* 라인1: 13주 이동평균(13주 MA) (주황색) */}
                   <Line
                     type="monotone"
                     dataKey="ma13Value"
@@ -213,9 +226,9 @@ function DragOverlayComponent({
                     strokeWidth={2}
                     isAnimationActive={false}
                     dot={false}
-                    name="13주 이동평균"
+                    name="13주 이동평균(13주 MA)"
                   />
-                  {/* 라인2: 52주 YoY (분홍색) */}
+                  {/* 라인2: 전년동기 대비 증감률(52주 YoY) (분홍색) */}
                   <Line
                     type="monotone"
                     dataKey="yoyValue"
@@ -223,7 +236,7 @@ function DragOverlayComponent({
                     strokeWidth={2}
                     isAnimationActive={false}
                     dot={false}
-                    name="52주 YoY"
+                    name="전년동기 대비 증감률(52주 YoY)"
                   />
                   {/* 라인3: 종목 주가 (초록색) - ticker 포함 */}
                   <Line
@@ -235,7 +248,7 @@ function DragOverlayComponent({
                     dot={false}
                     name={`${draggedOverlay.ticker} 주가`}
                   />
-                  {/* 라인4: 트렌드 지수 (파란색) */}
+                  {/* 라인4: 검색량 기반 (파란색) */}
                   <Line
                     type="monotone"
                     dataKey="trendsValue"
@@ -243,7 +256,7 @@ function DragOverlayComponent({
                     strokeWidth={2}
                     isAnimationActive={false}
                     dot={false}
-                    name="트렌드 지수"
+                    name="검색량 기반"
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -391,7 +404,7 @@ function SortableOverlayCard({
                     padding: '6px 8px',
                   }}
                 />
-                {/* 라인1: 13주 이동평균 (주황색) */}
+                {/* 라인1: 13주 이동평균(13주 MA) (주황색) */}
                 <Line
                   type="monotone"
                   dataKey="ma13Value"
@@ -399,9 +412,9 @@ function SortableOverlayCard({
                   strokeWidth={2}
                   isAnimationActive={false}
                   dot={false}
-                  name="13주 이동평균"
+                  name="13주 이동평균(13주 MA)"
                 />
-                {/* 라인2: 52주 YoY (분홍색) */}
+                {/* 라인2: 전년동기 대비 증감률(52주 YoY) (분홍색) */}
                 <Line
                   type="monotone"
                   dataKey="yoyValue"
@@ -409,7 +422,7 @@ function SortableOverlayCard({
                   strokeWidth={2}
                   isAnimationActive={false}
                   dot={false}
-                  name="52주 YoY"
+                  name="전년동기 대비 증감률(52주 YoY)"
                 />
                 {/* 라인3: 종목 주가 (초록색) - ticker 포함 */}
                 <Line
@@ -421,7 +434,7 @@ function SortableOverlayCard({
                   dot={false}
                   name={`${overlay.ticker} 주가`}
                 />
-                {/* 라인4: 트렌드 지수 (파란색) */}
+                {/* 라인4: 검색량 기반 (파란색) */}
                 <Line
                   type="monotone"
                   dataKey="trendsValue"
@@ -429,7 +442,7 @@ function SortableOverlayCard({
                   strokeWidth={2}
                   isAnimationActive={false}
                   dot={false}
-                  name="트렌드 지수"
+                  name="검색량 기반"
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -481,7 +494,7 @@ export function KeywordDetailClient({
   const [searchType, setSearchType] = useState<SearchType>(
     initialSearchParams.searchType
   )
-  const [period, setPeriod] = useState<Period>(initialSearchParams.period)
+  const period: Period = '5Y'
 
   // 데이터 상태
   const [chartData, setChartData] = useState<
@@ -511,7 +524,10 @@ export function KeywordDetailClient({
   const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(true) // 초기 로드 상태
   const [analysisNotFound, setAnalysisNotFound] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [isCreatingAnalysis, setIsCreatingAnalysis] = useState(false)
+  const visibleAnalysesList = useMemo(
+    () => analysesList.filter(analysis => analysis.period === '5Y'),
+    [analysesList]
+  )
 
   // 조합 목록 로드 (마운트 시 1회)
   useEffect(() => {
@@ -610,79 +626,12 @@ export function KeywordDetailClient({
     }
   }, [])
 
-  // 새로운 분석 생성 및 바로 이동
-  const handleCreateNewAnalysis = useCallback(async () => {
-    setIsCreatingAnalysis(true)
-    try {
-      // 1. 분석 생성 (현재 조건 기반, trends_data 함께 저장)
-      const createRes = await fetch(`/api/keywords/${keywordId}/analyses`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          region,
-          period,
-          search_type: searchType,
-        }),
-      })
-
-      if (!createRes.ok) throw new Error('분석 생성 실패')
-
-      const createData = await createRes.json()
-      const analysisId = createData.data?.id
-      const trendsData = createData.data?.trends_data
-
-      if (!analysisId) throw new Error('분석 ID를 받지 못했습니다')
-
-      // 2. trends_data 즉시 화면에 표시
-      if (trendsData && Array.isArray(trendsData)) {
-        setCurrentAnalysis({
-          id: analysisId,
-          keyword_id: keywordId,
-          region,
-          period,
-          search_type: searchType,
-          trends_data: trendsData,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-
-        setChartData(
-          trendsData.map(
-            (point: {
-              date: string
-              value: number
-              ma13Value: number | null
-              yoyValue: number | null
-            }) => ({
-              weekIndex: 0,
-              date: point.date,
-              trendsValue: point.value,
-              ma13Value: point.ma13Value,
-              yoyValue: point.yoyValue,
-            })
-          )
-        )
-        setAnalysisNotFound(false)
-
-        // 오버레이도 새로고침
-        await loadOverlays(analysisId)
-      }
-
-      toast.success('새로운 분석이 생성되었습니다')
-    } catch (error) {
-      console.error('Failed to create analysis:', error)
-      toast.error('분석 생성에 실패했습니다')
-    } finally {
-      setIsCreatingAnalysis(false)
-    }
-  }, [keywordId, loadOverlays, period, region, searchType])
-
   const loadAnalysis = useCallback(async () => {
     setIsLoadingAnalysis(true)
     setAnalysisNotFound(false)
     try {
       const response = await fetch(
-        `/api/keywords/${keywordId}/analyses?region=${region}&period=${period}&searchType=${searchType}`
+        `/api/keywords/${keywordId}/analyses?region=${region}&searchType=${searchType}`
       )
       if (!response.ok) throw new Error('Analysis not found')
 
@@ -726,11 +675,11 @@ export function KeywordDetailClient({
     } finally {
       setIsLoadingAnalysis(false)
     }
-  }, [keywordId, loadOverlays, period, region, searchType])
+  }, [keywordId, loadOverlays, region, searchType])
 
   // 필터 변경 시 URL 동기화 + 데이터 로드
   useEffect(() => {
-    const newUrl = `/keywords/${keywordId}?region=${region}&searchType=${searchType}&period=${period}`
+    const newUrl = `/keywords/${keywordId}?region=${region}&searchType=${searchType}`
     window.history.replaceState(null, '', newUrl)
 
     // 분석 조건 변경 시 selectedStock 초기화 (분석별 독립성 보장)
@@ -740,7 +689,7 @@ export function KeywordDetailClient({
 
     // Analysis 조회
     loadAnalysis()
-  }, [region, searchType, period, keywordId, loadAnalysis])
+  }, [region, searchType, keywordId, loadAnalysis])
 
   const [selectedStock, setSelectedStock] = useState<{
     ticker: string
@@ -1316,25 +1265,23 @@ export function KeywordDetailClient({
           </div>
 
           {/* 존재하는 분석 조합 버튼들 */}
-          {!isLoadingList && analysesList.length > 0 ? (
+          {!isLoadingList && visibleAnalysesList.length > 0 ? (
             <div className="mb-6 space-y-4">
               <p className="text-muted-foreground text-xs font-medium">
                 저장된 분석
               </p>
               <div className="flex flex-wrap gap-2">
-                {analysesList.map(analysis => {
+                {visibleAnalysesList.map(analysis => {
                   const isSelected =
                     analysis.region === region &&
-                    analysis.search_type === searchType &&
-                    analysis.period === period
+                    analysis.search_type === searchType
 
                   return (
                     <Button
-                      key={`${analysis.region}-${analysis.search_type}-${analysis.period}`}
+                      key={`${analysis.region}-${analysis.search_type}`}
                       onClick={() => {
                         setRegion(analysis.region)
                         setSearchType(analysis.search_type)
-                        setPeriod(analysis.period)
                       }}
                       variant={isSelected ? 'default' : 'outline'}
                       size="sm"
@@ -1346,8 +1293,7 @@ export function KeywordDetailClient({
                     >
                       <span>
                         {REGION_LABEL[analysis.region]} ·{' '}
-                        {SEARCH_TYPE_LABEL[analysis.search_type]} ·{' '}
-                        {PERIOD_LABEL[analysis.period]}
+                        {SEARCH_TYPE_LABEL[analysis.search_type]}
                       </span>
                       {isSelected && <span className="ml-1">✓</span>}
                     </Button>
@@ -1406,96 +1352,20 @@ export function KeywordDetailClient({
 
         {/* 분석 데이터 부재 시 Empty State */}
         {analysisNotFound && !isLoadingAnalysis && (
-          <div className="bg-muted/50 mb-12 rounded-lg border border-dashed p-8">
-            <p className="text-muted-foreground mb-6 text-center">
-              분석할 조건을 선택한 후 검색하세요
+          <div className="bg-muted/50 mb-12 rounded-lg border border-dashed p-8 text-center">
+            <p className="text-muted-foreground mb-4">
+              저장된 5년 분석이 없습니다.
             </p>
-
-            {/* 필터 선택 UI */}
-            <div className="mb-6 space-y-4">
-              {/* 지역 선택 */}
-              <div>
-                <p className="text-muted-foreground mb-2 text-xs font-medium">
-                  지역
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {(['GLOBAL', 'US', 'KR', 'JP', 'CN'] as const).map(r => (
-                    <Button
-                      key={r}
-                      onClick={() => setRegion(r)}
-                      variant={region === r ? 'default' : 'outline'}
-                      size="sm"
-                      className={cn(
-                        'text-xs',
-                        region === r &&
-                          'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700'
-                      )}
-                    >
-                      {REGION_LABEL[r]}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              {/* 기간 선택 */}
-              <div>
-                <p className="text-muted-foreground mb-2 text-xs font-medium">
-                  기간
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {(['1Y', '3Y', '5Y'] as const).map(p => (
-                    <Button
-                      key={p}
-                      onClick={() => setPeriod(p)}
-                      variant={period === p ? 'default' : 'outline'}
-                      size="sm"
-                      className={cn(
-                        'text-xs',
-                        period === p &&
-                          'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700'
-                      )}
-                    >
-                      {p}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              {/* 검색 유형 선택 */}
-              <div>
-                <p className="text-muted-foreground mb-2 text-xs font-medium">
-                  검색 유형
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {(['WEB', 'YOUTUBE'] as const).map(st => (
-                    <Button
-                      key={st}
-                      onClick={() => setSearchType(st)}
-                      variant={searchType === st ? 'default' : 'outline'}
-                      size="sm"
-                      className={cn(
-                        'text-xs',
-                        searchType === st &&
-                          'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700'
-                      )}
-                    >
-                      {SEARCH_TYPE_LABEL[st]}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* 분석 생성 버튼 */}
-            <div className="text-center">
-              <Button
-                onClick={handleCreateNewAnalysis}
-                disabled={isCreatingAnalysis}
-                className="bg-primary text-primary-foreground hover:bg-primary/90"
-              >
-                {isCreatingAnalysis ? '분석 중...' : '분석 검색'}
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              onClick={() =>
+                router.push(
+                  `/keyword-analysis/new?keyword=${encodeURIComponent(keyword.keyword)}`
+                )
+              }
+            >
+              + 새로운 분석 추가
+            </Button>
           </div>
         )}
 
@@ -1902,13 +1772,18 @@ export function KeywordDetailClient({
                     <span className="mt-0.5 font-bold text-green-500">✓</span>
                     <span>
                       각 카드는 4개 라인으로 구성:{' '}
-                      <span className="font-medium">13주 이동평균</span>
-                      (주황색), <span className="font-medium">52주 YoY</span>
+                      <span className="font-medium">
+                        13주 이동평균(13주 MA)
+                      </span>
+                      (주황색),{' '}
+                      <span className="font-medium">
+                        전년동기 대비 증감률(52주 YoY)
+                      </span>
                       (분홍색),{' '}
                       <span className="font-medium">
                         AAPL/TSLA 등 종목 주가
                       </span>
-                      (초록색), <span className="font-medium">트렌드 지수</span>
+                      (초록색), <span className="font-medium">검색량 기반</span>
                       (파란색)
                     </span>
                   </li>

@@ -80,14 +80,15 @@ DB 테이블:
 현재 흐름:
 
 1. 사용자가 ticker를 검색한다.
-2. `POST /api/searches`가 Yahoo Finance 데이터를 수집한다.
-3. 지표를 계산한다.
-4. `searches`와 `stock_price_data`에 저장한다.
-5. 상세 페이지에서 저장 데이터를 조회해 차트와 지표를 표시한다.
+2. `POST /api/stock-previews`가 Yahoo Finance 데이터를 수집하고 Redis preview를 만든다.
+3. preview 페이지와 preview 표 페이지는 같은 Redis preview 데이터를 읽는다.
+4. 사용자가 저장 버튼을 누르면 `POST /api/searches`가 preview를 `searches`와 `stock_price_data`에 저장한다.
+5. 저장 후 상세 페이지에서 저장 데이터를 조회해 차트와 지표를 표시한다.
 
 현재 상태:
 
 - 저장 종목은 `/api/searches` 계열로 처리한다.
+- 저장 전 종목 분석은 `/api/stock-previews`로 처리한다.
 - 외부 ticker/company 검색은 `/api/stocks/search`로 통합했다.
 - 키워드 오버레이용 주가 미리보기는 `/api/stocks/[ticker]`로 통합했다.
 - `/api/stock`, `/api/stock/save`, `/api/stock-data`, `/api/ticker-search`는 제거됐다.
@@ -210,12 +211,15 @@ DB 테이블:
 1. 키워드 상세 페이지에서 region/searchType 조건을 선택한다.
 2. `GET /api/keywords/[keywordId]/analyses`로 조건별 analysis를 조회한다.
 3. 없으면 `POST /api/keywords/[keywordId]/analyses`로 생성한다.
-4. 생성 과정에서 서버 서비스 함수로 Google Trends 데이터를 조회한다.
-5. Google Trends와 Yahoo Finance 주간 데이터는 월요일 week key로 정규화하고, 완료된 전주까지만 포함한다.
-6. analysis별 overlay는 `keyword_stock_overlays.analysis_id` 기준으로 저장한다.
-7. 주가 5년 주간 데이터는 선택적으로 Upstash Redis REST 캐시를 사용한다. 캐시 키는 ticker와 완료된 전주 week key를 포함하고, 기본 TTL은 24시간이다.
-8. analysis overlay 저장 API는 프론트가 `price_data`를 보내지 않아도 서버에서 Redis/Yahoo를 통해 주가 데이터를 확보해 저장한다.
-9. 오버레이 상세 페이지와 keyword batch API도 기본 analysis 기준으로 동작한다.
+4. 프론트/API/DB는 `GLOBAL`, `5Y`, `WEB` 같은 대문자 내부 표준값을 사용한다.
+5. 생성 과정에서 서버는 `src/lib/parsers/trends-parsers.ts`를 통해 내부 표준값을 pytrends 요청값으로 변환한다.
+6. 서버 서비스 함수로 Google Trends 데이터를 조회한다.
+7. Google Trends와 Yahoo Finance 주간 데이터는 월요일 week key로 정규화하고, 완료된 전주까지만 포함한다.
+8. analysis별 overlay는 `keyword_stock_overlays.analysis_id` 기준으로 저장한다.
+9. 주가 5년 주간 데이터는 선택적으로 Upstash Redis REST 캐시를 사용한다. 캐시 키는 ticker와 완료된 전주 week key를 포함하고, 기본 TTL은 24시간이다.
+10. pytrends 조회 결과는 선택적으로 Upstash Redis REST 캐시를 사용한다. 캐시 키는 키워드, region, period, search type, 완료된 전주 week key를 포함하고, 기본 TTL은 24시간이다.
+11. analysis overlay 저장 API는 프론트가 `price_data`를 보내지 않아도 서버에서 Redis/Yahoo를 통해 주가 데이터를 확보해 저장한다.
+12. 오버레이 상세 페이지와 keyword batch API도 기본 analysis 기준으로 동작한다.
 
 현재 상태:
 
@@ -276,6 +280,8 @@ DB 테이블:
 - `UPSTASH_REDIS_REST_URL`
 - `UPSTASH_REDIS_REST_TOKEN`
 - `STOCK_DATA_CACHE_TTL_SECONDS`
+- `TRENDS_CACHE_TTL_SECONDS`
+- `PREVIEW_CACHE_TTL_SECONDS`
 
 Vercel 환경에서 자동 주입되는 변수 (검증/타입만 명시, .env 작성 X):
 

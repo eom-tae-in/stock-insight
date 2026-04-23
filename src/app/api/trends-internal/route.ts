@@ -34,7 +34,8 @@ export async function GET(request: NextRequest) {
   try {
     const keyword = request.nextUrl.searchParams.get('keyword') || ''
     const geo = request.nextUrl.searchParams.get('geo') || ''
-    const timeframe = request.nextUrl.searchParams.get('timeframe') || '5y'
+    const timeframe =
+      request.nextUrl.searchParams.get('timeframe') || 'today 5-y'
     const gprop = request.nextUrl.searchParams.get('gprop') || ''
 
     const normalizedKeyword = normalizeKeywordSpacing(keyword)
@@ -64,7 +65,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { keyword, geo = '', timeframe = '5y', gprop = '' } = body
+    const { keyword, geo = '', timeframe = 'today 5-y', gprop = '' } = body
 
     const normalizedKeyword = normalizeKeywordSpacing(keyword || '')
 

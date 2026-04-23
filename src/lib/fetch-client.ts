@@ -6,6 +6,18 @@
  * - 비-2xx 응답 시 응답 본문의 message를 포함한 Error throw
  */
 
+export class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public code: string = 'API_ERROR',
+    public details?: Record<string, unknown>
+  ) {
+    super(message)
+    this.name = 'ApiRequestError'
+  }
+}
+
 /**
  * fetch를 래핑하여 공통 에러 처리를 적용합니다.
  *
@@ -40,8 +52,20 @@ export async function apiFetchJson<T>(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new Error(
-      (body as { message?: string }).message ?? `HTTP ${res.status}`
+    const errorBody = body as {
+      message?: string
+      error?: {
+        code?: string
+        message?: string
+        details?: Record<string, unknown>
+      }
+    }
+
+    throw new ApiRequestError(
+      errorBody.error?.message ?? errorBody.message ?? `HTTP ${res.status}`,
+      res.status,
+      errorBody.error?.code ?? 'API_ERROR',
+      errorBody.error?.details
     )
   }
 
