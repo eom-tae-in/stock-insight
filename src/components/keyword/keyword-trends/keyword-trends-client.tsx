@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState, useEffect, useMemo } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import type {
@@ -352,6 +353,7 @@ export default function KeywordTrendsClient() {
   const isLoadingTrends = fetchError.status === 'loading'
   const hasFetchError =
     fetchError.status === 'rate_limited' || fetchError.status === 'error'
+  const canShowSaveButton = !hasFetchError
 
   // 페이지 진입 시: 저장된 종목 목록 + 저장된 키워드 목록 로드
   useEffect(() => {
@@ -505,15 +507,37 @@ export default function KeywordTrendsClient() {
     <div className="bg-background min-h-screen p-6">
       <div className="mx-auto max-w-7xl">
         {/* 헤더 - 뒤로가기 + 제목 + 버튼들 */}
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8 space-y-5">
+          <div className="border-border/60 bg-muted/30 flex flex-col gap-3 rounded-xl border p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap gap-3">
+              <Button
+                asChild
+                variant="outline"
+                className="border-primary/25 bg-primary/10 text-foreground hover:bg-primary/15 shadow-sm"
+              >
+                <Link href="/keyword-analysis">← 내 키워드로 돌아가기</Link>
+              </Button>
+              <Button
+                onClick={() => router.push('/keyword-analysis/new')}
+                variant="outline"
+                className="border-primary/25 bg-primary/10 text-foreground hover:bg-primary/15 shadow-sm"
+              >
+                키워드 검색하기
+              </Button>
+            </div>
+            {canShowSaveButton && (
+              <Button
+                onClick={handleSaveKeyword}
+                disabled={!state.keyword || state.isLoading}
+                className="h-10"
+              >
+                {state.isLoading ? '저장중...' : '키워드 저장'}
+              </Button>
+            )}
+          </div>
+
           <div>
-            <a
-              href="/keyword-analysis"
-              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm transition-colors"
-            >
-              ← 내 키워드로 돌아가기
-            </a>
-            <h1 className="mt-3 text-3xl font-bold">키워드 트렌드 분석</h1>
+            <h1 className="text-3xl font-bold">키워드 트렌드 분석</h1>
             {state.keyword && (
               <div className="mt-4 flex items-baseline gap-2">
                 <span className="text-muted-foreground text-sm font-medium">
@@ -524,23 +548,6 @@ export default function KeywordTrendsClient() {
                 </span>
               </div>
             )}
-          </div>
-          {/* 버튼 그룹 */}
-          <div className="flex gap-2">
-            <Button
-              onClick={handleSaveKeyword}
-              disabled={!state.keyword || state.isLoading || hasFetchError}
-              className="h-10"
-            >
-              {state.isLoading ? '저장중...' : '키워드 저장'}
-            </Button>
-            <Button
-              onClick={() => router.push('/keyword-analysis/new')}
-              className="h-10"
-              variant="outline"
-            >
-              키워드 검색하기
-            </Button>
           </div>
         </div>
 

@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import KeywordSearchForm from '../keyword-trends/keyword-search-form'
 import {
   GEO_OPTIONS,
@@ -52,14 +54,14 @@ export default function KeywordSearchPageClient() {
   return (
     <div className="bg-background min-h-screen p-6">
       <div className="mx-auto max-w-2xl">
-        {/* 뒤로가기 */}
-        <div className="mb-8">
-          <a
-            href="/keyword-analysis"
-            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm transition-colors"
+        <div className="mb-8 flex items-center justify-between gap-3">
+          <Button
+            asChild
+            variant="outline"
+            className="border-primary/25 bg-primary/10 text-foreground hover:bg-primary/15 shadow-sm"
           >
-            ← 내 키워드로 돌아가기
-          </a>
+            <Link href="/keyword-analysis">← 내 키워드로 돌아가기</Link>
+          </Button>
         </div>
 
         {/* 제목 */}
