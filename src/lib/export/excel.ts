@@ -121,12 +121,7 @@ export function generateTableExcelFile(
   const tableSheet = XLSX.utils.aoa_to_sheet(tableSheetData)
 
   // 열 너비 설정
-  tableSheet['!cols'] = [
-    { wch: 12 },
-    { wch: 12 },
-    { wch: 14 },
-    { wch: 12 },
-  ]
+  tableSheet['!cols'] = [{ wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 12 }]
 
   XLSX.utils.book_append_sheet(workbook, tableSheet, '데이터')
 
@@ -189,8 +184,14 @@ export function generateKeywordAnalysisExcelFile({
     ['기간', period],
     ['검색 타입', searchType],
     ['현재 관심도', trendsData[trendsData.length - 1]?.value ?? ''],
-    ['13주 MA', ma13Data !== null && ma13Data !== undefined ? ma13Data.toFixed(2) : ''],
-    ['YoY (%)', yoyData !== null && yoyData !== undefined ? yoyData.toFixed(2) : ''],
+    [
+      '13주 MA',
+      ma13Data !== null && ma13Data !== undefined ? ma13Data.toFixed(2) : '',
+    ],
+    [
+      'YoY (%)',
+      yoyData !== null && yoyData !== undefined ? yoyData.toFixed(2) : '',
+    ],
   ]
 
   // 워크북 생성

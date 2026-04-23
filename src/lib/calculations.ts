@@ -111,4 +111,3 @@ export function calculateWeeklyYoY(priceData: PriceDataPoint[]): number[] {
     return Math.round(yoyChange * 100) / 100
   })
 }
-
