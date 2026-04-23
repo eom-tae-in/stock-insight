@@ -94,7 +94,7 @@ PYTRENDS_PYTHON_PATH=
 - **Google Trends**: 별도 API 키 불필요
   - 자동으로 검색 관심도 수집
   - 로컬에서는 `PYTRENDS_PYTHON_PATH`가 있으면 그 Python을 사용하고, 없으면
-    `.venv`, `venv`, 기본 `python3` 순서로 자동 탐색
+    기본 `python3`를 사용
   - Vercel 배포 시 `/api/pytrends` 내부 호출 보호를 위해
     `PYTRENDS_INTERNAL_SECRET` 값을 Vercel 환경 변수에도 동일하게 설정
 

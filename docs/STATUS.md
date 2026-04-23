@@ -107,14 +107,14 @@ API/스크립트:
 환경:
 
 - `package.json`의 기본 `npm run dev`는 Next.js만 실행한다.
-- 로컬: `PYTRENDS_PYTHON_PATH`가 있으면 그 Python을 사용하고, 없으면 `.venv/bin/python3`, `venv/bin/python3`, `python3` 순서로 찾아 `src/lib/get_trends.py`를 `child_process` spawn 으로 직접 실행한다.
+- 로컬: `PYTRENDS_PYTHON_PATH`가 있으면 그 Python을 사용하고, 없으면 `python3`로 `src/lib/get_trends.py`를 `child_process` spawn 으로 직접 실행한다.
 - Vercel: `api/pytrends.py` Python serverless function 으로 실행되며, Next.js route는 `https://${VERCEL_URL}/api/pytrends`로 fetch 한다.
 
 현재 흐름:
 
 - `src/server/trends-internal-service.ts` 의 `fetchInternalTrendsData()`가 단일 진입점이다.
   - `process.env.VERCEL === '1'` 이면 Vercel Python function 호출 (fetch).
-  - 그 외(로컬)에서는 로컬 Python 후보를 찾아 `src/lib/get_trends.py` 를 spawn.
+  - 그 외(로컬)에서는 `python3` 로 `src/lib/get_trends.py` 를 spawn.
 - `api/pytrends.py` 는 `src/lib/get_trends.py.get_trends()` 를 sys.path 확장 후 import 하여 동일 로직을 재사용한다 (코드 중복 없음).
 - `requirements.txt` 는 `pytrends` 만 명시하고, `.python-version` 은 `3.12` 로 고정한다.
 - `vercel.json` 은 `functions.api/**/*.py.excludeFiles` 로 `__pycache__`, `*.pyc`, `.venv` 를 번들에서 제외한다.
