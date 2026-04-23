@@ -185,7 +185,7 @@ export function KeywordStandaloneChart({
               visibleLines.trendsValue ? 'bg-blue-500 hover:bg-blue-600' : ''
             }
           >
-            트렌드 지수
+            검색량 기반
           </Button>
           <Button
             onClick={() => onToggleLine('ma13Value')}
@@ -195,7 +195,7 @@ export function KeywordStandaloneChart({
               visibleLines.ma13Value ? 'bg-orange-500 hover:bg-orange-600' : ''
             }
           >
-            13주 이동평균
+            13주 이동평균(13주 MA)
           </Button>
           <Button
             onClick={() => onToggleLine('yoyValue')}
@@ -205,7 +205,7 @@ export function KeywordStandaloneChart({
               visibleLines.yoyValue ? 'bg-pink-500 hover:bg-pink-600' : ''
             }
           >
-            52주 YoY
+            전년동기 대비 증감률(52주 YoY)
           </Button>
           {overlayStock && (
             <Button
@@ -238,7 +238,7 @@ export function KeywordStandaloneChart({
               domain={[0, 100]}
               tick={{ fontSize: 12, fill: 'hsl(var(--foreground))' }}
               label={{
-                value: '트렌드 지수 (0-100)',
+                value: '검색량 기반 (0-100)',
                 angle: -90,
                 position: 'insideLeft',
                 fill: 'hsl(var(--foreground))',
@@ -270,13 +270,13 @@ export function KeywordStandaloneChart({
             />
             <Legend />
 
-            {/* 트렌드 지수 (파란색) */}
+            {/* 검색량 기반 (파란색) */}
             {visibleLines.trendsValue && (
               <Line
                 type="monotone"
                 dataKey="trendsValue"
                 stroke="#3b82f6"
-                name="트렌드 지수"
+                name="검색량 기반"
                 dot={false}
                 strokeWidth={2}
                 isAnimationActive={false}
@@ -290,7 +290,7 @@ export function KeywordStandaloneChart({
                 type="monotone"
                 dataKey="ma13Value"
                 stroke="#f97316"
-                name="13주 이동평균"
+                name="13주 이동평균(13주 MA)"
                 dot={false}
                 strokeWidth={2}
                 isAnimationActive={false}
@@ -304,7 +304,7 @@ export function KeywordStandaloneChart({
                 type="monotone"
                 dataKey="yoyValue"
                 stroke="#ec4899"
-                name="52주 YoY"
+                name="전년동기 대비 증감률(52주 YoY)"
                 dot={false}
                 strokeWidth={2}
                 isAnimationActive={false}

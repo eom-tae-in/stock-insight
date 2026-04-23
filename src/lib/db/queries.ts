@@ -129,6 +129,13 @@ export const getAllKeywordAnalyses = async (
 ): Promise<KeywordAnalysis[]> =>
   db.getAllKeywordAnalyses(userId, client)
 
+export const getKeywordAnalysesByKeywordId = async (
+  keywordId: string,
+  userId: string,
+  client?: SupabaseClient
+): Promise<Array<{ id: string; region: Region; period: Period; search_type: SearchType }>> =>
+  db.getKeywordAnalysesByKeywordId(keywordId, userId, client)
+
 export const createKeywordAnalysis = async (
   data: Omit<KeywordAnalysis, 'id' | 'created_at' | 'updated_at'>,
   client?: SupabaseClient

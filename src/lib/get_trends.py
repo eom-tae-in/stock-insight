@@ -28,41 +28,49 @@ def normalize_to_week_start(date: datetime) -> datetime:
 
     return date - timedelta(days=date.weekday())
 
-def get_trends(keyword: str, geo: str = '', timeframe: str = '5y', gprop: str = '') -> list:
+def get_trends(keyword: str, geo: str = '', timeframe: str = 'today 5-y', gprop: str = '') -> list:
     """
     Google Trends에서 데이터 수집
 
     Args:
         keyword: 검색 키워드
-        geo: 국가 코드 (예: 'US', 'KR', 'JP', 기본값: 전체)
-        timeframe: 기간 ('w', '1y', '2y', '3y', '4y', '5y', 기본값: '5y')
-        gprop: 검색 범위 ('', 'youtube', 기본값: 웹 검색)
+        geo: 국가 코드 (예: 'US', 'KR', 'JP', 기본값: 전체 → '')
+        timeframe: 기간 (pytrends 형식: 'now 1-H', 'today 1-m', 'today 5-y' 등, 기본값: 'today 5-y')
+        gprop: 검색 범위 ('', 'youtube', 'images', 'news', 'froogle', 기본값: 웹 검색 → '')
 
     Returns:
         list: [{"date": "YYYY-MM-DD", "value": 0-100}, ...]
     """
     try:
-        # 기간 계산 (Critical: 2y, 4y, w 분기 추가 + 커스텀 주 지원)
+        # 기간 계산
         end_date = datetime.now()
         last_completed_week_start = get_last_completed_week_start(end_date)
         request_end_date = last_completed_week_start + timedelta(days=6)
 
-        # 커스텀 주 형식 처리 (예: '26w', '52w')
-        if timeframe.endswith('w') and timeframe[:-1].isdigit():
-            weeks = int(timeframe[:-1])
-            days = weeks * 7
-        elif timeframe == 'w':
-            days = 7
-        elif timeframe == '1y':
-            days = 365
-        elif timeframe == '2y':
-            days = 365 * 2
-        elif timeframe == '3y':
-            days = 365 * 3
-        elif timeframe == '4y':
-            days = 365 * 4
-        else:  # '5y' or default
-            days = 365 * 5
+        # pytrends timeframe 형식 파싱 (예: 'today 5-y', 'today 1-m', 'now 1-H')
+        # timeframe이 'today ...' 또는 'now ...' 형식인 경우, 날짜 범위로 계산
+        days = 365 * 5  # 기본값: 5년
+
+        if ' ' in timeframe:
+            # 형식: 'today 5-y', 'today 1-m', 'now 1-H' 등
+            parts = timeframe.split()
+            if len(parts) == 2:
+                _, period = parts  # 예: '5-y', '1-m', '1-H'
+                # 형식 파싱: '5-y', '1-m', '1-H'
+                match = __import__('re').match(r'(\d+)-([ymdhH])', period)
+                if match:
+                    value = int(match.group(1))
+                    unit = match.group(2)
+
+                    if unit == 'H':  # 시간
+                        days = value / 24
+                    elif unit == 'd':  # 일
+                        days = value
+                    elif unit == 'm':  # 월 (약 30일)
+                        days = value * 30
+                    elif unit == 'y':  # 년
+                        days = value * 365
+        # 아니면 timeframe이 이미 'now 1-H' 형식이므로 그대로 사용
 
         start_date = request_end_date - timedelta(days=days)
 
@@ -114,7 +122,7 @@ if __name__ == '__main__':
 
     keyword = sys.argv[1]
     geo = sys.argv[2] if len(sys.argv) > 2 else ''
-    timeframe = sys.argv[3] if len(sys.argv) > 3 else '5y'
+    timeframe = sys.argv[3] if len(sys.argv) > 3 else 'today 5-y'
     gprop = sys.argv[4] if len(sys.argv) > 4 else ''
 
     result = get_trends(keyword, geo, timeframe, gprop)

@@ -51,8 +51,8 @@ export default function SearchPage() {
       }, 4000)
       timerRefsRef.current.push(progressTimer2)
 
-      // POST /api/searches로 종목 조회 시작
-      const response = await fetch('/api/searches', {
+      // POST /api/stock-previews로 저장 전 미리보기 생성
+      const response = await fetch('/api/stock-previews', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -79,9 +79,11 @@ export default function SearchPage() {
         message: `${ticker} 조회가 완료되었습니다.`,
       })
 
-      // 1초 후 상세 페이지로 리다이렉트
+      // 1초 후 미리보기 페이지로 리다이렉트
       const redirectTimer = setTimeout(() => {
-        router.push(`/analysis/${data.data.id}`)
+        router.push(
+          `/stock-analysis/preview/${data.data.id}?ticker=${data.data.ticker}`
+        )
       }, 1000)
       timerRefsRef.current.push(redirectTimer)
     } catch (err) {

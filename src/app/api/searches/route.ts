@@ -5,29 +5,22 @@
  * Response: ApiResponse<SearchRecord[]>
  *
  * POST /api/searches
- * Body: { ticker: string }
+ * Body: { previewId: string; ticker?: string }
  * Response: ApiResponse<{ id: string; ticker: string }>
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { fetchStockData } from '@/lib/services/stock-service'
-import { fetchTrendsData } from '@/lib/services/trends-service'
-import { calculateMetrics, getWeeklyOHLC } from '@/lib/calculations'
-import { TickerInputSchema } from '@/lib/validation'
-import {
-  getAllSearches,
-  upsertSearch,
-  insertPriceData,
-  deleteSearch,
-} from '@/lib/db/queries'
+import { getAllSearches } from '@/lib/db/queries'
 import {
   createSuccessResponse,
   createErrorResponse,
   validateApiAuth,
 } from '@/lib/api-helpers'
-import type { SearchRecord, TrendsDataPoint } from '@/types'
-import crypto from 'crypto'
+import {
+  saveStockPreviewAsSearch,
+  StockPreviewServiceError,
+} from '@/server/stock-preview-service'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,121 +51,43 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    // 인증 확인
     const supabase = await createSupabaseServerClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-    if (!user || authError) {
-      return createErrorResponse('UNAUTHORIZED', '로그인이 필요합니다.', 401)
+    const authResult = await validateApiAuth(supabase)
+    if (authResult instanceof NextResponse) {
+      return authResult
     }
 
-    // 요청 본문 파싱
-    const body = await request.json()
-    const { ticker } = body
-
-    // ticker 검증
-    const result = TickerInputSchema.safeParse(ticker)
-    if (!result.success) {
+    const body = (await request.json()) as {
+      previewId?: unknown
+      ticker?: unknown
+    }
+    if (typeof body.previewId !== 'string' || !body.previewId.trim()) {
       return createErrorResponse(
-        'INVALID_TICKER',
-        '올바른 종목 심볼을 입력하세요 (1-12자, 영문/숫자/점 포함)',
+        'INVALID_INPUT',
+        'previewId가 필요합니다.',
         400
       )
     }
 
-    const validatedTicker = result.data
-
-    // 1. 주가 데이터 수집
-    let stockData
-    try {
-      stockData = await fetchStockData(validatedTicker)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      if (message.includes('No price data')) {
-        return createErrorResponse(
-          'TICKER_NOT_FOUND',
-          '종목을 찾을 수 없습니다. 정확한 심볼을 확인해주세요.',
-          404
-        )
-      }
-      throw error
-    }
-
-    // 2. 트렌드 데이터 수집 (실패 시 빈 배열로 계속)
-    let trendsData: TrendsDataPoint[] = []
-    try {
-      const trendsResult = await fetchTrendsData(
-        validatedTicker,
-        stockData.companyName
-      )
-      trendsData = trendsResult.trendsData
-    } catch (error) {
-      // 트렌드 수집 실패는 경고만 하고 계속 진행 (부분 성공)
-      console.warn(
-        'Trends fetch failed, proceeding without trends data:',
-        error
-      )
-    }
-
-    // 3. 지표 계산
-    const metrics = calculateMetrics(stockData.priceData)
-    const weeklyOHLC = getWeeklyOHLC(stockData.priceData)
-
-    // 4. DB 저장 (어댑터가 내부적으로 트랜잭션 처리)
-    const now = new Date()
-
-    const searchRecord: SearchRecord = {
-      id: crypto.randomUUID(),
-      ticker: validatedTicker,
-      company_name: stockData.companyName,
-      currency: stockData.currency,
-      weekly_open: weeklyOHLC.open,
-      weekly_high: weeklyOHLC.high,
-      weekly_low: weeklyOHLC.low,
-      current_price: metrics.currentPrice,
-      previous_close: metrics.previousClose,
-      ma13: metrics.ma13,
-      yoy_change: metrics.yoyChange,
-      price_data: stockData.priceData,
-      trends_data: trendsData,
-      last_updated_at: now.toISOString(),
-      searched_at: now.toISOString(),
-      created_at: now.toISOString(),
-      user_id: user.id, // 인증된 사용자의 ID 설정
-    }
-
-    // 인증된 클라이언트로 저장 (RLS 적용)
-    const id = await upsertSearch(searchRecord, supabase)
-
-    // 가격 데이터 저장 (stock_price_data 테이블)
-    // 원자성 보장: insertPriceData 실패 시 search 레코드를 롤백하여 데이터 불일치 방지
-    try {
-      await insertPriceData(id, stockData.priceData, supabase)
-    } catch (error) {
-      // 보상 로직: 이미 저장된 search 레코드 삭제
-      await deleteSearch(id, supabase)
-      throw error
-    }
-
-    // 5. 응답
-    return createSuccessResponse(
-      {
-        id,
-        ticker: validatedTicker,
-      },
-      201
+    const savedSearch = await saveStockPreviewAsSearch(
+      supabase,
+      authResult.userId,
+      body.previewId,
+      typeof body.ticker === 'string' ? body.ticker : undefined
     )
+
+    return createSuccessResponse(savedSearch, 201)
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
+    if (error instanceof StockPreviewServiceError) {
+      return createErrorResponse(error.code, error.message, error.status)
+    }
+
     console.error('Error in POST /api/searches:', error)
 
     return createErrorResponse(
-      'SEARCH_FAILED',
-      '종목 조회 중 오류가 발생했습니다.',
-      500,
-      { message }
+      'SAVE_FAILED',
+      '종목 저장 중 오류가 발생했습니다.',
+      500
     )
   }
 }

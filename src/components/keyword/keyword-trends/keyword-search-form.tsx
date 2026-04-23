@@ -10,18 +10,48 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Globe2,
+  ImageIcon,
+  Newspaper,
+  ShoppingBag,
+  Youtube,
+} from 'lucide-react'
+import { GEO_OPTIONS, GPROP_OPTIONS } from '@/lib/constants/trends'
 
-// Timeframe 타입은 keyword-trends-client에서 export 필요하므로,
-// 여기서는 string으로 유지하고 부모에서 타입 강제
+const REGION_FLAG: Record<string, string> = {
+  GLOBAL: '🌐',
+  US: '🇺🇸',
+  KR: '🇰🇷',
+  JP: '🇯🇵',
+  GB: '🇬🇧',
+  DE: '🇩🇪',
+  FR: '🇫🇷',
+  CA: '🇨🇦',
+  AU: '🇦🇺',
+  IN: '🇮🇳',
+  BR: '🇧🇷',
+  CN: '🇨🇳',
+  TW: '🇹🇼',
+  HK: '🇭🇰',
+  SG: '🇸🇬',
+}
+
+const searchTypeIcon = {
+  WEB: Globe2,
+  IMAGES: ImageIcon,
+  NEWS: Newspaper,
+  YOUTUBE: Youtube,
+  SHOPPING: ShoppingBag,
+} as const
+
 interface KeywordSearchFormProps {
   keyword: string
   geo: string
-  timeframe: string
   gprop: string
   isLoading: boolean
   onKeywordChange: (value: string) => void
   onGeoChange: (value: string) => void
-  onTimeframeChange: (value: string) => void
   onGpropChange: (value: string) => void
   onSearch: () => void
 }
@@ -29,12 +59,10 @@ interface KeywordSearchFormProps {
 export default function KeywordSearchForm({
   keyword,
   geo,
-  timeframe,
   gprop,
   isLoading,
   onKeywordChange,
   onGeoChange,
-  onTimeframeChange,
   onGpropChange,
   onSearch,
 }: KeywordSearchFormProps) {
@@ -58,51 +86,45 @@ export default function KeywordSearchForm({
           </Button>
         </div>
 
-        {/* F023: 국가/기간/범위 선택 - Google Trends 스타일 (flex 레이아웃) */}
-        <div className="flex flex-wrap gap-2">
-          <Select
-            value={geo || 'all'}
-            onValueChange={value => onGeoChange(value === 'all' ? '' : value)}
-          >
-            <SelectTrigger className="h-9 min-w-[120px] flex-1">
-              <SelectValue placeholder="국가 선택" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">전체</SelectItem>
-              <SelectItem value="US">미국</SelectItem>
-              <SelectItem value="KR">한국</SelectItem>
-              <SelectItem value="JP">일본</SelectItem>
-              <SelectItem value="CN">중국</SelectItem>
-              <SelectItem value="GB">영국</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="grid gap-4">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Select value={geo} onValueChange={onGeoChange}>
+              <SelectTrigger className="h-10">
+                <SelectValue placeholder="국가 선택" />
+              </SelectTrigger>
+              <SelectContent>
+                {GEO_OPTIONS.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    <span className="inline-flex items-center gap-2">
+                      <span aria-hidden="true">
+                        {REGION_FLAG[option.value]}
+                      </span>
+                      <span>{option.label}</span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          <Select value={timeframe} onValueChange={onTimeframeChange}>
-            <SelectTrigger className="h-9 min-w-[100px] flex-1">
-              <SelectValue placeholder="기간 선택" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="w">1주</SelectItem>
-              <SelectItem value="1y">1년</SelectItem>
-              <SelectItem value="2y">2년</SelectItem>
-              <SelectItem value="3y">3년</SelectItem>
-              <SelectItem value="4y">4년</SelectItem>
-              <SelectItem value="5y">5년</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={gprop || 'web'}
-            onValueChange={value => onGpropChange(value === 'web' ? '' : value)}
-          >
-            <SelectTrigger className="h-9 min-w-[120px] flex-1">
-              <SelectValue placeholder="검색범위 선택" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="web">웹 검색</SelectItem>
-              <SelectItem value="youtube">유튜브</SelectItem>
-            </SelectContent>
-          </Select>
+            <Select value={gprop} onValueChange={onGpropChange}>
+              <SelectTrigger className="h-10">
+                <SelectValue placeholder="검색범위 선택" />
+              </SelectTrigger>
+              <SelectContent>
+                {GPROP_OPTIONS.map(option => {
+                  const Icon = searchTypeIcon[option.value]
+                  return (
+                    <SelectItem key={option.value} value={option.value}>
+                      <span className="inline-flex items-center gap-2">
+                        <Icon className="h-4 w-4" />
+                        <span>{option.label}</span>
+                      </span>
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </CardContent>
     </Card>

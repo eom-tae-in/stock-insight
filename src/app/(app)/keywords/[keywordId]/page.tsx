@@ -1,8 +1,8 @@
 /**
  * 키워드 분석 페이지 (재설계)
- * Route: /keywords/[keywordId]?region=GLOBAL&period=5Y&searchType=WEB
+ * Route: /keywords/[keywordId]?region=GLOBAL&searchType=WEB
  *
- * 조건 조합(region, period, searchType) 기준의 분석 데이터 조회
+ * 조건 조합(region, searchType) 기준의 5Y 분석 데이터 조회
  */
 
 import { redirect } from 'next/navigation'
@@ -16,9 +16,30 @@ export const metadata = {
   description: '키워드 분석 페이지',
 }
 
-const validRegions: Region[] = ['GLOBAL', 'US', 'KR', 'JP', 'CN']
-const validPeriods: Period[] = ['1Y', '3Y', '5Y']
-const validSearchTypes: SearchType[] = ['WEB', 'YOUTUBE']
+const validRegions: Region[] = [
+  'GLOBAL',
+  'US',
+  'KR',
+  'JP',
+  'GB',
+  'DE',
+  'FR',
+  'CA',
+  'AU',
+  'IN',
+  'BR',
+  'CN',
+  'TW',
+  'HK',
+  'SG',
+]
+const validSearchTypes: SearchType[] = [
+  'WEB',
+  'IMAGES',
+  'NEWS',
+  'YOUTUBE',
+  'SHOPPING',
+]
 
 export default async function KeywordDetailPage({
   params,
@@ -49,15 +70,11 @@ export default async function KeywordDetailPage({
 
   // 쿼리 파라미터에서 필터 추출 (유효성 검사)
   const regionParam = (resolvedSearchParams.region as string) || 'GLOBAL'
-  const periodParam = (resolvedSearchParams.period as string) || '5Y'
   const searchTypeParam = (resolvedSearchParams.searchType as string) || 'WEB'
 
   const region: Region = validRegions.includes(regionParam as Region)
     ? (regionParam as Region)
     : 'GLOBAL'
-  const period: Period = validPeriods.includes(periodParam as Period)
-    ? (periodParam as Period)
-    : '5Y'
   const searchType: SearchType = validSearchTypes.includes(
     searchTypeParam as SearchType
   )
@@ -70,7 +87,7 @@ export default async function KeywordDetailPage({
       keyword={keyword}
       initialSearchParams={{
         region,
-        period,
+        period: '5Y' as Period,
         searchType,
       }}
     />

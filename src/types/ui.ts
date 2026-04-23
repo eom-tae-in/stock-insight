@@ -142,7 +142,7 @@ export interface CustomTable {
 export interface CustomTableBuilderProps {
   searchId: string
   priceData: PriceDataPoint[]
-  trendsData: TrendsDataPoint[]
+  trendsData?: TrendsDataPoint[]
   ma13?: (number | null)[]
   onTableCreated?: (table: CustomTable) => void
 }

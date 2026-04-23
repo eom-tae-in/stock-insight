@@ -75,7 +75,7 @@ Supabase Auth callback은 유지한다.
 
 ### Stocks
 
-저장 종목은 `/api/searches`, 외부 종목 검색은 `/api/stocks/search`, 저장 없는 주가 미리보기는 `/api/stocks/[ticker]`로 분리한다.
+저장 종목은 `/api/searches`, 저장 전 분석 미리보기는 `/api/stock-previews`, 외부 종목 검색은 `/api/stocks/search`, 키워드 오버레이용 주가 미리보기는 `/api/stocks/[ticker]`로 분리한다.
 
 목표:
 
@@ -84,18 +84,26 @@ Supabase Auth callback은 유지한다.
 | `GET`  | `/api/stocks/search?q=...` | 외부 ticker/company 검색     |
 | `GET`  | `/api/stocks/[ticker]`     | 외부 종목 메타/주가 미리보기 |
 
+### Stock Previews
+
+저장 전 종목 분석은 임시 preview 리소스로 다룬다. preview 데이터는 Redis에 TTL 기반으로 보관하며, 저장 버튼을 누르면 `/api/searches`가 preview를 저장 종목으로 승격한다.
+
+| Method | Route                 | 설명                             |
+| ------ | --------------------- | -------------------------------- |
+| `POST` | `/api/stock-previews` | ticker 수집 후 임시 preview 생성 |
+
 ### Saved Stock Searches
 
 현재 `searches`는 저장된 종목 리소스다. 이름은 장기적으로 `saved-stocks` 또는 `watchlist-items`가 더 명확하지만, 기존 URL 호환을 고려해 먼저 내부 구조를 정리한다.
 
 현재 유지:
 
-| Method   | Route                | 설명                |
-| -------- | -------------------- | ------------------- |
-| `GET`    | `/api/searches`      | 저장 종목 목록 조회 |
-| `POST`   | `/api/searches`      | ticker 수집 후 저장 |
-| `GET`    | `/api/searches/[id]` | 저장 종목 상세 조회 |
-| `DELETE` | `/api/searches/[id]` | 저장 종목 삭제      |
+| Method   | Route                | 설명                         |
+| -------- | -------------------- | ---------------------------- |
+| `GET`    | `/api/searches`      | 저장 종목 목록 조회          |
+| `POST`   | `/api/searches`      | preview를 저장 종목으로 생성 |
+| `GET`    | `/api/searches/[id]` | 저장 종목 상세 조회          |
+| `DELETE` | `/api/searches/[id]` | 저장 종목 삭제               |
 
 추후 검토:
 
@@ -139,6 +147,10 @@ legacy:
 ### Keyword Analyses
 
 조건 조합별 분석은 keyword의 하위 리소스로 표현한다.
+
+프론트와 DB는 pytrends 값을 직접 저장하지 않고 내부 표준값을 저장한다. 예를 들어 `GLOBAL`, `5Y`, `WEB`처럼 대문자 값을 API에 전달하고, 서버는 `src/lib/parsers/trends-parsers.ts`에서 pytrends 요청값인 `''`, `today 5-y`, `''`로 변환한다. 프론트 옵션, API body/query, DB 저장값은 이 parser 입력값과 싱크를 맞춘다.
+
+pytrends 조회 결과는 키워드 엔티티가 아니라 조회 결과 캐시로만 Redis에 저장한다. 캐시 키는 정규화된 키워드, region, period, search type, 완료된 전주 week key를 포함하며 기본 TTL은 24시간이다.
 
 목표:
 

@@ -8,6 +8,7 @@ type KeywordRow = {
   name: string
   normalized_name: string | null
   created_at: string
+  display_order: number | null
 }
 
 function toKeywordRecord(row: KeywordRow): KeywordRecord {
@@ -22,6 +23,7 @@ function toKeywordRecord(row: KeywordRow): KeywordRecord {
     searched_at: row.created_at,
     created_at: row.created_at,
     updated_at: row.created_at,
+    display_order: row.display_order ?? 0,
     last_viewed_at: null,
   }
 }
@@ -32,8 +34,9 @@ export async function getKeywords(
 ): Promise<KeywordRecord[]> {
   const { data, error } = await supabase
     .from('keywords')
-    .select('id, user_id, name, normalized_name, created_at')
+    .select('id, user_id, name, normalized_name, created_at, display_order')
     .eq('user_id', userId)
+    .order('display_order', { ascending: true })
     .order('created_at', { ascending: false })
 
   if (error) throw error
@@ -48,7 +51,7 @@ export async function getKeyword(
 ): Promise<KeywordRecord | null> {
   const { data, error } = await supabase
     .from('keywords')
-    .select('id, user_id, name, normalized_name, created_at')
+    .select('id, user_id, name, normalized_name, created_at, display_order')
     .eq('id', keywordId)
     .eq('user_id', userId)
     .single()
@@ -70,17 +73,39 @@ export async function upsertKeyword(
     throw new Error('KEYWORD_REQUIRED')
   }
 
+  const { data: existing, error: existingError } = await supabase
+    .from('keywords')
+    .select('id, user_id, name, normalized_name, created_at, display_order')
+    .eq('user_id', userId)
+    .eq('normalized_name', normalizedKeyword)
+    .single()
+
+  if (existingError && existingError.code !== 'PGRST116') throw existingError
+  if (existing) return toKeywordRecord(existing as KeywordRow)
+
+  const { data: orderRows, error: orderError } = await supabase
+    .from('keywords')
+    .select('display_order')
+    .eq('user_id', userId)
+    .order('display_order', { ascending: false })
+    .limit(1)
+
+  if (orderError) throw orderError
+
+  const nextDisplayOrder =
+    orderRows && orderRows.length > 0
+      ? Number(orderRows[0].display_order ?? 0) + 1
+      : 1
+
   const { data, error } = await supabase
     .from('keywords')
-    .upsert(
-      {
-        user_id: userId,
-        name: normalizedKeyword,
-        normalized_name: normalizedKeyword,
-      },
-      { onConflict: 'user_id,normalized_name' }
-    )
-    .select('id, user_id, name, normalized_name, created_at')
+    .insert({
+      user_id: userId,
+      name: normalizedKeyword,
+      normalized_name: normalizedKeyword,
+      display_order: nextDisplayOrder,
+    })
+    .select('id, user_id, name, normalized_name, created_at, display_order')
     .single()
 
   if (error) throw error
@@ -108,13 +133,51 @@ export async function updateKeyword(
     })
     .eq('id', keywordId)
     .eq('user_id', userId)
-    .select('id, user_id, name, normalized_name, created_at')
+    .select('id, user_id, name, normalized_name, created_at, display_order')
     .single()
 
   if (error?.code === 'PGRST116') return null
   if (error) throw error
 
   return toKeywordRecord(data as KeywordRow)
+}
+
+export async function reorderKeywords(
+  supabase: SupabaseClient,
+  userId: string,
+  orderedIds: string[]
+): Promise<void> {
+  if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
+    throw new Error('INVALID_ORDER')
+  }
+
+  const uniqueIds = Array.from(new Set(orderedIds))
+  if (uniqueIds.length !== orderedIds.length) {
+    throw new Error('DUPLICATE_KEYWORD_ID')
+  }
+
+  const { data: ownedKeywords, error: ownedError } = await supabase
+    .from('keywords')
+    .select('id')
+    .eq('user_id', userId)
+    .in('id', orderedIds)
+
+  if (ownedError) throw ownedError
+  if ((ownedKeywords ?? []).length !== orderedIds.length) {
+    throw new Error('KEYWORD_OWNERSHIP_MISMATCH')
+  }
+
+  const updates = orderedIds.map((id, index) =>
+    supabase
+      .from('keywords')
+      .update({ display_order: index + 1 })
+      .eq('id', id)
+      .eq('user_id', userId)
+  )
+
+  const results = await Promise.all(updates)
+  const failed = results.find(result => result.error)
+  if (failed?.error) throw failed.error
 }
 
 export async function deleteKeyword(

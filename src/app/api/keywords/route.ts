@@ -51,7 +51,6 @@ export async function POST(request: NextRequest) {
       keyword?: string
       region?: Region
       search_type?: SearchType
-      period?: Period
       chartData?: Array<{
         date: string
         trendsValue: number
@@ -76,7 +75,7 @@ export async function POST(request: NextRequest) {
     )
     const region: Region = body.region ?? 'GLOBAL'
     const searchType: SearchType = body.search_type ?? 'WEB'
-    const period: Period = body.period ?? '5Y'
+    const period: Period = '5Y'
 
     if (body.chartData && body.chartData.length > 0) {
       await createKeywordAnalysis(

@@ -1,79 +1,52 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import KeywordSearchForm from '../keyword-trends/keyword-search-form'
-import { apiFetchJson } from '@/lib/fetch-client'
 import {
-  TIMEFRAMES,
-  DEFAULT_TIMEFRAME,
-  type Timeframe,
+  GEO_OPTIONS,
+  GPROP_OPTIONS,
+  DEFAULT_GEO,
+  DEFAULT_TIMEFRAME_VALUE,
+  DEFAULT_GPROP,
+  type GeoValue,
+  type GpropValue,
 } from '@/lib/constants/trends'
-import type { KeywordRecord } from '@/types/database'
 import { normalizeKeywordSpacing } from '@/lib/utils/keyword-normalization'
 
 export default function KeywordSearchPageClient() {
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [keyword, setKeyword] = useState('')
-  const [geo, setGeo] = useState('')
-  const [timeframe, setTimeframe] = useState<Timeframe | 'custom'>(
-    DEFAULT_TIMEFRAME
-  )
-  const [gprop, setGprop] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const [geo, setGeo] = useState<GeoValue>(DEFAULT_GEO)
+  const [gprop, setGprop] = useState<GpropValue>(DEFAULT_GPROP)
 
-  const handleSearch = async () => {
+  // URL 파라미터에서 키워드 자동 채우기
+  useEffect(() => {
+    const keywordParam = searchParams.get('keyword')
+    if (keywordParam) {
+      setKeyword(decodeURIComponent(keywordParam))
+    }
+  }, [searchParams])
+
+  const handleSearch = () => {
     const trimmedKeyword = normalizeKeywordSpacing(keyword)
     if (!trimmedKeyword) {
       toast.error('키워드를 입력해주세요')
       return
     }
 
-    setIsLoading(true)
-
-    try {
-      // 1단계: 기존 키워드 확인
-      const res = await apiFetchJson('/api/keywords')
-      const keywords = Array.isArray(res)
-        ? res
-        : ((res as Record<string, unknown>)?.data as unknown) || res
-
-      if (!Array.isArray(keywords)) {
-        throw new Error('Invalid response format')
-      }
-
-      const existingKeyword = keywords.find(
-        (k: KeywordRecord) =>
-          normalizeKeywordSpacing(k.keyword) === trimmedKeyword
-      )
-
-      // 2단계: 기존 키워드가 있으면 상세 페이지로 이동
-      if (existingKeyword) {
-        toast.success('이미 저장된 키워드입니다')
-        router.push(`/keywords/${existingKeyword.id}`)
-        return
-      }
-
-      // 3단계: 새 키워드면 검색 페이지로 이동
-      const params = new URLSearchParams({
-        keyword: trimmedKeyword,
-        ...(geo && { geo }),
-        ...(timeframe !== DEFAULT_TIMEFRAME && {
-          timeframe: timeframe as string,
-        }),
-        ...(gprop && { gprop }),
-      })
-
-      router.push(`/trends/search?${params.toString()}`)
-    } catch (error) {
-      console.error('[handleSearch] 에러:', error)
-      toast.error('검색 중 오류가 발생했습니다')
-    } finally {
-      setIsLoading(false)
-    }
+    // /new는 순수 입력/이동만 담당하고 실제 조회는 /search에서 REST API로 수행한다.
+    // 조회 조건(keyword, geo, gprop)을 URL query로 전달한다.
+    // 분석 원본 데이터 범위는 항상 5Y로 고정한다.
+    router.push(
+      `/keyword-analysis/search?keyword=${encodeURIComponent(
+        trimmedKeyword
+      )}&geo=${geo}&timeframe=${DEFAULT_TIMEFRAME_VALUE}&gprop=${gprop}`
+    )
   }
 
   return (
@@ -82,7 +55,7 @@ export default function KeywordSearchPageClient() {
         {/* 뒤로가기 */}
         <div className="mb-8">
           <a
-            href="/trends"
+            href="/keyword-analysis"
             className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm transition-colors"
           >
             ← 내 키워드로 돌아가기
@@ -103,18 +76,23 @@ export default function KeywordSearchPageClient() {
             <KeywordSearchForm
               keyword={keyword}
               geo={geo}
-              timeframe={timeframe as string}
               gprop={gprop}
-              isLoading={isLoading}
+              isLoading={false}
               onKeywordChange={setKeyword}
-              onGeoChange={setGeo}
-              onTimeframeChange={(tf: string) => {
-                const validTimeframe = TIMEFRAMES.includes(tf as Timeframe)
-                  ? (tf as Timeframe)
-                  : DEFAULT_TIMEFRAME
-                setTimeframe(validTimeframe)
+              onGeoChange={(geoValue: string) => {
+                const validGeo = GEO_OPTIONS.some(opt => opt.value === geoValue)
+                  ? (geoValue as GeoValue)
+                  : DEFAULT_GEO
+                setGeo(validGeo)
               }}
-              onGpropChange={setGprop}
+              onGpropChange={(gpropValue: string) => {
+                const validGprop = GPROP_OPTIONS.some(
+                  opt => opt.value === gpropValue
+                )
+                  ? (gpropValue as GpropValue)
+                  : DEFAULT_GPROP
+                setGprop(validGprop)
+              }}
               onSearch={handleSearch}
             />
           </CardContent>

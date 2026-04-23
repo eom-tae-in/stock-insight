@@ -8,7 +8,10 @@
  * - 날짜 정규화 (ISO week 기준 → 월요일)
  */
 
-import { fetchInternalTrendsData } from '@/server/trends-internal-service'
+import {
+  fetchInternalTrendsData,
+  buildTrendsDataWithIndicators,
+} from '@/server/trends-internal-service'
 import type { TrendsDataPoint } from '@/types'
 
 export interface TrendsDataResult {
@@ -18,25 +21,25 @@ export interface TrendsDataResult {
 
 /**
  * Python Trends 스크립트 호출
+ *
+ * @param keyword 검색 키워드
+ * @param geo 지역 코드 (예: 'US', 'KR', 기본값: '' = 전체)
+ * @param timeframe pytrends 형식 기간 (예: 'today 5-y', 기본값: 'today 5-y')
+ * @param gprop 검색 범위 (예: '', 'news', 'youtube', 기본값: '' = 웹)
  */
 export async function callPyTrendsAPI(
   keyword: string,
   geo: string = '',
-  timeframe: string = '5y',
+  timeframe: string = 'today 5-y',
   gprop: string = ''
 ): Promise<TrendsDataPoint[]> {
-  const data = await fetchInternalTrendsData({ keyword, geo, timeframe, gprop })
+  const rawData = await fetchInternalTrendsData({ keyword, geo, timeframe, gprop })
 
-  if (data.length === 0) {
+  if (rawData.length === 0) {
     throw new Error('No valid trends data points')
   }
 
-  return data.map(point => ({
-    date: point.date,
-    value: point.value,
-    ma13Value: null,
-    yoyValue: null,
-  }))
+  return buildTrendsDataWithIndicators(rawData)
 }
 
 /**

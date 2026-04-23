@@ -1,7 +1,7 @@
 /**
  * RESTful keyword analyses route.
  *
- * GET /api/keywords/[keywordId]/analyses?region=GLOBAL&period=5Y&searchType=WEB
+ * GET /api/keywords/[keywordId]/analyses?region=GLOBAL&searchType=WEB
  * POST /api/keywords/[keywordId]/analyses
  */
 
@@ -18,7 +18,7 @@ import {
   getKeywordAnalysis,
   getKeywordAnalysesList,
 } from '@/server/keyword-analyses-service'
-import type { Period, Region, SearchType } from '@/types/database'
+import type { Region, SearchType } from '@/types/database'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,10 +46,9 @@ export async function GET(
     const { searchParams } = request.nextUrl
 
     const regionParam = searchParams.get('region')
-    const periodParam = searchParams.get('period')
     const searchTypeParam = searchParams.get('searchType')
 
-    if (!regionParam || !periodParam || !searchTypeParam) {
+    if (!regionParam || !searchTypeParam) {
       const analysesList = await getKeywordAnalysesList(
         supabase,
         authResult.userId,
@@ -63,7 +62,7 @@ export async function GET(
       authResult.userId,
       keywordId,
       regionParam as Region,
-      periodParam as Period,
+      '5Y',
       searchTypeParam as SearchType
     )
 
@@ -93,7 +92,6 @@ export async function POST(
       {
         keyword: body.keyword,
         region: body.region,
-        period: body.period,
         search_type: body.search_type,
       }
     )

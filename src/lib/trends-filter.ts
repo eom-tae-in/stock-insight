@@ -26,18 +26,6 @@ export function filterTrendsByDays(
 }
 
 /**
- * 최근 N개 포인트 반환 ('주간' 처리용)
- * 5년 데이터는 주간 단위이므로, 최근 4개 포인트 = 약 4주
- */
-export function filterTrendsByCount(
-  allData: TrendsDataPoint[],
-  count: number
-): TrendsDataPoint[] {
-  if (allData.length === 0) return []
-  return allData.slice(Math.max(0, allData.length - count))
-}
-
-/**
  * timeframe 분기 통합 필터링
  * 주어진 timeframe과 customWeeks에 따라 적절한 필터링 적용
  */
@@ -53,11 +41,6 @@ export function filterTrendsForTimeframe(
   if (timeframe === 'custom') {
     const weeks = Math.max(1, customWeeks ?? 26)
     return filterTrendsByDays(allData, weeks * 7)
-  }
-
-  // 최근 4주 (약 4개 포인트)
-  if (timeframe === 'w') {
-    return filterTrendsByCount(allData, 4)
   }
 
   // 표준 타임프레임 (1y, 2y, 3y, 4y, 5y)

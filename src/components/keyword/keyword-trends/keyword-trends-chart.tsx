@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import {
   ComposedChart,
   Line,
@@ -14,7 +14,16 @@ import {
 import { format, parseISO, differenceInDays } from 'date-fns'
 import type { TrendsDataPoint, SearchRecord } from '@/types/database'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { OVERLAY_COLORS } from '@/lib/constants/trends'
+
+type KeywordSeriesKey = 'trendsValue' | 'ma13' | 'yoyValue'
+
+const KEYWORD_SERIES_LABELS: Record<KeywordSeriesKey, string> = {
+  trendsValue: '검색량 기반',
+  ma13: '13주 이동평균(13주 MA)',
+  yoyValue: '전년동기 대비 증감률(52주 YoY)',
+}
 
 /**
  * 날짜 범위 기반으로 X축 interval을 동적 계산
@@ -70,6 +79,23 @@ export default function KeywordTrendsChart({
   ma13Values,
   yoyValuesArray,
 }: KeywordTrendsChartProps) {
+  const [visibleSeries, setVisibleSeries] = useState<
+    Record<KeywordSeriesKey, boolean>
+  >({
+    trendsValue: true,
+    ma13: true,
+    yoyValue: true,
+  })
+
+  const hasYoYData = Boolean(yoyValuesArray?.some(v => v !== null))
+
+  const toggleSeries = (series: KeywordSeriesKey) => {
+    setVisibleSeries(prev => ({
+      ...prev,
+      [series]: !prev[series],
+    }))
+  }
+
   // P0-4 / P1-10: 오버레이별 Map 미리 계산 (O(n²) → O(n+m))
   // Google Trends(주 단위) ↔ Yahoo Finance(일 단위) 날짜 매칭
   const overlayMaps = useMemo(
@@ -174,7 +200,45 @@ export default function KeywordTrendsChart({
       <CardHeader>
         <CardTitle>트렌드 분석 차트</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            onClick={() => toggleSeries('trendsValue')}
+            variant={visibleSeries.trendsValue ? 'default' : 'outline'}
+            size="sm"
+            className={
+              visibleSeries.trendsValue ? 'bg-blue-500 hover:bg-blue-600' : ''
+            }
+          >
+            {KEYWORD_SERIES_LABELS.trendsValue}
+          </Button>
+          <Button
+            type="button"
+            onClick={() => toggleSeries('ma13')}
+            variant={visibleSeries.ma13 ? 'default' : 'outline'}
+            size="sm"
+            className={
+              visibleSeries.ma13 ? 'bg-orange-500 hover:bg-orange-600' : ''
+            }
+          >
+            {KEYWORD_SERIES_LABELS.ma13}
+          </Button>
+          {hasYoYData && (
+            <Button
+              type="button"
+              onClick={() => toggleSeries('yoyValue')}
+              variant={visibleSeries.yoyValue ? 'default' : 'outline'}
+              size="sm"
+              className={
+                visibleSeries.yoyValue ? 'bg-pink-500 hover:bg-pink-600' : ''
+              }
+            >
+              {KEYWORD_SERIES_LABELS.yoyValue}
+            </Button>
+          )}
+        </div>
+
         <ResponsiveContainer width="100%" height={400}>
           <ComposedChart
             data={chartData}
@@ -187,31 +251,32 @@ export default function KeywordTrendsChart({
               interval={xAxisInterval}
             />
 
-            {/* 왼쪽 Y축: 트렌드 지수 (0-100) */}
+            {/* 왼쪽 Y축: 검색량 기반 지수 (0-100) */}
             <YAxis
               yAxisId="left"
               domain={[0, 100]}
               tick={{ fontSize: 12, fill: 'hsl(var(--foreground))' }}
               label={{
-                value: '트렌드 지수 (0-100)',
+                value: '검색량 기반 (0-100)',
                 angle: -90,
                 position: 'insideLeft',
                 fill: 'hsl(var(--foreground))',
               }}
             />
 
-            {/* 오른쪽 Y축: 항상 52주 YoY (%) */}
-            <YAxis
-              yAxisId="right"
-              orientation="right"
-              tick={{ fontSize: 12, fill: 'hsl(var(--foreground))' }}
-              label={{
-                value: '52주 YoY (%)',
-                angle: 90,
-                position: 'insideRight',
-                fill: 'hsl(var(--foreground))',
-              }}
-            />
+            {visibleSeries.yoyValue && hasYoYData && (
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                tick={{ fontSize: 12, fill: 'hsl(var(--foreground))' }}
+                label={{
+                  value: '52주 YoY (%)',
+                  angle: 90,
+                  position: 'insideRight',
+                  fill: 'hsl(var(--foreground))',
+                }}
+              />
+            )}
 
             {/* P1-10: Tooltip - O(n) find 제거, Map O(1) 조회 */}
             <Tooltip
@@ -233,37 +298,41 @@ export default function KeywordTrendsChart({
             <Legend />
 
             {/* 트렌드 라인 */}
-            <Line
-              yAxisId="left"
-              type="monotone"
-              dataKey="trendsValue"
-              stroke="#3b82f6"
-              name="트렌드 지수"
-              dot={false}
-              strokeWidth={2}
-              isAnimationActive={false}
-            />
+            {visibleSeries.trendsValue && (
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="trendsValue"
+                stroke="#3b82f6"
+                name={KEYWORD_SERIES_LABELS.trendsValue}
+                dot={false}
+                strokeWidth={2}
+                isAnimationActive={false}
+              />
+            )}
 
             {/* MA13 라인 */}
-            <Line
-              yAxisId="left"
-              type="monotone"
-              dataKey="ma13"
-              stroke="#f97316"
-              name="13주 이동평균"
-              dot={false}
-              strokeWidth={2}
-              isAnimationActive={false}
-            />
+            {visibleSeries.ma13 && (
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="ma13"
+                stroke="#f97316"
+                name={KEYWORD_SERIES_LABELS.ma13}
+                dot={false}
+                strokeWidth={2}
+                isAnimationActive={false}
+              />
+            )}
 
             {/* 52주 YoY 라인 */}
-            {yoyValuesArray && yoyValuesArray.some(v => v !== null) && (
+            {visibleSeries.yoyValue && hasYoYData && (
               <Line
                 yAxisId="right"
                 type="monotone"
                 dataKey="yoyValue"
                 stroke="#ec4899"
-                name="52주 YoY"
+                name={KEYWORD_SERIES_LABELS.yoyValue}
                 dot={false}
                 strokeWidth={2}
                 isAnimationActive={false}
@@ -289,18 +358,23 @@ export default function KeywordTrendsChart({
 
         {/* 범례 설명 */}
         <div className="text-muted-foreground mt-6 space-y-2 text-sm">
-          <p>
-            <span className="mr-2 inline-block h-0.5 w-8 bg-blue-500" />
-            트렌드 지수: Google Trends 검색 관심도 (0-100)
-          </p>
-          <p>
-            <span className="mr-2 inline-block h-0.5 w-8 bg-orange-500" />
-            13주 이동평균: 트렌드 지수의 13주 이동평균
-          </p>
-          {yoyValuesArray && yoyValuesArray.some(v => v !== null) && (
+          {visibleSeries.trendsValue && (
+            <p>
+              <span className="mr-2 inline-block h-0.5 w-8 bg-blue-500" />
+              검색량 기반: Google Trends 검색 관심도 (0-100)
+            </p>
+          )}
+          {visibleSeries.ma13 && (
+            <p>
+              <span className="mr-2 inline-block h-0.5 w-8 bg-orange-500" />
+              13주 이동평균(13주 MA): 검색량 기반 값의 13주 이동평균
+            </p>
+          )}
+          {visibleSeries.yoyValue && hasYoYData && (
             <p>
               <span className="mr-2 inline-block h-0.5 w-8 bg-pink-500" />
-              52주 YoY: 52주 전 대비 트렌드 지수 변화율 (%)
+              전년동기 대비 증감률(52주 YoY): 52주 전 대비 검색량 기반 값의
+              변화율 (%)
             </p>
           )}
           {overlays.map((search, idx) => (

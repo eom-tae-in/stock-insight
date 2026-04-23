@@ -10,19 +10,17 @@ import type {
   TrendsDataPoint,
 } from '@/types/database'
 import { calculateTrendsMA13, calculateTrendsYoY } from '@/lib/indicators'
-import { apiFetch, apiFetchJson } from '@/lib/fetch-client'
+import { ApiRequestError, apiFetch, apiFetchJson } from '@/lib/fetch-client'
 import { filterTrendsForTimeframe } from '@/lib/trends-filter'
 import { normalizeKeywordSpacing } from '@/lib/utils/keyword-normalization'
-import { searchKeywordWithCache } from '@/app/actions/keyword-actions'
-import { getTrendsErrorMessage } from '@/types/trends-error'
-import { createBrowserClient } from '@supabase/ssr'
 import KeywordTrendsChart from './keyword-trends-chart'
 import {
   TIMEFRAMES,
   TIMEFRAME_LABELS,
+  TIMEFRAME_MAX_WEEKS,
+  TIMEFRAME_VALUE_MAX_WEEKS,
   DEFAULT_TIMEFRAME,
   GEO_OPTIONS,
-  TIMEFRAME_OPTIONS,
   GPROP_OPTIONS,
   DEFAULT_GEO,
   DEFAULT_TIMEFRAME_VALUE,
@@ -105,7 +103,16 @@ export default function KeywordTrendsClient() {
   const [customWeeks, setCustomWeeks] = useState(26)
   const [customWeeksInput, setCustomWeeksInput] = useState('26')
 
-  // 페이지 진입 시: URL 파라미터 읽기 + Server Action으로 데이터 조회
+  const searchTimeframeValue = DEFAULT_TIMEFRAME_VALUE
+
+  const maxCustomWeeks = TIMEFRAME_VALUE_MAX_WEEKS[searchTimeframeValue]
+
+  const availableTimeframes = useMemo(
+    () => TIMEFRAMES.filter(tf => TIMEFRAME_MAX_WEEKS[tf] <= maxCustomWeeks),
+    [maxCustomWeeks]
+  )
+
+  // 페이지 진입 시: URL 파라미터 읽기 + REST API로 데이터 조회
   // URL은 single source of truth → state 변경 시 URL 동기화 안 함
   useEffect(() => {
     // 1️⃣ URL 파라미터 읽기 (URL을 유일한 정보원으로 사용)
@@ -117,16 +124,13 @@ export default function KeywordTrendsClient() {
         ? (geoParam as GeoValue)
         : DEFAULT_GEO
 
-    const timeframeParam = searchParams.get('timeframe')
-    const tfValue: TimeframeValue =
-      timeframeParam &&
-      TIMEFRAME_OPTIONS.some(opt => opt.value === timeframeParam)
-        ? (timeframeParam as TimeframeValue)
-        : DEFAULT_TIMEFRAME_VALUE
+    const tfValue: TimeframeValue = DEFAULT_TIMEFRAME_VALUE
 
     // TimeframeValue (대문자: 5Y) → Timeframe (소문자: 5y) 정규화
     const timeframeMap: Record<TimeframeValue, Timeframe | 'custom'> = {
-      '4W': 'w',
+      '1M': 'custom',
+      '3M': 'custom',
+      '12M': '1y',
       '1Y': '1y',
       '2Y': '2y',
       '3Y': '3y',
@@ -134,6 +138,7 @@ export default function KeywordTrendsClient() {
       '5Y': '5y',
     }
     const tf = timeframeMap[tfValue]
+    const maxWeeksForSearch = TIMEFRAME_VALUE_MAX_WEEKS[tfValue]
 
     const gpropParam = searchParams.get('gprop')
     const gprop: GpropValue =
@@ -151,59 +156,51 @@ export default function KeywordTrendsClient() {
       gprop,
     }))
     setTimeframe(tf)
+    if (tf === 'custom') {
+      setCustomWeeks(maxWeeksForSearch)
+      setCustomWeeksInput(String(maxWeeksForSearch))
+    }
 
-    // 3️⃣ Server Action으로 데이터 조회
+    // 3️⃣ REST API로 데이터 조회
     const fetchTrendsData = async () => {
       try {
         setState(prev => ({ ...prev, isLoading: true }))
 
-        const supabase = createBrowserClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-        )
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
-
-        if (!user?.id) {
-          toast.error('로그인이 필요합니다')
-          return
-        }
-
-        console.log(
-          `[keyword-trends-client] 데이터 조회: "${keyword}", geo="${geo}", timeframe="${tfValue}", gprop="${gprop}"`
-        )
-
-        const result = await searchKeywordWithCache(
+        const params = new URLSearchParams({
           keyword,
-          user.id,
           geo,
-          tfValue,
-          gprop
-        )
+          timeframe: tfValue,
+          gprop,
+        })
+        const result = await apiFetchJson<{
+          trendsData: TrendsDataPoint[]
+          keyword: string
+        }>(`/api/trends?${params.toString()}`)
 
-        if (result.status === 'error') {
-          const errorMessage = result.error
-            ? getTrendsErrorMessage(result.error)
-            : '데이터를 가져올 수 없습니다'
-          toast.error(errorMessage)
-          return
-        }
-
-        if (result.trendsData) {
-          console.log(
-            `[keyword-trends-client] 데이터 로드 성공: ${result.trendsData.length}개`
-          )
-          setState(prev => ({
-            ...prev,
-            fullTrendsData: result.trendsData ?? [],
-            selectedSearches: [],
-            isLoading: false,
-          }))
-        }
+        setState(prev => ({
+          ...prev,
+          fullTrendsData: result.trendsData,
+          selectedSearches: [],
+          isLoading: false,
+        }))
       } catch (error) {
         console.error('[keyword-trends-client] 에러:', error)
-        toast.error('데이터 조회 중 오류가 발생했습니다')
+        if (
+          error instanceof ApiRequestError &&
+          error.code === 'PYTRENDS_RATE_LIMIT'
+        ) {
+          toast.error(
+            'Google Trends 요청이 잠시 제한되었습니다. 잠시 후 다시 시도해주세요.'
+          )
+          setState(prev => ({ ...prev, isLoading: false }))
+          return
+        }
+
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : '데이터 조회 중 오류가 발생했습니다'
+        )
         setState(prev => ({ ...prev, isLoading: false }))
       }
     }
@@ -242,13 +239,24 @@ export default function KeywordTrendsClient() {
         // 2단계: 5y 데이터 재조회
         const params = new URLSearchParams({
           keyword: keywordSearch.keyword,
-          geo: '',
-          timeframe: '5y',
-          gprop: '',
+          geo: DEFAULT_GEO,
+          timeframe: DEFAULT_TIMEFRAME_VALUE,
+          gprop: DEFAULT_GPROP,
         })
 
         const res = await apiFetch(`/api/trends?${params.toString()}`)
-        if (!res.ok) throw new Error('Failed to fetch trends')
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}))
+          const errorCode = errorData?.error?.code
+          const errorMessage =
+            errorData?.error?.message ?? 'Failed to fetch trends'
+
+          if (errorCode === 'PYTRENDS_RATE_LIMIT') {
+            throw new ApiRequestError(errorMessage, res.status, errorCode)
+          }
+
+          throw new Error(errorMessage)
+        }
 
         const data = await res.json()
         const raw = data?.data?.trendsData
@@ -266,9 +274,9 @@ export default function KeywordTrendsClient() {
         // URL 업데이트 (keywordId 제거)
         const urlParams = new URLSearchParams({
           keyword: keywordSearch.keyword,
-          geo: '',
-          timeframe: DEFAULT_TIMEFRAME,
-          gprop: '',
+          geo: DEFAULT_GEO,
+          timeframe: DEFAULT_TIMEFRAME_VALUE,
+          gprop: DEFAULT_GPROP,
         })
         router.push(`/keyword-analysis/search?${urlParams.toString()}`)
 
@@ -276,6 +284,16 @@ export default function KeywordTrendsClient() {
       } catch (error) {
         console.error('Error restoring keyword:', error)
         setState(prev => ({ ...prev, isLoading: false }))
+        if (
+          error instanceof ApiRequestError &&
+          error.code === 'PYTRENDS_RATE_LIMIT'
+        ) {
+          toast.error(
+            'Google Trends 요청이 잠시 제한되었습니다. 잠시 후 다시 시도해주세요.'
+          )
+          return
+        }
+
         toast.error('저장된 키워드를 불러오지 못했습니다')
       }
     }
@@ -287,6 +305,12 @@ export default function KeywordTrendsClient() {
   useEffect(() => {
     setCustomWeeksInput(String(customWeeks))
   }, [customWeeks])
+
+  useEffect(() => {
+    if (customWeeks <= maxCustomWeeks) return
+
+    setCustomWeeks(maxCustomWeeks)
+  }, [customWeeks, maxCustomWeeks])
 
   const [deleteDialogId, setDeleteDialogId] = useState<string | null>(null)
 
@@ -372,16 +396,12 @@ export default function KeywordTrendsClient() {
         yoyValue: point.yoyValue,
       }))
 
-      // searchParams에서 timeframe 읽기
-      const timeframeParam =
-        searchParams.get('timeframe') || DEFAULT_TIMEFRAME_VALUE
-
       await apiFetchJson('/api/keywords', {
         method: 'POST',
         body: JSON.stringify({
           keyword: trimmedKeyword,
           region: state.geo,
-          period: timeframeParam,
+          period: DEFAULT_TIMEFRAME_VALUE,
           search_type: state.gprop,
           chartData, // 차트 데이터 포함
         }),
@@ -401,46 +421,6 @@ export default function KeywordTrendsClient() {
     }
   }
 
-  // 필터 변경 시 URL 직접 변경 (사용자 액션 → URL 변경 → GET 발생)
-  const updateUrlIfChanged = (
-    newKeyword: string,
-    newGeo: GeoValue,
-    newTimeframe: TimeframeValue,
-    newGprop: GpropValue
-  ) => {
-    const currentParams = new URLSearchParams(searchParams)
-    const newParams = new URLSearchParams({
-      keyword: newKeyword,
-      geo: newGeo,
-      timeframe: newTimeframe,
-      gprop: newGprop,
-    })
-
-    const currentUrl = currentParams.toString()
-    const newUrl = newParams.toString()
-
-    // URL이 다를 때만 라우트 변경
-    if (currentUrl !== newUrl) {
-      router.replace(`/keyword-analysis/search?${newUrl}`, { scroll: false })
-    }
-  }
-
-  const handleGeoChange = (newGeo: GeoValue) => {
-    const currentTimeframe =
-      (searchParams.get('timeframe') as TimeframeValue) ||
-      DEFAULT_TIMEFRAME_VALUE
-    const currentGprop =
-      (searchParams.get('gprop') as GpropValue) || DEFAULT_GPROP
-    updateUrlIfChanged(state.keyword, newGeo, currentTimeframe, currentGprop)
-  }
-
-  const handleGpropChange = (newGprop: GpropValue) => {
-    const currentTimeframe =
-      (searchParams.get('timeframe') as TimeframeValue) ||
-      DEFAULT_TIMEFRAME_VALUE
-    updateUrlIfChanged(state.keyword, state.geo, currentTimeframe, newGprop)
-  }
-
   // 기간 변경 시 스크롤 위치 유지 (state만 변경, URL은 timeframe 필터링용 state로 관리)
   const handleTimeframeChange = (tf: Timeframe | 'custom') => {
     setTimeframe(tf)
@@ -450,8 +430,8 @@ export default function KeywordTrendsClient() {
   // 커스텀 주 수 적용 — 입력값 검증 후 확정
   const handleApplyCustomWeeks = () => {
     const weeks = parseInt(customWeeksInput, 10)
-    if (isNaN(weeks) || weeks < 1 || weeks > 260) {
-      toast.error('1~260 사이의 숫자를 입력하세요')
+    if (isNaN(weeks) || weeks < 1 || weeks > maxCustomWeeks) {
+      toast.error(`1~${maxCustomWeeks} 사이의 숫자를 입력하세요`)
       setCustomWeeksInput(String(customWeeks))
       return
     }
@@ -528,7 +508,7 @@ export default function KeywordTrendsClient() {
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-muted-foreground text-sm font-medium">
-                    13주 이동평균
+                    13주 이동평균(13주 MA)
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -542,7 +522,7 @@ export default function KeywordTrendsClient() {
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-muted-foreground text-sm font-medium">
-                    52주 YoY
+                    전년동기 대비 증감률(52주 YoY)
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -570,7 +550,7 @@ export default function KeywordTrendsClient() {
               {/* 기간 선택 버튼 + 커스텀 입력 */}
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-2">
-                  {TIMEFRAMES.map(tf => (
+                  {availableTimeframes.map(tf => (
                     <Button
                       key={tf}
                       onClick={() => handleTimeframeChange(tf)}
@@ -585,14 +565,31 @@ export default function KeywordTrendsClient() {
                 {/* 커스텀 기간 입력 - 명시적 적용 */}
                 <div className="flex items-center gap-2">
                   <input
-                    type="number"
-                    min="1"
-                    max="260"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    minLength={1}
+                    maxLength={String(maxCustomWeeks).length}
                     value={customWeeksInput}
                     onChange={e => {
-                      setCustomWeeksInput(e.target.value)
+                      const digitsOnly = e.target.value.replace(/\D/g, '')
+                      if (!digitsOnly) {
+                        setCustomWeeksInput('')
+                        return
+                      }
+
+                      const nextWeeks = Math.min(
+                        Number(digitsOnly),
+                        maxCustomWeeks
+                      )
+                      setCustomWeeksInput(String(nextWeeks))
                     }}
                     onKeyDown={e => {
+                      if (['e', 'E', '+', '-', '.', ','].includes(e.key)) {
+                        e.preventDefault()
+                        return
+                      }
+
                       if (e.key === 'Enter') {
                         handleApplyCustomWeeks()
                       }
@@ -611,7 +608,7 @@ export default function KeywordTrendsClient() {
                   </Button>
                   <span className="text-muted-foreground text-sm">주</span>
                   <span className="text-muted-foreground text-sm">
-                    ({((customWeeks * 7) / 365).toFixed(2)}년)
+                    (최대 {maxCustomWeeks}주)
                   </span>
                 </div>
               </div>
