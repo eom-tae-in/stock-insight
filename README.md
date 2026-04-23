@@ -75,6 +75,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_public_key
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_KEY=your_anon_public_key
 PYTRENDS_INTERNAL_SECRET=replace_with_a_long_random_secret
+# 선택: 로컬 Python 경로를 직접 지정하고 싶을 때만 사용
+PYTRENDS_PYTHON_PATH=
 ```
 
 **설정 정보:**
@@ -91,6 +93,8 @@ PYTRENDS_INTERNAL_SECRET=replace_with_a_long_random_secret
 
 - **Google Trends**: 별도 API 키 불필요
   - 자동으로 검색 관심도 수집
+  - 로컬에서는 `PYTRENDS_PYTHON_PATH`가 있으면 그 Python을 사용하고, 없으면
+    `.venv`, `venv`, 기본 `python3` 순서로 자동 탐색
   - Vercel 배포 시 `/api/pytrends` 내부 호출 보호를 위해
     `PYTRENDS_INTERNAL_SECRET` 값을 Vercel 환경 변수에도 동일하게 설정
 

@@ -1,4 +1,5 @@
 import { execFile } from 'child_process'
+import { existsSync } from 'fs'
 import { promisify } from 'util'
 import path from 'path'
 import { calculateTrendsMA13 } from '@/lib/indicators'
@@ -216,6 +217,31 @@ function isVercelRuntime(): boolean {
   return process.env.VERCEL === '1'
 }
 
+function getLocalPythonPath(): string {
+  const configuredPythonPath = process.env.PYTRENDS_PYTHON_PATH?.trim()
+  if (configuredPythonPath) return configuredPythonPath
+
+  const localPythonCandidates =
+    process.platform === 'win32'
+      ? [
+          path.join(process.cwd(), '.venv', 'Scripts', 'python.exe'),
+          path.join(process.cwd(), 'venv', 'Scripts', 'python.exe'),
+          'python',
+        ]
+      : [
+          path.join(process.cwd(), '.venv', 'bin', 'python3'),
+          path.join(process.cwd(), 'venv', 'bin', 'python3'),
+          'python3',
+        ]
+
+  return (
+    localPythonCandidates.find(candidate => {
+      if (candidate === 'python' || candidate === 'python3') return true
+      return existsSync(candidate)
+    }) ?? 'python3'
+  )
+}
+
 function parseRawTrendsData(data: unknown, source: string) {
   if (!Array.isArray(data)) {
     throw new TrendsProviderError(
@@ -247,7 +273,7 @@ class LocalSpawnTrendsProvider implements TrendsProvider {
     timeframe,
     gprop,
   }: Required<FetchInternalTrendsDataParams>) {
-    const pythonPath = path.join(process.cwd(), '.venv', 'bin', 'python3')
+    const pythonPath = getLocalPythonPath()
     const scriptPath = path.join(process.cwd(), 'src', 'lib', 'get_trends.py')
 
     const { stdout, stderr } = await execFileAsync(pythonPath, [

@@ -93,9 +93,6 @@ export function UnifiedChart({
   currency,
   priceData,
   ma13,
-  // metrics는 타입 정의에만 필요하고 현재 사용하지 않음
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  metrics,
   onDownload,
   initialEnabledSeries,
   timeRange,

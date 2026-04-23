@@ -50,6 +50,10 @@ const envSchema = z.object({
     .string()
     .optional()
     .describe('Vercel /api/pytrends 내부 서버 호출 인증 secret'),
+  PYTRENDS_PYTHON_PATH: z
+    .string()
+    .optional()
+    .describe('로컬 pytrends 실행에 사용할 Python 경로'),
 })
 
 /**
@@ -70,6 +74,7 @@ function validateEnv() {
       TRENDS_CACHE_TTL_SECONDS: process.env.TRENDS_CACHE_TTL_SECONDS,
       PREVIEW_CACHE_TTL_SECONDS: process.env.PREVIEW_CACHE_TTL_SECONDS,
       PYTRENDS_INTERNAL_SECRET: process.env.PYTRENDS_INTERNAL_SECRET,
+      PYTRENDS_PYTHON_PATH: process.env.PYTRENDS_PYTHON_PATH,
     })
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {

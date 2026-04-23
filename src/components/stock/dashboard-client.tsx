@@ -119,8 +119,7 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
         console.error('Failed to restore sort order:', error)
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [initialRecords])
 
   const saveOrder = (nextRecords: SearchRecord[]) => {
     const orderMap: Record<string, number> = {}
