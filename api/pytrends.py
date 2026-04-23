@@ -22,6 +22,13 @@ if _SRC_LIB_DIR not in sys.path:
 from get_trends import TrendsFetchError, get_trends  # noqa: E402
 
 
+def mask_secret(secret):
+    if not secret:
+        return 'missing'
+
+    return f'{secret[:6]}... (len={len(secret)})'
+
+
 class handler(BaseHTTPRequestHandler):
     """Vercel Python Serverless Function Handler"""
 
@@ -29,6 +36,12 @@ class handler(BaseHTTPRequestHandler):
         try:
             internal_secret = os.environ.get('PYTRENDS_INTERNAL_SECRET')
             request_secret = self.headers.get('x-internal-api-secret')
+            print(
+                '[pytrends] auth debug '
+                f'env={mask_secret(internal_secret)} '
+                f'header={mask_secret(request_secret)}',
+                file=sys.stderr
+            )
 
             if not internal_secret:
                 self._send_json(500, {
