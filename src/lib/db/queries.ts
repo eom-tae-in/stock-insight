@@ -64,13 +64,7 @@ export const addStockOverlay = async (
   displayOrder?: number,
   client?: SupabaseClient
 ): Promise<string> =>
-  db.addStockOverlay(
-    keywordSearchId,
-    ticker,
-    companyName,
-    displayOrder,
-    client
-  )
+  db.addStockOverlay(keywordSearchId, ticker, companyName, displayOrder, client)
 
 export const getKeywordStockOverlays = async (
   keywordSearchId: string,
@@ -87,7 +81,8 @@ export const updateStockOverlayOrder = async (
   overlayId: string,
   newDisplayOrder: number,
   client?: SupabaseClient
-): Promise<boolean> => db.updateStockOverlayOrder(overlayId, newDisplayOrder, client)
+): Promise<boolean> =>
+  db.updateStockOverlayOrder(overlayId, newDisplayOrder, client)
 
 // ============ overlay_chart_timeseries (오버레이 시계열) ============
 export const insertOverlayChartTimeseries = async (
@@ -121,36 +116,45 @@ export const getKeywordAnalysisByFilters = async (
   userId?: string,
   client?: SupabaseClient
 ): Promise<KeywordAnalysis | null> =>
-  db.getKeywordAnalysisByFilters(keywordId, region, period, searchType, userId, client)
+  db.getKeywordAnalysisByFilters(
+    keywordId,
+    region,
+    period,
+    searchType,
+    userId,
+    client
+  )
 
 export const getAllKeywordAnalyses = async (
   userId: string,
   client?: SupabaseClient
-): Promise<KeywordAnalysis[]> =>
-  db.getAllKeywordAnalyses(userId, client)
+): Promise<KeywordAnalysis[]> => db.getAllKeywordAnalyses(userId, client)
 
 export const getKeywordAnalysesByKeywordId = async (
   keywordId: string,
   userId: string,
   client?: SupabaseClient
-): Promise<Array<{ id: string; region: Region; period: Period; search_type: SearchType }>> =>
-  db.getKeywordAnalysesByKeywordId(keywordId, userId, client)
+): Promise<
+  Array<{ id: string; region: Region; period: Period; search_type: SearchType }>
+> => db.getKeywordAnalysesByKeywordId(keywordId, userId, client)
 
 export const createKeywordAnalysis = async (
   data: Omit<KeywordAnalysis, 'id' | 'created_at' | 'updated_at'>,
   client?: SupabaseClient
-): Promise<string> =>
-  db.createKeywordAnalysis(data, client)
+): Promise<string> => db.createKeywordAnalysis(data, client)
 
 export const updateKeywordAnalysis = async (
   id: string,
-  data: Partial<Omit<KeywordAnalysis, 'id' | 'keyword_id' | 'region' | 'period' | 'search_type' | 'created_at'>>,
+  data: Partial<
+    Omit<
+      KeywordAnalysis,
+      'id' | 'keyword_id' | 'region' | 'period' | 'search_type' | 'created_at'
+    >
+  >,
   client?: SupabaseClient
-): Promise<boolean> =>
-  db.updateKeywordAnalysis(id, data, client)
+): Promise<boolean> => db.updateKeywordAnalysis(id, data, client)
 
 export const deleteKeywordAnalysis = async (
   id: string,
   client?: SupabaseClient
-): Promise<boolean> =>
-  db.deleteKeywordAnalysis(id, client)
+): Promise<boolean> => db.deleteKeywordAnalysis(id, client)

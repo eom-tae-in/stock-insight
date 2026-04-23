@@ -73,7 +73,14 @@ export interface DbAdapter {
     keywordId: string,
     userId: string,
     client?: SupabaseClient
-  ): Promise<Array<{ id: string; region: Region; period: Period; search_type: SearchType }>>
+  ): Promise<
+    Array<{
+      id: string
+      region: Region
+      period: Period
+      search_type: SearchType
+    }>
+  >
 
   createKeywordAnalysis(
     data: Omit<KeywordAnalysis, 'id' | 'created_at' | 'updated_at'>,
@@ -82,14 +89,16 @@ export interface DbAdapter {
 
   updateKeywordAnalysis(
     id: string,
-    data: Partial<Omit<KeywordAnalysis, 'id' | 'keyword_id' | 'region' | 'period' | 'search_type' | 'created_at'>>,
+    data: Partial<
+      Omit<
+        KeywordAnalysis,
+        'id' | 'keyword_id' | 'region' | 'period' | 'search_type' | 'created_at'
+      >
+    >,
     client?: SupabaseClient
   ): Promise<boolean>
 
-  deleteKeywordAnalysis(
-    id: string,
-    client?: SupabaseClient
-  ): Promise<boolean>
+  deleteKeywordAnalysis(id: string, client?: SupabaseClient): Promise<boolean>
 
   // ============ keyword_stock_overlays (오버레이) ============
   addStockOverlay(
@@ -170,7 +179,10 @@ class SupabaseDbAdapter implements DbAdapter {
     client?: SupabaseClient
   ): Promise<string> {
     const supabase = client ?? getSupabaseClient()
-    const resolvedKeywordId = await this.assertKeywordExists(keywordId, supabase)
+    const resolvedKeywordId = await this.assertKeywordExists(
+      keywordId,
+      supabase
+    )
 
     const { data: existingAnalysis, error: existingError } = await supabase
       .from('keyword_analysis')
@@ -663,7 +675,7 @@ class SupabaseDbAdapter implements DbAdapter {
 
     if (error) throw error
 
-    return (data || []).map((row) => ({
+    return (data || []).map(row => ({
       id: row.id,
       keyword_id: row.keyword_id,
       region: row.region as Region,
@@ -681,7 +693,14 @@ class SupabaseDbAdapter implements DbAdapter {
     keywordId: string,
     userId: string,
     client?: SupabaseClient
-  ): Promise<Array<{ id: string; region: Region; period: Period; search_type: SearchType }>> {
+  ): Promise<
+    Array<{
+      id: string
+      region: Region
+      period: Period
+      search_type: SearchType
+    }>
+  > {
     const supabase = client ?? getSupabaseClient()
 
     const { data: keywordOwner, error: keywordError } = await supabase
@@ -702,7 +721,7 @@ class SupabaseDbAdapter implements DbAdapter {
 
     if (error) throw error
 
-    return (data || []).map((row) => ({
+    return (data || []).map(row => ({
       id: row.id,
       region: row.region as Region,
       period: row.period as Period,
@@ -766,13 +785,19 @@ class SupabaseDbAdapter implements DbAdapter {
 
   async updateKeywordAnalysis(
     id: string,
-    data: Partial<Omit<KeywordAnalysis, 'id' | 'keyword_id' | 'region' | 'period' | 'search_type' | 'created_at'>>,
+    data: Partial<
+      Omit<
+        KeywordAnalysis,
+        'id' | 'keyword_id' | 'region' | 'period' | 'search_type' | 'created_at'
+      >
+    >,
     client?: SupabaseClient
   ): Promise<boolean> {
     const supabase = client ?? getSupabaseClient()
 
     const updateData: Partial<KeywordAnalysisRaw> = {}
-    if (data.trends_data !== undefined) updateData.trends_data = JSON.stringify(data.trends_data)
+    if (data.trends_data !== undefined)
+      updateData.trends_data = JSON.stringify(data.trends_data)
     if (data.ma13_data !== undefined) updateData.ma13_data = data.ma13_data
     if (data.yoy_data !== undefined) updateData.yoy_data = data.yoy_data
 

@@ -33,7 +33,12 @@ export async function callPyTrendsAPI(
   timeframe: string = 'today 5-y',
   gprop: string = ''
 ): Promise<TrendsDataPoint[]> {
-  const rawData = await fetchInternalTrendsData({ keyword, geo, timeframe, gprop })
+  const rawData = await fetchInternalTrendsData({
+    keyword,
+    geo,
+    timeframe,
+    gprop,
+  })
 
   if (rawData.length === 0) {
     throw new Error('No valid trends data points')
