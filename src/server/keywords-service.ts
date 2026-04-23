@@ -11,7 +11,18 @@ type KeywordRow = {
   display_order: number | null
 }
 
-function toKeywordRecord(row: KeywordRow): KeywordRecord {
+type KeywordAnalysisRefreshRow = {
+  keyword_id: string
+  updated_at: string | null
+  created_at: string
+}
+
+function toKeywordRecord(
+  row: KeywordRow,
+  refreshedAt?: string | null
+): KeywordRecord {
+  const displayDate = refreshedAt ?? row.created_at
+
   return {
     id: row.id,
     user_id: row.user_id,
@@ -20,9 +31,9 @@ function toKeywordRecord(row: KeywordRow): KeywordRecord {
     region: 'GLOBAL',
     search_type: 'WEB',
     trends_data: [],
-    searched_at: row.created_at,
+    searched_at: displayDate,
     created_at: row.created_at,
-    updated_at: row.created_at,
+    updated_at: displayDate,
     display_order: row.display_order ?? 0,
     last_viewed_at: null,
   }
@@ -41,7 +52,31 @@ export async function getKeywords(
 
   if (error) throw error
 
-  return (data ?? []).map(row => toKeywordRecord(row as KeywordRow))
+  const rows = (data ?? []) as KeywordRow[]
+  const keywordIds = rows.map(row => row.id)
+
+  if (keywordIds.length === 0) return []
+
+  const { data: analyses, error: analysesError } = await supabase
+    .from('keyword_analysis')
+    .select('keyword_id, created_at, updated_at')
+    .in('keyword_id', keywordIds)
+    .eq('region', 'GLOBAL')
+    .eq('period', '5Y')
+    .eq('search_type', 'WEB')
+
+  if (analysesError) throw analysesError
+
+  const refreshedAtByKeywordId = new Map(
+    ((analyses ?? []) as KeywordAnalysisRefreshRow[]).map(analysis => [
+      analysis.keyword_id,
+      analysis.updated_at ?? analysis.created_at,
+    ])
+  )
+
+  return rows.map(row =>
+    toKeywordRecord(row, refreshedAtByKeywordId.get(row.id))
+  )
 }
 
 export async function getKeyword(
@@ -59,7 +94,21 @@ export async function getKeyword(
   if (error?.code === 'PGRST116') return null
   if (error) throw error
 
-  return toKeywordRecord(data as KeywordRow)
+  const { data: analysis, error: analysisError } = await supabase
+    .from('keyword_analysis')
+    .select('created_at, updated_at')
+    .eq('keyword_id', keywordId)
+    .eq('region', 'GLOBAL')
+    .eq('period', '5Y')
+    .eq('search_type', 'WEB')
+    .maybeSingle()
+
+  if (analysisError) throw analysisError
+
+  return toKeywordRecord(
+    data as KeywordRow,
+    analysis?.updated_at ?? analysis?.created_at
+  )
 }
 
 export async function upsertKeyword(

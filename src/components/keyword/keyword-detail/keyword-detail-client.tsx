@@ -13,6 +13,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
+import { GripVertical, Pencil, RefreshCw, Trash2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   DndContext,
@@ -28,9 +29,10 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
-  verticalListSortingStrategy,
+  rectSortingStrategy,
   arrayMove,
 } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { DragOverlay } from '@dnd-kit/core'
 import type {
   KeywordRecord,
@@ -80,6 +82,7 @@ type OverlayItem = {
   ticker: string
   companyName: string
   displayOrder: number
+  lastRefreshedAt?: string | null
   chartData: Array<{
     date: string
     normalizedPrice: number
@@ -132,6 +135,16 @@ const PERIOD_MAX_YEARS: Record<Period, number> = {
   '4Y': 4,
   '5Y': 5,
   ALL: 25,
+}
+
+function formatDisplayDate(value?: string | null) {
+  if (!value) return ''
+
+  return new Date(value).toLocaleDateString('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
 }
 
 interface KeywordDetailClientProps {
@@ -288,6 +301,8 @@ function SortableOverlayCard({
   mode,
   isSelected,
   onToggleSelect,
+  onRefresh,
+  isRefreshing,
 }: {
   overlay: OverlayItem
   chartData: ChartDataPoint[]
@@ -306,17 +321,22 @@ function SortableOverlayCard({
   mode: 'normal' | 'delete' | 'reorder'
   isSelected: boolean
   onToggleSelect: (id: string) => void
+  onRefresh: (id: string) => Promise<void>
+  isRefreshing: boolean
 }) {
-  const { attributes, listeners, setNodeRef, isDragging, isOver } = useSortable(
-    {
-      id: overlay.id,
-      animateLayoutChanges: () => false,
-    }
-  )
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: overlay.id })
 
   const isDraggingCard = isDragging && mode === 'reorder'
   const style = {
-    transform: undefined,
+    transform: CSS.Transform.toString(transform),
+    transition,
     opacity: mode === 'delete' ? 1 : isDraggingCard ? 0.3 : 1,
     zIndex: isDraggingCard ? 9999 : 'auto',
   }
@@ -330,8 +350,10 @@ function SortableOverlayCard({
       style={style}
       onClick={mode === 'delete' ? () => onToggleSelect(overlay.id) : undefined}
       className={cn(
-        'flex h-full flex-col transition-all',
+        'relative flex h-full flex-col overflow-hidden transition-all',
         mode === 'normal' && 'cursor-pointer hover:shadow-lg',
+        isRefreshing &&
+          'border-cyan-400 bg-cyan-50/50 shadow-md ring-2 ring-cyan-400/30 dark:bg-cyan-950/20',
         mode === 'delete' && 'cursor-pointer hover:shadow-lg',
         mode === 'delete' &&
           isSelected &&
@@ -339,14 +361,17 @@ function SortableOverlayCard({
         mode === 'reorder' && 'cursor-grab hover:cursor-grab',
         mode === 'reorder' &&
           isDraggingCard &&
-          'cursor-grabbing border-2 border-blue-500 bg-blue-100 shadow-2xl dark:bg-blue-900/30',
-        mode === 'reorder' &&
-          !isDraggingCard &&
-          isOver &&
-          'border-2 border-orange-300 bg-orange-100 dark:bg-orange-900/30'
+          'cursor-grabbing border-2 border-blue-500 bg-blue-100 shadow-lg dark:bg-blue-900/30'
       )}
       {...(mode === 'reorder' ? { ...attributes, ...listeners } : {})}
     >
+      {isRefreshing && (
+        <div className="absolute top-3 right-3 z-20 inline-flex items-center gap-1 rounded-full border border-cyan-300 bg-cyan-50 px-2 py-1 text-xs font-medium text-cyan-700 shadow-sm dark:border-cyan-800 dark:bg-cyan-950 dark:text-cyan-200">
+          <RefreshCw className="h-3 w-3 animate-spin" />
+          최신화 중
+        </div>
+      )}
+
       {/* delete 모드: 토글 스위치 (카드 클릭으로도 토글 가능) */}
       {mode === 'delete' && (
         <div
@@ -459,6 +484,33 @@ function SortableOverlayCard({
           <span>{formattedDate}</span>
         </div>
       </CardContent>
+
+      {mode === 'normal' && (
+        <div
+          className={cn(
+            'bg-background/70 absolute inset-0 flex items-center justify-center backdrop-blur-sm transition-opacity',
+            isRefreshing ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          )}
+        >
+          <Button
+            type="button"
+            size="lg"
+            variant="outline"
+            className="bg-background/95 h-12 w-12 rounded-full border-cyan-300 text-cyan-700 shadow-md transition-all hover:border-cyan-400 hover:bg-cyan-50 hover:text-cyan-800 hover:shadow-lg dark:border-cyan-800 dark:text-cyan-200 dark:hover:bg-cyan-950"
+            onClick={event => {
+              event.preventDefault()
+              event.stopPropagation()
+              void onRefresh(overlay.id)
+            }}
+            disabled={isRefreshing}
+            aria-label={`${overlay.ticker} 최신화`}
+          >
+            <RefreshCw
+              className={cn('h-5 w-5', isRefreshing && 'animate-spin')}
+            />
+          </Button>
+        </div>
+      )}
     </Card>
   )
 
@@ -506,19 +558,7 @@ export function KeywordDetailClient({
       yoyValue: number | null
     }>
   >([])
-  const [overlays, setOverlays] = useState<
-    Array<{
-      id: string
-      ticker: string
-      companyName: string
-      displayOrder: number
-      chartData: Array<{
-        date: string
-        normalizedPrice: number
-        rawPrice: number
-      }>
-    }>
-  >([])
+  const [overlays, setOverlays] = useState<OverlayItem[]>([])
   const [currentAnalysis, setCurrentAnalysis] =
     useState<KeywordAnalysis | null>(null)
   const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(true) // 초기 로드 상태
@@ -614,6 +654,8 @@ export function KeywordDetailClient({
             ticker: overlay.ticker,
             companyName: overlay.company_name,
             displayOrder: overlay.display_order,
+            lastRefreshedAt:
+              overlay.last_refreshed_at ?? overlay.lastRefreshedAt ?? null,
             chartData,
           } as OverlayItem
         })
@@ -735,9 +777,16 @@ export function KeywordDetailClient({
 
   // 카드 관리 모드 (normal: 기본, delete: 선택 삭제, reorder: 위치 변경)
   const [mode, setMode] = useState<'normal' | 'delete' | 'reorder'>('normal')
+  const [isEditingOverlays, setIsEditingOverlays] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [refreshingOverlayIds, setRefreshingOverlayIds] = useState<Set<string>>(
+    new Set()
+  )
+  const [isRefreshingAnalysis, setIsRefreshingAnalysis] = useState(false)
   const [reorderBackup, setReorderBackup] = useState<OverlayItem[] | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const canReorderOverlays =
+    overlaySortBy === 'order' && overlayFilterText.trim().length === 0
 
   // 차트 ref (PNG 다운로드)
   const chartRef = useRef<HTMLDivElement>(null)
@@ -777,6 +826,11 @@ export function KeywordDetailClient({
   // 모드 전환
   const handleModeChange = (newMode: 'normal' | 'delete' | 'reorder') => {
     if (newMode === 'reorder') {
+      if (!canReorderOverlays) {
+        toast.info('위치 변경은 검색 없이 추가 순서에서 사용할 수 있습니다.')
+        return
+      }
+
       // 위치 변경 모드로 진입할 때 현재 상태 백업
       setReorderBackup(overlays)
     }
@@ -843,6 +897,7 @@ export function KeywordDetailClient({
       setOverlays(prev => prev.filter(o => !selectedIds.has(o.id)))
       setSelectedIds(new Set())
       setMode('normal')
+      setIsEditingOverlays(false)
       toast.success(`${selectedArray.length}개 종목이 삭제되었습니다`)
     } catch (error) {
       console.error('Batch delete error:', error)
@@ -853,12 +908,14 @@ export function KeywordDetailClient({
     }
   }
 
-  // 위치 변경 취소
-  const handleCancelReorder = () => {
-    if (reorderBackup) {
+  const closeOverlayEditMode = () => {
+    if (mode === 'reorder' && reorderBackup) {
       setOverlays(reorderBackup)
     }
+
     setMode('normal')
+    setIsEditingOverlays(false)
+    setSelectedIds(new Set())
     setReorderBackup(null)
   }
 
@@ -888,9 +945,19 @@ export function KeywordDetailClient({
 
       if (!res.ok) throw new Error('Order update failed')
 
+      setOverlays(prev =>
+        [...prev]
+          .sort((a, b) => a.displayOrder - b.displayOrder)
+          .map((overlay, index) => ({
+            ...overlay,
+            displayOrder: index + 1,
+          }))
+      )
       setMode('normal')
+      setIsEditingOverlays(false)
       setReorderBackup(null)
       toast.success('순서가 저장되었습니다')
+      await loadOverlays(currentAnalysis.id)
     } catch (error) {
       console.error('Order update error:', error)
       toast.error('순서 저장에 실패했습니다')
@@ -906,13 +973,28 @@ export function KeywordDetailClient({
     // 위치 변경 모드에서만 드래그 반응
     if (mode !== 'reorder' || !over || active.id === over.id) return
 
-    const oldIndex = overlays.findIndex(o => o.id === active.id)
-    const newIndex = overlays.findIndex(o => o.id === over.id)
+    const oldIndex = filteredOverlays.findIndex(o => o.id === active.id)
+    const newIndex = filteredOverlays.findIndex(o => o.id === over.id)
 
-    if (oldIndex !== -1 && newIndex !== -1) {
-      const newOrder = arrayMove(overlays, oldIndex, newIndex)
-      setOverlays(newOrder)
-    }
+    if (oldIndex === -1 || newIndex === -1) return
+
+    const reorderedVisible = arrayMove(filteredOverlays, oldIndex, newIndex)
+    const visibleIdSet = new Set(filteredOverlays.map(o => o.id))
+    const reorderedQueue = [...reorderedVisible]
+
+    setOverlays(prev =>
+      prev
+        .map(overlay => {
+          if (!visibleIdSet.has(overlay.id)) return overlay
+
+          const nextOverlay = reorderedQueue.shift()
+          return nextOverlay ?? overlay
+        })
+        .map((overlay, index) => ({
+          ...overlay,
+          displayOrder: index + 1,
+        }))
+    )
   }
 
   // 라인 토글
@@ -937,6 +1019,77 @@ export function KeywordDetailClient({
     toast.success(
       `${value}${timeframeType === 'weeks' ? '주' : '년'} 기간으로 설정했습니다`
     )
+  }
+
+  const handleRefreshCurrentAnalysis = async () => {
+    if (!currentAnalysis) {
+      toast.error('분석 데이터를 먼저 로드해주세요')
+      return
+    }
+
+    setIsRefreshingAnalysis(true)
+    try {
+      const response = await fetch(
+        `/api/analyses/${currentAnalysis.id}/refreshes`,
+        {
+          method: 'POST',
+        }
+      )
+
+      if (!response.ok) throw new Error('Analysis refresh failed')
+
+      const body = (await response.json()) as { data?: KeywordAnalysis }
+      const refreshedAnalysis = body.data
+      if (!refreshedAnalysis)
+        throw new Error('Analysis refresh payload missing')
+
+      setCurrentAnalysis(refreshedAnalysis)
+      setChartData(
+        (refreshedAnalysis.trends_data || []).map(point => ({
+          weekIndex: 0,
+          date: point.date,
+          trendsValue: point.value,
+          ma13Value: point.ma13Value,
+          yoyValue: point.yoyValue,
+        }))
+      )
+
+      toast.success('키워드 분석을 최신화했습니다')
+    } catch (error) {
+      console.error('Analysis refresh error:', error)
+      toast.error('키워드 분석 최신화에 실패했습니다')
+    } finally {
+      setIsRefreshingAnalysis(false)
+    }
+  }
+
+  const handleRefreshOverlay = async (overlayId: string) => {
+    if (!currentAnalysis) {
+      toast.error('분석 데이터를 먼저 로드해주세요')
+      return
+    }
+
+    setRefreshingOverlayIds(prev => new Set(prev).add(overlayId))
+    try {
+      const response = await fetch(
+        `/api/analyses/${currentAnalysis.id}/overlays/${overlayId}/refreshes`,
+        { method: 'POST' }
+      )
+
+      if (!response.ok) throw new Error('Overlay refresh failed')
+
+      await loadOverlays(currentAnalysis.id)
+      toast.success('오버레이 종목을 최신화했습니다')
+    } catch (error) {
+      console.error('Overlay refresh error:', error)
+      toast.error('오버레이 종목 최신화에 실패했습니다')
+    } finally {
+      setRefreshingOverlayIds(prev => {
+        const next = new Set(prev)
+        next.delete(overlayId)
+        return next
+      })
+    }
   }
 
   // Excel 다운로드
@@ -1104,13 +1257,26 @@ export function KeywordDetailClient({
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault()
-        setSelectedAutocompleteIndex(prev =>
-          prev < autocompleteResults.length - 1 ? prev + 1 : prev
-        )
+        setSelectedAutocompleteIndex(prev => {
+          const nextIndex =
+            prev < autocompleteResults.length - 1 ? prev + 1 : prev
+          const nextResult = autocompleteResults[nextIndex]
+          if (nextResult) {
+            setStockSearchInput(nextResult.ticker)
+          }
+          return nextIndex
+        })
         break
       case 'ArrowUp':
         e.preventDefault()
-        setSelectedAutocompleteIndex(prev => (prev > 0 ? prev - 1 : -1))
+        setSelectedAutocompleteIndex(prev => {
+          const nextIndex = prev > 0 ? prev - 1 : -1
+          const nextResult = autocompleteResults[nextIndex]
+          if (nextResult) {
+            setStockSearchInput(nextResult.ticker)
+          }
+          return nextIndex
+        })
         break
       case 'Enter':
         e.preventDefault()
@@ -1222,14 +1388,10 @@ export function KeywordDetailClient({
     }
   }
 
-  const formattedDate = new Date(keyword.searched_at).toLocaleDateString(
-    'ko-KR',
-    {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }
+  const formattedDate = formatDisplayDate(
+    currentAnalysis?.updated_at ?? keyword.updated_at ?? keyword.searched_at
   )
+  const selectedAnalysisLabel = `${REGION_LABEL[region]} · ${SEARCH_TYPE_LABEL[searchType]} · 5Y`
 
   return (
     <div className="bg-background min-h-screen p-6">
@@ -1250,103 +1412,153 @@ export function KeywordDetailClient({
               <span className="text-foreground"> 키워드 분석</span>
             </h1>
             <p className="text-muted-foreground text-sm">
-              Google Trends 데이터 기반 5년 트렌드 분석
+              Google Trends 데이터는 완료된 전주까지 수집되며, 주간 검색 관심도
+              기준으로 분석됩니다.
             </p>
           </div>
         </div>
 
-        {/* 필터 섹션 */}
-        <div className="bg-card mb-8 rounded-lg border p-6">
-          <div className="mb-6">
-            <h3 className="text-sm font-semibold">분석 조건</h3>
-            <p className="text-muted-foreground text-xs">
-              저장된 분석을 선택하면 해당 조건의 차트와 종목이 함께 전환됩니다
-            </p>
-          </div>
+        {/* 분석 선택 및 현재 분석 액션 */}
+        <div className="mb-8 grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="bg-card rounded-lg border p-5">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h3 className="text-sm font-semibold">저장된 분석</h3>
+                <p className="text-muted-foreground mt-1 text-xs">
+                  분석을 선택하면 차트와 커스텀 종목 목록이 함께 전환됩니다
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  router.push(
+                    `/keyword-analysis/new?keyword=${encodeURIComponent(keyword.keyword)}`
+                  )
+                }
+                className="h-8 shrink-0 text-xs"
+              >
+                + 분석 추가
+              </Button>
+            </div>
 
-          {/* 존재하는 분석 조합 버튼들 */}
-          {!isLoadingList && visibleAnalysesList.length > 0 ? (
-            <div className="mb-6 space-y-4">
-              <p className="text-muted-foreground text-xs font-medium">
-                저장된 분석
-              </p>
-              <div className="flex flex-wrap gap-2">
+            {!isLoadingList && visibleAnalysesList.length > 0 ? (
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 {visibleAnalysesList.map(analysis => {
                   const isSelected =
                     analysis.region === region &&
                     analysis.search_type === searchType
 
                   return (
-                    <Button
+                    <button
                       key={`${analysis.region}-${analysis.search_type}`}
+                      type="button"
                       onClick={() => {
                         setRegion(analysis.region)
                         setSearchType(analysis.search_type)
                       }}
-                      variant={isSelected ? 'default' : 'outline'}
-                      size="sm"
                       className={cn(
-                        'text-xs',
-                        isSelected &&
-                          'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700'
+                        'rounded-lg border p-3 text-left transition-all',
+                        'hover:border-cyan-300 hover:bg-cyan-50/60 dark:hover:bg-cyan-950/20',
+                        isSelected
+                          ? 'border-cyan-400 bg-cyan-50 ring-2 ring-cyan-400/20 dark:bg-cyan-950/30'
+                          : 'border-border bg-background'
                       )}
+                      aria-pressed={isSelected}
                     >
-                      <span>
-                        {REGION_LABEL[analysis.region]} ·{' '}
-                        {SEARCH_TYPE_LABEL[analysis.search_type]}
-                      </span>
-                      {isSelected && <span className="ml-1">✓</span>}
-                    </Button>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-semibold">
+                          {REGION_LABEL[analysis.region]}
+                        </span>
+                        {isSelected && (
+                          <span className="rounded-full bg-cyan-600 px-2 py-0.5 text-xs font-medium text-white">
+                            선택됨
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-muted-foreground mt-1 text-xs">
+                        {SEARCH_TYPE_LABEL[analysis.search_type]} · 5Y
+                      </p>
+                    </button>
                   )
                 })}
               </div>
-            </div>
-          ) : !isLoadingList ? (
-            <div className="bg-muted/50 mb-6 rounded border border-dashed p-4 text-center">
-              <p className="text-muted-foreground text-xs">
-                저장된 분석이 없습니다
-              </p>
-            </div>
-          ) : (
-            <div className="bg-muted/50 mb-6 rounded border border-dashed p-4 text-center">
-              <p className="text-muted-foreground text-xs">로드 중...</p>
-            </div>
-          )}
-
-          {/* 새로운 분석 추가 버튼 */}
-          <div className="mb-6 flex">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                router.push(
-                  `/keyword-analysis/new?keyword=${encodeURIComponent(keyword.keyword)}`
-                )
-              }
-              className="text-xs"
-            >
-              + 새로운 분석 추가
-            </Button>
+            ) : !isLoadingList ? (
+              <div className="bg-muted/50 rounded border border-dashed p-5 text-center">
+                <p className="text-muted-foreground text-xs">
+                  저장된 분석이 없습니다
+                </p>
+              </div>
+            ) : (
+              <div className="bg-muted/50 rounded border border-dashed p-5 text-center">
+                <p className="text-muted-foreground text-xs">로드 중...</p>
+              </div>
+            )}
           </div>
 
-          {/* 액션 버튼 */}
-          <div className="flex flex-wrap gap-2 border-t pt-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDownloadExcel}
-              disabled={!currentAnalysis || isLoadingAnalysis}
-            >
-              📊 Excel 다운로드
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDownloadPNG}
-              disabled={!currentAnalysis || isLoadingAnalysis}
-            >
-              🖼️ 차트 PNG 저장
-            </Button>
+          <div
+            className={cn(
+              'bg-card rounded-lg border p-5 transition-all',
+              isRefreshingAnalysis &&
+                'border-cyan-400 bg-cyan-50/50 ring-2 ring-cyan-400/20 dark:bg-cyan-950/20'
+            )}
+          >
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-muted-foreground text-xs font-medium">
+                  현재 분석
+                </p>
+                <h3 className="mt-1 text-lg font-semibold">
+                  {selectedAnalysisLabel}
+                </h3>
+                <p className="text-muted-foreground mt-1 text-xs">
+                  마지막 갱신: {formattedDate || '-'}
+                </p>
+              </div>
+              {isRefreshingAnalysis && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-cyan-300 bg-cyan-50 px-2 py-1 text-xs font-medium text-cyan-700 dark:border-cyan-800 dark:bg-cyan-950 dark:text-cyan-200">
+                  <RefreshCw className="h-3 w-3 animate-spin" />
+                  진행 중
+                </span>
+              )}
+            </div>
+
+            <div className="grid gap-2">
+              <Button
+                variant="outline"
+                onClick={handleRefreshCurrentAnalysis}
+                disabled={
+                  !currentAnalysis || isLoadingAnalysis || isRefreshingAnalysis
+                }
+                className="justify-start border-cyan-300 text-cyan-700 hover:bg-cyan-50 hover:text-cyan-800 dark:border-cyan-800 dark:text-cyan-200 dark:hover:bg-cyan-950"
+              >
+                <RefreshCw
+                  className={cn(
+                    'mr-2 h-4 w-4',
+                    isRefreshingAnalysis && 'animate-spin'
+                  )}
+                />
+                현재 분석 최신화
+              </Button>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadExcel}
+                  disabled={!currentAnalysis || isLoadingAnalysis}
+                >
+                  Excel
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadPNG}
+                  disabled={!currentAnalysis || isLoadingAnalysis}
+                >
+                  PNG
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1551,7 +1763,7 @@ export function KeywordDetailClient({
                   chartData={chartData}
                   formattedDate={formattedDate}
                   overlayStock={selectedStock || undefined}
-                  overlays={overlays}
+                  overlays={[]}
                   timeframeType={timeframeType}
                   timeframeValue={timeframeValue}
                   visibleLines={visibleLines}
@@ -1593,60 +1805,110 @@ export function KeywordDetailClient({
 
               {/* 모드별 버튼 UI */}
               {overlays.length > 0 && (
-                <div className="mb-6 flex justify-end gap-2">
-                  {mode === 'normal' && (
-                    <>
+                <div className="mb-6 space-y-3">
+                  <div className="flex justify-end gap-2">
+                    {!isEditingOverlays && mode === 'normal' ? (
                       <Button
                         variant="outline"
-                        onClick={() => handleModeChange('delete')}
+                        size="sm"
+                        onClick={() => setIsEditingOverlays(true)}
+                        className="border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:bg-slate-800"
                       >
-                        선택 삭제
+                        <Pencil className="mr-2 h-4 w-4" />
+                        편집
                       </Button>
+                    ) : mode === 'normal' ? (
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleModeChange('delete')}
+                          className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300 dark:hover:bg-red-950/40"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          선택 삭제
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleModeChange('reorder')}
+                          className="border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-800 dark:border-indigo-900/60 dark:bg-indigo-950/20 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
+                        >
+                          <GripVertical className="mr-2 h-4 w-4" />
+                          위치 변경
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={closeOverlayEditMode}
+                          className="text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                        >
+                          <X className="mr-2 h-4 w-4" />
+                          완료
+                        </Button>
+                      </div>
+                    ) : mode === 'delete' ? (
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={closeOverlayEditMode}
+                          className="text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                        >
+                          <X className="mr-2 h-4 w-4" />
+                          완료
+                        </Button>
+                      </div>
+                    ) : (
                       <Button
-                        variant="outline"
-                        onClick={() => handleModeChange('reorder')}
+                        onClick={handleConfirmReorder}
+                        size="sm"
+                        className="bg-indigo-600 text-white hover:bg-indigo-700"
                       >
-                        위치 변경
+                        완료
                       </Button>
-                    </>
-                  )}
+                    )}
+                  </div>
 
                   {mode === 'delete' && (
-                    <>
-                      <Button variant="outline" onClick={handleToggleSelectAll}>
-                        {selectedIds.size === overlays.length
-                          ? '전체 해제'
-                          : '전체 선택'}
-                      </Button>
-                      <span className="text-muted-foreground flex items-center">
-                        {selectedIds.size}개 선택됨
-                      </span>
-                      <Button
-                        disabled={selectedIds.size === 0}
-                        onClick={handleOpenDeleteConfirm}
-                        variant="destructive"
-                      >
-                        {deletingId === 'batch' ? '삭제 중...' : '확인'}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setMode('normal')
-                          setSelectedIds(new Set())
-                        }}
-                      >
-                        취소
-                      </Button>
-                    </>
-                  )}
-
-                  {mode === 'reorder' && (
-                    <>
-                      <Button onClick={handleConfirmReorder}>확인</Button>
-                      <Button variant="outline" onClick={handleCancelReorder}>
-                        취소
-                      </Button>
-                    </>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleToggleSelectAll}
+                          className="border-slate-300 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:bg-slate-800"
+                        >
+                          {selectedIds.size === overlays.length
+                            ? '전체 해제'
+                            : '전체 선택'}
+                        </Button>
+                        {selectedIds.size > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSelectedIds(new Set())}
+                            className="border-slate-300 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:bg-slate-800"
+                          >
+                            선택 해제
+                          </Button>
+                        )}
+                        <span className="text-muted-foreground text-sm">
+                          {selectedIds.size}개 선택됨
+                        </span>
+                      </div>
+                      {selectedIds.size > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleOpenDeleteConfirm}
+                          className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300 dark:hover:bg-red-950/40"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          {deletingId === 'batch' ? '삭제 중...' : '삭제'}
+                        </Button>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
@@ -1704,7 +1966,7 @@ export function KeywordDetailClient({
                     >
                       <SortableContext
                         items={filteredOverlays.map(o => o.id)}
-                        strategy={verticalListSortingStrategy}
+                        strategy={rectSortingStrategy}
                       >
                         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                           {filteredOverlays.map(overlay => (
@@ -1713,11 +1975,22 @@ export function KeywordDetailClient({
                               overlay={overlay}
                               chartData={chartData}
                               mergeChartData={mergeChartData}
-                              formattedDate={formattedDate}
+                              formattedDate={
+                                formatDisplayDate(
+                                  overlay.lastRefreshedAt ??
+                                    currentAnalysis?.updated_at ??
+                                    keyword.updated_at ??
+                                    keyword.searched_at
+                                ) || formattedDate
+                              }
                               keywordId={keyword.id}
                               mode={mode}
                               isSelected={selectedIds.has(overlay.id)}
                               onToggleSelect={handleToggleSelect}
+                              onRefresh={handleRefreshOverlay}
+                              isRefreshing={refreshingOverlayIds.has(
+                                overlay.id
+                              )}
                             />
                           ))}
                         </div>

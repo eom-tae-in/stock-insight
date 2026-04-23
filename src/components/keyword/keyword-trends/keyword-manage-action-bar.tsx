@@ -39,28 +39,27 @@ export function KeywordManageActionBar({
           </span>
         )}
 
-        {mode === 'delete' ? (
+        {mode === 'delete' && selectedCount > 0 ? (
           <Button
             variant="outline"
             size="sm"
             onClick={onDelete}
-            disabled={selectedCount === 0}
-            className="border-destructive/50 hover:bg-destructive/10 hover:text-destructive h-9 px-3 text-xs sm:text-sm"
+            className="h-9 border-red-200 bg-red-50 px-3 text-xs text-red-700 hover:bg-red-100 hover:text-red-800 sm:text-sm dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300 dark:hover:bg-red-950/40"
           >
             <Trash2 className="mr-1 h-4 w-4" />
             삭제
           </Button>
-        ) : (
+        ) : mode === 'reorder' ? (
           <Button
             variant="default"
             size="sm"
             onClick={onDone}
-            className="h-9 px-3 text-xs sm:text-sm"
+            className="h-9 bg-slate-800 px-3 text-xs text-white hover:bg-slate-900 sm:text-sm dark:bg-slate-200 dark:text-slate-950 dark:hover:bg-white"
           >
             <Check className="mr-1 h-4 w-4" />
             완료
           </Button>
-        )}
+        ) : null}
       </div>
     </div>
   )

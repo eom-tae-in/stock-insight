@@ -228,6 +228,154 @@ export async function createKeywordAnalysisForKeyword(
   }
 }
 
+export async function refreshKeywordAnalysis(
+  supabase: SupabaseClient,
+  userId: string,
+  analysisId: string
+) {
+  const { data: analysis, error: analysisError } = await supabase
+    .from('keyword_analysis')
+    .select(
+      'id, keyword_id, region, period, search_type, keywords!inner(name, user_id)'
+    )
+    .eq('id', analysisId)
+    .single()
+
+  if (analysisError?.code === 'PGRST116' || !analysis) {
+    throw new AnalysisServiceError(
+      'NOT_FOUND',
+      'Analysis를 찾을 수 없습니다.',
+      404
+    )
+  }
+
+  if (analysisError) throw analysisError
+
+  const keyword = Array.isArray(analysis.keywords)
+    ? analysis.keywords[0]
+    : analysis.keywords
+
+  if (!keyword || keyword.user_id !== userId) {
+    throw new AnalysisServiceError(
+      'NOT_FOUND',
+      'Analysis를 찾을 수 없습니다.',
+      404
+    )
+  }
+
+  try {
+    const parsed = parsePytrendsParams({
+      keyword: keyword.name,
+      geo: analysis.region as Region,
+      timeframe: analysis.period as Period,
+      gprop: analysis.search_type as SearchType,
+    })
+    const trendsRawData = await fetchInternalTrendsData({
+      keyword: parsed.keyword,
+      geo: parsed.geo,
+      timeframe: parsed.timeframe,
+      gprop: parsed.gprop,
+    })
+    const trendsData = buildTrendsDataWithIndicators(trendsRawData)
+    const lastTrendPoint = trendsData.at(-1)
+
+    const { error: updateError } = await supabase
+      .from('keyword_analysis')
+      .update({
+        trends_data: trendsData,
+        ma13_data: lastTrendPoint?.ma13Value ?? null,
+        yoy_data: lastTrendPoint?.yoyValue ?? null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', analysisId)
+
+    if (updateError) throw updateError
+
+    const refreshed = await getOwnedAnalysis(supabase, userId, analysisId)
+    if (!refreshed) {
+      throw new AnalysisServiceError(
+        'REFRESH_FAILED',
+        '갱신된 Analysis를 다시 조회하지 못했습니다.',
+        500
+      )
+    }
+
+    return refreshed
+  } catch (error) {
+    console.error('[keyword analyses] Trends refresh error:', error)
+
+    if (error instanceof AnalysisServiceError) throw error
+
+    if (error instanceof TrendsProviderError) {
+      throw new AnalysisServiceError(
+        error.code,
+        '트렌드 데이터를 갱신하지 못했습니다.',
+        error.status
+      )
+    }
+
+    throw new AnalysisServiceError(
+      'TRENDS_REFRESH_FAILED',
+      '트렌드 데이터를 갱신하지 못했습니다.',
+      502
+    )
+  }
+}
+
+export async function refreshDefaultKeywordAnalysis(
+  supabase: SupabaseClient,
+  userId: string,
+  keywordId: string
+) {
+  const keyword = await getOwnedKeywordName(supabase, userId, keywordId)
+  const existingAnalysis = await getKeywordAnalysis(
+    supabase,
+    userId,
+    keywordId,
+    'GLOBAL',
+    '5Y',
+    'WEB'
+  )
+
+  if (!existingAnalysis) {
+    const created = await createKeywordAnalysisForKeyword(
+      supabase,
+      userId,
+      keywordId,
+      {
+        keyword,
+        region: 'GLOBAL',
+        search_type: 'WEB',
+      }
+    )
+
+    const analysis = await getKeywordAnalysis(
+      supabase,
+      userId,
+      keywordId,
+      'GLOBAL',
+      '5Y',
+      'WEB'
+    )
+
+    return {
+      id: created.id,
+      analysis,
+    }
+  }
+
+  const refreshed = await refreshKeywordAnalysis(
+    supabase,
+    userId,
+    existingAnalysis.id
+  )
+
+  return {
+    id: refreshed.id,
+    analysis: refreshed,
+  }
+}
+
 export async function getOwnedAnalysis(
   supabase: SupabaseClient,
   userId: string,
