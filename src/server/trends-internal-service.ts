@@ -3,9 +3,8 @@ import { normalizeKeywordSpacing } from '@/lib/utils/keyword-normalization'
 import { getLastCompletedWeekKey } from '@/lib/utils/week-sync'
 import type { TrendsDataPoint } from '@/types/database'
 import { headers } from 'next/headers'
-const MAX_TRENDS_ATTEMPTS = 4
-const BASE_BACKOFF_MS = 1000
-const MAX_JITTER_MS = 500
+const MAX_TRENDS_ATTEMPTS = 2
+const RETRY_DELAY_MS = 3000
 const TRENDS_CACHE_TTL_SECONDS = Number(
   process.env.TRENDS_CACHE_TTL_SECONDS ?? 60 * 60 * 24
 )
@@ -42,11 +41,8 @@ export class TrendsProviderError extends Error {
   }
 }
 
-function calculateBackoffWithJitter(attemptIndex: number): number {
-  const baseMs = Math.pow(2, attemptIndex) * BASE_BACKOFF_MS
-  const jitterMs = Math.floor(Math.random() * MAX_JITTER_MS)
-
-  return baseMs + jitterMs
+function getRetryDelayMs(): number {
+  return RETRY_DELAY_MS
 }
 
 function isRetryableTrendsError(error: unknown): boolean {
@@ -425,7 +421,7 @@ export async function fetchInternalTrendsData({
         break
       }
 
-      const waitMs = calculateBackoffWithJitter(attempt - 1)
+      const waitMs = getRetryDelayMs()
       console.info(
         `[trends] retry scheduled keyword="${normalizedKeyword}" nextAttempt=${attempt + 1}/${MAX_TRENDS_ATTEMPTS} waitMs=${waitMs}`
       )
