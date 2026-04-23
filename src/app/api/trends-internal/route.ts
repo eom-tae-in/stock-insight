@@ -1,5 +1,5 @@
 /**
- * 로컬 개발용 Google Trends API Route
+ * 내부 Google Trends API Route
  * GET /api/trends-internal?keyword=...
  * POST /api/trends-internal
  * Response: [{ date, value }, ...]
@@ -13,7 +13,7 @@ import {
 import { normalizeKeywordSpacing } from '@/lib/utils/keyword-normalization'
 
 /**
- * Python 스크립트 기반 Google Trends 조회
+ * 내부 `/api/pytrends` 기반 Google Trends 조회
  */
 async function getTrendsData(
   keyword: string,

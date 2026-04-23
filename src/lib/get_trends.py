@@ -4,9 +4,35 @@ Google Trends 데이터 수집 (pytrends 사용)
 """
 
 import json
+import re
 import sys
 from datetime import datetime, timedelta
-from pytrends.request import TrendReq
+
+try:
+    from pytrends.request import TrendReq
+except ImportError:
+    TrendReq = None
+
+
+class TrendsFetchError(Exception):
+    def __init__(self, code: str, message: str, status: int = 502):
+        super().__init__(message)
+        self.code = code
+        self.status = status
+
+
+def classify_trends_error(error: Exception) -> TrendsFetchError:
+    message = str(error).strip() or error.__class__.__name__
+    normalized = message.lower()
+
+    if '429' in normalized or 'rate limit' in normalized or 'too many requests' in normalized:
+        return TrendsFetchError(
+            'PYTRENDS_RATE_LIMIT',
+            'Google Trends rate limit reached',
+            429
+        )
+
+    return TrendsFetchError('PYTRENDS_REQUEST_FAILED', message, 502)
 
 def get_last_completed_week_start(now: datetime) -> datetime:
     """
@@ -41,40 +67,44 @@ def get_trends(keyword: str, geo: str = '', timeframe: str = 'today 5-y', gprop:
     Returns:
         list: [{"date": "YYYY-MM-DD", "value": 0-100}, ...]
     """
+    if TrendReq is None:
+        raise TrendsFetchError(
+            'PYTRENDS_DEPENDENCY_MISSING',
+            'pytrends dependency is not installed',
+            500
+        )
+
+    # 기간 계산
+    end_date = datetime.now()
+    last_completed_week_start = get_last_completed_week_start(end_date)
+    request_end_date = last_completed_week_start + timedelta(days=6)
+
+    # pytrends timeframe 형식 파싱 (예: 'today 5-y', 'today 1-m', 'now 1-H')
+    # timeframe이 'today ...' 또는 'now ...' 형식인 경우, 날짜 범위로 계산
+    days = 365 * 5  # 기본값: 5년
+
+    if ' ' in timeframe:
+        # 형식: 'today 5-y', 'today 1-m', 'now 1-H' 등
+        parts = timeframe.split()
+        if len(parts) == 2:
+            _, period = parts  # 예: '5-y', '1-m', '1-H'
+            match = re.match(r'(\d+)-([ymdhH])', period)
+            if match:
+                value = int(match.group(1))
+                unit = match.group(2)
+
+                if unit == 'H':  # 시간
+                    days = value / 24
+                elif unit == 'd':  # 일
+                    days = value
+                elif unit == 'm':  # 월 (약 30일)
+                    days = value * 30
+                elif unit == 'y':  # 년
+                    days = value * 365
+
+    start_date = request_end_date - timedelta(days=days)
+
     try:
-        # 기간 계산
-        end_date = datetime.now()
-        last_completed_week_start = get_last_completed_week_start(end_date)
-        request_end_date = last_completed_week_start + timedelta(days=6)
-
-        # pytrends timeframe 형식 파싱 (예: 'today 5-y', 'today 1-m', 'now 1-H')
-        # timeframe이 'today ...' 또는 'now ...' 형식인 경우, 날짜 범위로 계산
-        days = 365 * 5  # 기본값: 5년
-
-        if ' ' in timeframe:
-            # 형식: 'today 5-y', 'today 1-m', 'now 1-H' 등
-            parts = timeframe.split()
-            if len(parts) == 2:
-                _, period = parts  # 예: '5-y', '1-m', '1-H'
-                # 형식 파싱: '5-y', '1-m', '1-H'
-                match = __import__('re').match(r'(\d+)-([ymdhH])', period)
-                if match:
-                    value = int(match.group(1))
-                    unit = match.group(2)
-
-                    if unit == 'H':  # 시간
-                        days = value / 24
-                    elif unit == 'd':  # 일
-                        days = value
-                    elif unit == 'm':  # 월 (약 30일)
-                        days = value * 30
-                    elif unit == 'y':  # 년
-                        days = value * 365
-        # 아니면 timeframe이 이미 'now 1-H' 형식이므로 그대로 사용
-
-        start_date = request_end_date - timedelta(days=days)
-
-        # pytrends 요청
         pytrends = TrendReq(hl='ko_KR', tz=0)
         pytrends.build_payload(
             kw_list=[keyword],
@@ -111,9 +141,10 @@ def get_trends(keyword: str, geo: str = '', timeframe: str = 'today 5-y', gprop:
 
         return [trends_by_week[key] for key in sorted(trends_by_week.keys())]
 
-    except Exception as e:
-        print(f"Error: {str(e)}", file=sys.stderr)
-        return []
+    except TrendsFetchError:
+        raise
+    except Exception as error:
+        raise classify_trends_error(error) from error
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
@@ -125,5 +156,9 @@ if __name__ == '__main__':
     timeframe = sys.argv[3] if len(sys.argv) > 3 else 'today 5-y'
     gprop = sys.argv[4] if len(sys.argv) > 4 else ''
 
-    result = get_trends(keyword, geo, timeframe, gprop)
-    print(json.dumps(result))
+    try:
+        result = get_trends(keyword, geo, timeframe, gprop)
+        print(json.dumps(result))
+    except TrendsFetchError as error:
+        print(f"{error.code}: {str(error)}", file=sys.stderr)
+        sys.exit(1)

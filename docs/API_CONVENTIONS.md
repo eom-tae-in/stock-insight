@@ -125,6 +125,7 @@ Supabase Auth callback은 유지한다.
 제거/내부화 대상:
 
 - `/api/trends-internal`
+  - 서버 내부 래퍼이며 실제 Trends 수집은 `/api/pytrends` Python function으로 단일화한다.
 
 ### Keywords
 

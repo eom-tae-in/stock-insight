@@ -1,12 +1,7 @@
-import { execFile } from 'child_process'
-import { promisify } from 'util'
-import path from 'path'
 import { calculateTrendsMA13 } from '@/lib/indicators'
 import { normalizeKeywordSpacing } from '@/lib/utils/keyword-normalization'
 import { getLastCompletedWeekKey } from '@/lib/utils/week-sync'
 import type { TrendsDataPoint } from '@/types/database'
-
-const execFileAsync = promisify(execFile)
 const MAX_TRENDS_ATTEMPTS = 4
 const BASE_BACKOFF_MS = 1000
 const MAX_JITTER_MS = 500
@@ -212,15 +207,14 @@ function toRawTrendsDataPoint(point: unknown): RawTrendsDataPoint | null {
   }
 }
 
-function isVercelRuntime(): boolean {
-  return process.env.VERCEL === '1'
-}
+function getPytrendsApiBaseUrl(): string {
+  const vercelUrl = process.env.VERCEL_URL?.trim()
+  if (vercelUrl) {
+    return `https://${vercelUrl}`
+  }
 
-function getLocalPythonPath(): string {
-  const configuredPythonPath = process.env.PYTRENDS_PYTHON_PATH?.trim()
-  if (configuredPythonPath) return configuredPythonPath
-
-  return process.platform === 'win32' ? 'python' : 'python3'
+  const port = process.env.PORT?.trim() || '3000'
+  return `http://127.0.0.1:${port}`
 }
 
 function parseRawTrendsData(data: unknown, source: string) {
@@ -247,63 +241,13 @@ function parseRawTrendsData(data: unknown, source: string) {
   return trendsData
 }
 
-class LocalSpawnTrendsProvider implements TrendsProvider {
+class HttpPytrendsProvider implements TrendsProvider {
   async fetch({
     keyword,
     geo,
     timeframe,
     gprop,
   }: Required<FetchInternalTrendsDataParams>) {
-    const pythonPath = getLocalPythonPath()
-    const scriptPath = path.join(process.cwd(), 'src', 'lib', 'get_trends.py')
-
-    const { stdout, stderr } = await execFileAsync(pythonPath, [
-      scriptPath,
-      keyword,
-      geo,
-      timeframe,
-      gprop,
-    ])
-
-    if (stderr) {
-      const sanitizedStderr = stderr.trim().replace(/\s+/g, ' ')
-
-      if (
-        sanitizedStderr.includes('429') ||
-        sanitizedStderr.toLowerCase().includes('rate limit')
-      ) {
-        throw new TrendsProviderError(
-          'PYTRENDS_RATE_LIMIT',
-          `Google Trends rate limited: ${sanitizedStderr}`,
-          'RATE_LIMIT',
-          429
-        )
-      }
-
-      console.warn(`[trends] python stderr="${sanitizedStderr}"`)
-    }
-
-    return parseRawTrendsData(JSON.parse(stdout), 'Local Python')
-  }
-}
-
-class VercelPythonTrendsProvider implements TrendsProvider {
-  async fetch({
-    keyword,
-    geo,
-    timeframe,
-    gprop,
-  }: Required<FetchInternalTrendsDataParams>) {
-    const vercelUrl = process.env.VERCEL_URL
-    if (!vercelUrl) {
-      throw new TrendsProviderError(
-        'VERCEL_URL_MISSING',
-        'VERCEL_URL is not set; cannot reach /api/pytrends',
-        'NO_DATA',
-        500
-      )
-    }
-
     const internalSecret = process.env.PYTRENDS_INTERNAL_SECRET
     if (!internalSecret) {
       throw new TrendsProviderError(
@@ -314,29 +258,62 @@ class VercelPythonTrendsProvider implements TrendsProvider {
       )
     }
 
-    const response = await fetch(`https://${vercelUrl}/api/pytrends`, {
+    const baseUrl = getPytrendsApiBaseUrl()
+    const response = await fetch(`${baseUrl}/api/pytrends`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-internal-api-secret': internalSecret,
       },
       body: JSON.stringify({ keyword, geo, timeframe, gprop }),
+      cache: 'no-store',
     })
 
     if (!response.ok) {
+      let errorCode = 'PYTRENDS_FUNCTION_FAILED'
+      let errorMessage = `/api/pytrends failed: ${response.status} ${response.statusText}`
+
+      try {
+        const errorJson = (await response.json()) as {
+          code?: unknown
+          error?: unknown
+        }
+
+        if (typeof errorJson.code === 'string') {
+          errorCode = errorJson.code
+        }
+
+        if (typeof errorJson.error === 'string' && errorJson.error.trim()) {
+          errorMessage = errorJson.error
+        }
+      } catch {
+        // Keep the HTTP status fallback message when the response is not JSON.
+      }
+
       // 429 rate limit → RATE_LIMIT으로 분류
       const classification: TrendsErrorClassification =
         response.status === 429 ? 'RATE_LIMIT' : 'NO_DATA'
 
       throw new TrendsProviderError(
-        'PYTRENDS_FUNCTION_FAILED',
-        `Vercel /api/pytrends failed: ${response.status} ${response.statusText}`,
+        errorCode,
+        errorMessage,
         classification,
         response.status
       )
     }
 
-    const json: unknown = await response.json()
+    let json: unknown
+    try {
+      json = await response.json()
+    } catch {
+      throw new TrendsProviderError(
+        'PYTRENDS_FUNCTION_INVALID_RESPONSE',
+        '/api/pytrends returned invalid JSON',
+        'NO_DATA',
+        502
+      )
+    }
+
     if (
       typeof json !== 'object' ||
       json === null ||
@@ -344,22 +321,20 @@ class VercelPythonTrendsProvider implements TrendsProvider {
     ) {
       throw new TrendsProviderError(
         'PYTRENDS_FUNCTION_FAILED',
-        'Vercel /api/pytrends returned unsuccessful payload',
+        '/api/pytrends returned unsuccessful payload',
         'NO_DATA'
       )
     }
 
     return parseRawTrendsData(
       (json as { data?: unknown }).data,
-      'Vercel /api/pytrends'
+      '/api/pytrends'
     )
   }
 }
 
 function getTrendsProvider(): TrendsProvider {
-  return isVercelRuntime()
-    ? new VercelPythonTrendsProvider()
-    : new LocalSpawnTrendsProvider()
+  return new HttpPytrendsProvider()
 }
 
 export async function fetchInternalTrendsData({
