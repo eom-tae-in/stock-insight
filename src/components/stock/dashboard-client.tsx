@@ -2,29 +2,106 @@
  * Task 013: 대시보드 Client Component
  *
  * Server Component에서 초기 데이터를 받아
- * 상호작용 (삭제, 새로고침) 처리
+ * 내 종목 목록의 삭제/순서 변경을 처리합니다.
  */
 
 'use client'
 
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  type DragEndEvent,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  arrayMove,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { GripVertical, Pencil, Trash2, X } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { StockCard } from '@/components/stock/stock-card'
-import { Edit2, Check } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import type { SearchRecord } from '@/types'
 
 interface DashboardClientProps {
   initialRecords: SearchRecord[]
 }
 
+type EditMode = 'none' | 'delete' | 'reorder'
+
 const SORT_ORDER_KEY = 'stock-sort-order'
+
+function SortableStockCard({
+  record,
+  children,
+}: {
+  record: SearchRecord
+  children: ReactNode
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: record.id })
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.45 : 1,
+        zIndex: isDragging ? 10 : 'auto',
+      }}
+      {...attributes}
+      {...listeners}
+    >
+      {children}
+    </div>
+  )
+}
 
 export function DashboardClient({ initialRecords }: DashboardClientProps) {
   const [records, setRecords] = useState(initialRecords)
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set())
   const [isEditMode, setIsEditMode] = useState(false)
-  const [draggedId, setDraggedId] = useState<string | null>(null)
+  const [editMode, setEditMode] = useState<EditMode>('none')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [reorderBackup, setReorderBackup] = useState<SearchRecord[] | null>(
+    null
+  )
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   // 저장된 순서 복원 (초기 로딩 시에만)
   useEffect(() => {
@@ -45,86 +122,143 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // 순서 저장
-  const saveOrder = (newRecords: SearchRecord[]) => {
+  const saveOrder = (nextRecords: SearchRecord[]) => {
     const orderMap: Record<string, number> = {}
-    newRecords.forEach((record, index) => {
+    nextRecords.forEach((record, index) => {
       orderMap[record.id] = index
     })
     localStorage.setItem(SORT_ORDER_KEY, JSON.stringify(orderMap))
   }
 
-  // 드래그 시작
-  const handleDragStart = (e: React.DragEvent, id: string) => {
-    setDraggedId(id)
+  const closeEditMode = () => {
+    if (editMode === 'reorder' && reorderBackup) {
+      setRecords(reorderBackup)
+    }
 
-    // 드래그 이미지 설정 (투명한 이미지)
-    const dragImage = new Image()
-    dragImage.src =
-      'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100"><rect width="200" height="100" fill="rgba(59, 130, 246, 0.3)" rx="8"/></svg>'
-    e.dataTransfer!.setDragImage(dragImage, 100, 50)
-    e.dataTransfer!.effectAllowed = 'move'
+    setIsEditMode(false)
+    setEditMode('none')
+    setSelectedIds(new Set())
+    setReorderBackup(null)
   }
 
-  // 드래그 오버
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.dataTransfer!.dropEffect = 'move'
+  const handleSelectDeleteMode = () => {
+    setEditMode('delete')
+    setSelectedIds(new Set())
+    setReorderBackup(null)
   }
 
-  // 드롭
-  const handleDrop = (targetId: string) => {
-    if (!draggedId || draggedId === targetId) return
+  const handleSelectReorderMode = () => {
+    setEditMode('reorder')
+    setSelectedIds(new Set())
+    setReorderBackup(records)
+  }
 
-    const draggedIndex = records.findIndex(r => r.id === draggedId)
-    const targetIndex = records.findIndex(r => r.id === targetId)
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
 
-    if (draggedIndex === -1 || targetIndex === -1) return
+  const handleSelectAll = () => {
+    setSelectedIds(new Set(records.map(record => record.id)))
+  }
 
-    const newRecords = [...records]
-    ;[newRecords[draggedIndex], newRecords[targetIndex]] = [
-      newRecords[targetIndex],
-      newRecords[draggedIndex],
-    ]
+  const handleDeleteSelected = async () => {
+    if (selectedIds.size === 0) {
+      toast.error('삭제할 종목을 선택하세요.')
+      return
+    }
 
-    setRecords(newRecords)
-    saveOrder(newRecords)
-    setDraggedId(null)
+    const idsToDelete = Array.from(selectedIds)
+    setLoadingIds(new Set(idsToDelete))
+
+    try {
+      const results = await Promise.all(
+        idsToDelete.map(id =>
+          fetch(`/api/searches/${id}`, {
+            method: 'DELETE',
+          })
+        )
+      )
+
+      if (!results.every(response => response.ok)) {
+        throw new Error('Some deletions failed')
+      }
+
+      const nextRecords = records.filter(record => !selectedIds.has(record.id))
+      setRecords(nextRecords)
+      saveOrder(nextRecords)
+      setSelectedIds(new Set())
+      setIsEditMode(false)
+      setEditMode('none')
+      toast.success(`${idsToDelete.length}개 종목이 삭제되었습니다.`)
+    } catch (error) {
+      console.error('Delete failed:', error)
+      toast.error('삭제에 실패했습니다.')
+    } finally {
+      setLoadingIds(new Set())
+      setDeleteConfirmOpen(false)
+    }
+  }
+
+  const handleConfirmReorder = () => {
+    saveOrder(records)
+    setIsEditMode(false)
+    setEditMode('none')
+    setReorderBackup(null)
+    toast.success('종목 위치가 저장되었습니다.')
+  }
+
+  const handleEditDone = () => {
+    if (editMode === 'reorder') {
+      handleConfirmReorder()
+      return
+    }
+
+    closeEditMode()
+  }
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (editMode !== 'reorder' || !over || active.id === over.id) return
+
+    const oldIndex = records.findIndex(record => record.id === active.id)
+    const newIndex = records.findIndex(record => record.id === over.id)
+
+    if (oldIndex < 0 || newIndex < 0) return
+
+    setRecords(prev => arrayMove(prev, oldIndex, newIndex))
   }
 
   const handleRefresh = async (id: string) => {
     try {
       setLoadingIds(prev => new Set(prev).add(id))
 
-      // 해당 종목의 ticker 찾기
-      const record = records.find(r => r.id === id)
-      if (!record) return
-
-      // POST /api/searches로 동일 ticker 재조회 (UPSERT)
-      const response = await fetch('/api/searches', {
+      const response = await fetch(`/api/searches/${id}/refreshes`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ ticker: record.ticker }),
       })
 
       if (!response.ok) {
         throw new Error('Failed to refresh')
       }
 
-      // 데이터 재조회 (새로고침된 레코드 반영)
-      const getAllResponse = await fetch('/api/searches')
-      if (getAllResponse.ok) {
-        const allData = (await getAllResponse.json()) as {
-          data?: SearchRecord[]
-        }
-        if (allData.data && Array.isArray(allData.data)) {
-          setRecords(allData.data)
-        }
+      const body = (await response.json()) as { data?: SearchRecord }
+      if (body.data) {
+        setRecords(prev =>
+          prev.map(record => (record.id === id ? body.data! : record))
+        )
       }
+
+      toast.success('종목을 최신화했습니다.')
     } catch (error) {
       console.error('Refresh failed:', error)
+      toast.error('종목 최신화에 실패했습니다.')
     } finally {
       setLoadingIds(prev => {
         const next = new Set(prev)
@@ -134,40 +268,65 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
     }
   }
 
-  const handleDelete = async (id: string) => {
-    try {
-      setLoadingIds(prev => new Set(prev).add(id))
+  const handleDeleteOne = async (id: string) => {
+    setSelectedIds(new Set([id]))
+    setDeleteConfirmOpen(true)
+  }
 
-      const response = await fetch(`/api/searches/${id}`, {
-        method: 'DELETE',
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to delete')
+  const renderStockCard = (record: SearchRecord) => (
+    <div
+      className={cn(
+        'group relative',
+        editMode === 'delete' && 'cursor-pointer',
+        editMode === 'delete' &&
+          selectedIds.has(record.id) &&
+          'ring-offset-background rounded-lg ring-2 ring-cyan-400 ring-offset-2'
+      )}
+      onClick={
+        editMode === 'delete' ? () => handleToggleSelect(record.id) : undefined
       }
-
-      // 로컬 상태에서 제거
-      setRecords(records.filter(r => r.id !== id))
-    } catch (error) {
-      console.error('Delete failed:', error)
-    } finally {
-      setLoadingIds(prev => {
-        const next = new Set(prev)
-        next.delete(id)
-        return next
-      })
-    }
-  }
+    >
+      {editMode === 'delete' && (
+        <div
+          className="absolute top-4 left-4 z-20"
+          onClick={event => event.stopPropagation()}
+        >
+          <Checkbox
+            checked={selectedIds.has(record.id)}
+            onCheckedChange={() => handleToggleSelect(record.id)}
+            aria-label={`${record.ticker} 선택`}
+          />
+        </div>
+      )}
+      <StockCard
+        id={record.id}
+        ticker={record.ticker}
+        companyName={record.company_name}
+        currency={record.currency}
+        weeklyOpen={record.weekly_open ?? 0}
+        weeklyHigh={record.weekly_high ?? 0}
+        weeklyLow={record.weekly_low ?? 0}
+        currentPrice={record.current_price ?? 0}
+        previousClose={record.previous_close ?? 0}
+        ma13={record.ma13 ?? 0}
+        yoyChange={record.yoy_change ?? 0}
+        lastUpdatedAt={record.last_updated_at ?? record.searched_at}
+        onRefresh={() => handleRefresh(record.id)}
+        onDelete={() => handleDeleteOne(record.id)}
+        isLoading={loadingIds.has(record.id)}
+        editMode={editMode}
+      />
+    </div>
+  )
 
   const isEmpty = records.length === 0
 
   return (
     <>
       {isEmpty ? (
-        /* 빈 상태 UI */
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <p className="text-muted-foreground mb-6 text-lg">
-            저장된 종목이 없습니다.
+            내 종목이 없습니다.
           </p>
           <Button asChild>
             <Link href="/search">+ 추가</Link>
@@ -175,84 +334,163 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
         </div>
       ) : (
         <>
-          {/* 수정 모드 토글 버튼 */}
-          <div className="mb-6 flex justify-end">
-            <Button
-              variant={isEditMode ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setIsEditMode(!isEditMode)}
-            >
-              {isEditMode ? (
-                <>
-                  <Check className="mr-2 h-4 w-4" />
+          <div className="mb-6 flex justify-end gap-2">
+            {!isEditMode ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditMode(true)}
+                className="border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                <Pencil className="mr-2 h-4 w-4" />
+                편집
+              </Button>
+            ) : editMode === 'none' ? (
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSelectDeleteMode}
+                  className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300 dark:hover:bg-red-950/40"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  삭제
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSelectReorderMode}
+                  className="border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-800 dark:border-indigo-900/60 dark:bg-indigo-950/20 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
+                >
+                  <GripVertical className="mr-2 h-4 w-4" />
+                  순서 변경
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={closeEditMode}
+                  className="text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  <X className="mr-2 h-4 w-4" />
                   완료
-                </>
-              ) : (
-                <>
-                  <Edit2 className="mr-2 h-4 w-4" />
-                  수정
-                </>
-              )}
-            </Button>
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleEditDone}
+                className="text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                <X className="mr-2 h-4 w-4" />
+                완료
+              </Button>
+            )}
           </div>
 
-          {/* 수정 모드 안내 */}
-          {isEditMode && (
-            <div className="mb-4 rounded-lg bg-blue-500/10 p-3 text-sm text-blue-700 dark:text-blue-400">
-              💡 카드를 드래그해서 순서를 변경할 수 있습니다
+          {editMode === 'delete' && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSelectAll}
+                  className="border-slate-300 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  전체 선택
+                </Button>
+                {selectedIds.size > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedIds(new Set())}
+                    className="border-slate-300 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    선택 해제
+                  </Button>
+                )}
+                <span className="text-muted-foreground text-sm">
+                  {selectedIds.size}개 선택됨
+                </span>
+              </div>
+              {selectedIds.size > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDeleteConfirmOpen(true)}
+                  disabled={loadingIds.size > 0}
+                  className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300 dark:hover:bg-red-950/40"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  삭제
+                </Button>
+              )}
             </div>
           )}
 
-          {/* 종목 카드 그리드 - 한 줄에 3개씩 표시 */}
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {records.map(record => (
-              <div
-                key={record.id}
-                draggable={isEditMode}
-                onDragStart={e => handleDragStart(e, record.id)}
-                onDragOver={handleDragOver}
-                onDrop={() => handleDrop(record.id)}
-                className={`transition-all duration-300 ${
-                  isEditMode ? 'cursor-move' : ''
-                } ${draggedId === record.id ? 'scale-95 opacity-50' : ''}`}
-                style={{
-                  transform:
-                    draggedId === record.id ? 'scale(0.95)' : 'scale(1)',
-                }}
+          {editMode === 'reorder' ? (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={records.map(record => record.id)}
+                strategy={rectSortingStrategy}
               >
-                <StockCard
-                  id={record.id}
-                  ticker={record.ticker}
-                  companyName={record.company_name}
-                  currency={record.currency}
-                  weeklyOpen={record.weekly_open ?? 0}
-                  weeklyHigh={record.weekly_high ?? 0}
-                  weeklyLow={record.weekly_low ?? 0}
-                  currentPrice={record.current_price ?? 0}
-                  previousClose={record.previous_close ?? 0}
-                  ma13={record.ma13 ?? 0}
-                  yoyChange={record.yoy_change ?? 0}
-                  lastUpdatedAt={record.last_updated_at ?? record.searched_at}
-                  onRefresh={() => handleRefresh(record.id)}
-                  onDelete={() => handleDelete(record.id)}
-                  isLoading={loadingIds.has(record.id)}
-                  isEditMode={isEditMode}
-                  isDragging={draggedId === record.id}
-                />
-              </div>
-            ))}
-          </div>
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  {records.map(record => (
+                    <SortableStockCard key={record.id} record={record}>
+                      {renderStockCard(record)}
+                    </SortableStockCard>
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          ) : (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {records.map(record => (
+                <div key={record.id}>{renderStockCard(record)}</div>
+              ))}
+            </div>
+          )}
         </>
       )}
 
-      {/* 하단 고정 추가 버튼 */}
-      {!isEmpty && (
+      {!isEmpty && editMode !== 'delete' && editMode !== 'reorder' && (
         <div className="fixed right-6 bottom-6">
           <Button size="lg" className="rounded-full shadow-lg" asChild>
             <Link href="/search">+ 추가</Link>
           </Button>
         </div>
       )}
+
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>종목 삭제</AlertDialogTitle>
+            <AlertDialogDescription>
+              선택된 {selectedIds.size}개의 종목을 삭제하시겠습니까? 이 작업은
+              되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loadingIds.size > 0}>
+              취소
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={event => {
+                event.preventDefault()
+                void handleDeleteSelected()
+              }}
+              disabled={loadingIds.size > 0}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {loadingIds.size > 0 ? '삭제 중...' : '삭제'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }

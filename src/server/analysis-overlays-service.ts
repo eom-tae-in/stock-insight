@@ -122,6 +122,8 @@ export async function listAnalysisOverlays(
     ticker: row.ticker,
     company_name: row.company_name,
     display_order: row.display_order,
+    last_refreshed_at: row.last_refreshed_at,
+    lastRefreshedAt: row.last_refreshed_at,
     created_at: row.created_at,
     chart_data: (row.overlay_chart_timeseries || [])
       .map(
@@ -322,4 +324,77 @@ export async function deleteAnalysisOverlay(
   if (error) throw error
 
   return { success: true }
+}
+
+export async function refreshAnalysisOverlay(
+  supabase: SupabaseClient,
+  userId: string,
+  analysisId: string,
+  overlayId: string
+) {
+  await assertOwnedAnalysis(supabase, analysisId, userId)
+
+  const { data: overlay, error: overlayError } = await supabase
+    .from('keyword_stock_overlays')
+    .select('id, ticker')
+    .eq('id', overlayId)
+    .eq('analysis_id', analysisId)
+    .single()
+
+  if (overlayError?.code === 'PGRST116' || !overlay) {
+    throw new AnalysisOverlayServiceError(
+      'NOT_FOUND',
+      '오버레이를 찾을 수 없습니다.',
+      404
+    )
+  }
+
+  if (overlayError) throw overlayError
+
+  const stockData = await fetchCachedStockData(overlay.ticker)
+  const priceData = stockData.priceData.map(point => ({
+    date: point.date,
+    price: point.close,
+  }))
+  const records = toTimeseriesRecords(overlayId, priceData)
+
+  const firstDate = priceData[0]?.date
+  if (firstDate) {
+    const { error: pruneError } = await supabase
+      .from('overlay_chart_timeseries')
+      .delete()
+      .eq('overlay_id', overlayId)
+      .lt('date', firstDate)
+
+    if (pruneError) throw pruneError
+  }
+
+  if (records.length > 0) {
+    const { error: timeseriesError } = await supabase
+      .from('overlay_chart_timeseries')
+      .upsert(records, { onConflict: 'overlay_id,date' })
+
+    if (timeseriesError) throw timeseriesError
+  }
+
+  const { error: overlayUpdateError } = await supabase
+    .from('keyword_stock_overlays')
+    .update({ last_refreshed_at: new Date().toISOString() })
+    .eq('id', overlayId)
+    .eq('analysis_id', analysisId)
+
+  if (overlayUpdateError) throw overlayUpdateError
+
+  const overlays = await listAnalysisOverlays(supabase, userId, analysisId)
+  const refreshedOverlay = overlays.find(item => item.id === overlayId)
+
+  if (!refreshedOverlay) {
+    throw new AnalysisOverlayServiceError(
+      'REFRESH_FAILED',
+      '갱신된 오버레이를 다시 조회하지 못했습니다.',
+      500
+    )
+  }
+
+  return refreshedOverlay
 }

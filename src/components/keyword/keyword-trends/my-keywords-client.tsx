@@ -20,6 +20,14 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,14 +40,8 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Container } from '@/components/layout/container'
 import { KeywordCard } from '@/components/keyword/keyword-trends/keyword-card'
-import { KeywordIndexSidebar } from '@/components/keyword/keyword-trends/keyword-index-sidebar'
-import { KeywordManageActionBar } from '@/components/keyword/keyword-trends/keyword-manage-action-bar'
 import {
-  groupKeywordsByIndex,
-  getActiveIndices,
-  ALL_INDICES,
   filterKeywordsByLanguage,
-  SHOW_ALL_INDEX,
   type KeywordLanguage,
 } from '@/lib/utils/keyword-classifier'
 import { toast } from 'sonner'
@@ -51,6 +53,8 @@ interface MyKeywordsClientProps {
 }
 
 type EditMode = 'none' | 'delete' | 'reorder'
+type KeywordFilter = 'all' | KeywordLanguage
+type KeywordSort = 'custom' | 'latest' | 'name'
 
 function SortableKeywordCard({
   keyword,
@@ -104,23 +108,15 @@ function EmptyKeywordsState() {
   )
 }
 
-function EmptyLanguageState({ language }: { language: KeywordLanguage }) {
-  const languageText = {
-    ko: '한글',
-    en: '영어',
-    symbol: '숫자/기호',
-  }[language]
-
+function EmptyFilteredState() {
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
       <div className="mb-4 text-4xl" aria-hidden="true">
         ✨
       </div>
-      <h2 className="mb-2 text-base font-semibold">
-        {languageText} 키워드가 없어요
-      </h2>
+      <h2 className="mb-2 text-base font-semibold">키워드가 없어요</h2>
       <p className="text-muted-foreground text-sm">
-        다른 언어 탭을 선택해보세요
+        검색어나 필터를 바꿔보세요
       </p>
     </div>
   )
@@ -128,13 +124,12 @@ function EmptyLanguageState({ language }: { language: KeywordLanguage }) {
 
 export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
   const [keywords, setKeywords] = useState<KeywordRecord[]>(initialKeywords)
-  const [selectedIndex, setSelectedIndex] = useState<string | null>(
-    SHOW_ALL_INDEX
-  )
   const [isLoading, setIsLoading] = useState(false)
+  const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set())
 
-  // 언어 탭 필터링
-  const [languageTab, setLanguageTab] = useState<KeywordLanguage>('ko')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [keywordFilter, setKeywordFilter] = useState<KeywordFilter>('all')
+  const [keywordSort, setKeywordSort] = useState<KeywordSort>('custom')
 
   // 무한스크롤
   const [displayCount, setDisplayCount] = useState(100)
@@ -145,10 +140,7 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
   const [editMode, setEditMode] = useState<EditMode>('none')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<
-    'selected' | 'single' | null
-  >(null)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<'selected' | null>(null)
   const [isSavingOrder, setIsSavingOrder] = useState(false)
 
   const sensors = useSensors(
@@ -175,51 +167,50 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
     fetchKeywords()
   }, [fetchKeywords])
 
-  // 언어별 필터링 → 인덱스 그룹핑
-  const filteredKeywords = useMemo(
-    () => filterKeywordsByLanguage(keywords, languageTab),
-    [keywords, languageTab]
-  )
-
-  const grouped = useMemo(
-    () => groupKeywordsByIndex(filteredKeywords),
-    [filteredKeywords]
-  )
-
-  // 선택된 인덱스 유효성 확인 및 필요시 업데이트
+  // 필터/정렬 변경 시 편집 모드 해제 + displayCount 초기화
   useEffect(() => {
-    // "전체" 상태면 grouped 확인 스킵
-    if (selectedIndex === SHOW_ALL_INDEX) return
-
-    // grouped가 변경되었을 때 특정 인덱스가 유효한지 확인
-    if (!selectedIndex || !(grouped[selectedIndex]?.length > 0)) {
-      const first = ALL_INDICES.find(idx => (grouped[idx]?.length ?? 0) > 0)
-      setSelectedIndex(first ?? SHOW_ALL_INDEX)
-    }
-  }, [selectedIndex, grouped])
-
-  // 언어 탭 변경 시 selectedIndex 초기화 + 관리 모드 해제 + displayCount 초기화
-  useEffect(() => {
-    setSelectedIndex(SHOW_ALL_INDEX)
     setDisplayCount(100)
     setIsEditMode(false)
     setEditMode('none')
     setSelectedIds(new Set())
-  }, [languageTab])
+  }, [keywordFilter, keywordSort, searchQuery])
 
-  // 선택된 인덱스의 키워드 목록 (무한스크롤 적용)
-  const displayedKeywords = useMemo(() => {
-    if (!selectedIndex) return []
+  const filteredKeywords = useMemo(() => {
+    const languageFiltered =
+      keywordFilter === 'all'
+        ? keywords
+        : filterKeywordsByLanguage(keywords, keywordFilter)
 
-    // "전체" 선택 시: 모든 인덱스의 키워드를 합쳐서 반환
-    if (selectedIndex === SHOW_ALL_INDEX) {
-      return filteredKeywords.slice(0, displayCount)
+    const normalizedQuery = searchQuery.trim().toLowerCase()
+    if (!normalizedQuery) return languageFiltered
+
+    return languageFiltered.filter(keyword =>
+      keyword.keyword.toLowerCase().includes(normalizedQuery)
+    )
+  }, [keywordFilter, keywords, searchQuery])
+
+  const sortedKeywords = useMemo(() => {
+    const copied = [...filteredKeywords]
+
+    if (keywordSort === 'latest') {
+      copied.sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )
+      return copied
     }
 
-    // 특정 인덱스 선택 시: 해당 인덱스만 반환
-    const indexKeywords = grouped[selectedIndex] ?? []
-    return indexKeywords.slice(0, displayCount)
-  }, [selectedIndex, filteredKeywords, grouped, displayCount])
+    if (keywordSort === 'name') {
+      copied.sort((a, b) => a.keyword.localeCompare(b.keyword, 'ko'))
+      return copied
+    }
+
+    return copied
+  }, [filteredKeywords, keywordSort])
+
+  const displayedKeywords = useMemo(() => {
+    return sortedKeywords.slice(0, displayCount)
+  }, [displayCount, sortedKeywords])
 
   // 무한스크롤 감지
   useEffect(() => {
@@ -268,6 +259,15 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
   }
 
   const handleSelectReorderMode = () => {
+    if (
+      keywordSort !== 'custom' ||
+      keywordFilter !== 'all' ||
+      searchQuery.trim()
+    ) {
+      toast.info('순서 변경은 전체 목록의 직접 설정순에서 사용할 수 있습니다.')
+      return
+    }
+
     setEditMode(prev => (prev === 'reorder' ? 'none' : 'reorder'))
     setSelectedIds(new Set())
     setEditingId(null)
@@ -291,15 +291,11 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
     setSelectedIds(new Set(displayedKeywords.map(k => k.id)))
   }
 
-  // 키워드 삭제 (단건 또는 일괄)
+  // 키워드 삭제
   const handleDeleteKeyword = async () => {
     try {
       const idsToDelete =
-        deleteTarget === 'selected'
-          ? Array.from(selectedIds)
-          : deleteTarget === 'single' && deletingId
-            ? [deletingId]
-            : []
+        deleteTarget === 'selected' ? Array.from(selectedIds) : []
 
       if (idsToDelete.length === 0) return
 
@@ -316,18 +312,9 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
       const updated = keywords.filter(k => !idsToDelete.includes(k.id))
       setKeywords(updated)
 
-      // 선택된 인덱스 재계산
-      const newGrouped = groupKeywordsByIndex(updated)
-      const newActiveIndices = getActiveIndices(newGrouped)
-
-      if (selectedIndex && !newActiveIndices.includes(selectedIndex)) {
-        setSelectedIndex(newActiveIndices[0] ?? null)
-      }
-
       // 상태 초기화
       setSelectedIds(new Set())
       setDeleteTarget(null)
-      setDeletingId(null)
       if (editMode === 'delete') {
         setEditMode('none')
       }
@@ -421,21 +408,64 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
     }
   }
 
+  const handleEditDone = () => {
+    if (editMode === 'reorder') {
+      void handleConfirmReorder()
+      return
+    }
+
+    closeEditMode()
+  }
+
+  const handleRefreshKeyword = async (id: string) => {
+    setRefreshingIds(prev => new Set(prev).add(id))
+
+    try {
+      await apiFetchJson(`/api/keywords/${id}/refreshes`, {
+        method: 'POST',
+      })
+      await fetchKeywords()
+      toast.success('키워드를 최신화했습니다.')
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : '키워드 최신화에 실패했습니다.'
+      toast.error(message)
+    } finally {
+      setRefreshingIds(prev => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+    }
+  }
+
   // 헤더 영역
   const header = (
-    <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h1 className="text-3xl font-bold">내 키워드</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          {keywords.length}개의 키워드 저장됨
-        </p>
+    <div className="mb-6 space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">내 키워드</h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            저장한 키워드의 검색 트렌드와 커스텀 비교 차트를 확인합니다.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Link href="/keyword-analysis/new">
+            <Button>
+              <Search className="mr-2 h-4 w-4" />새 키워드 검색
+            </Button>
+          </Link>
+        </div>
       </div>
-      <div className="flex gap-2">
-        <Link href="/keyword-analysis/new">
-          <Button>
-            <Search className="mr-2 h-4 w-4" />새 키워드 검색
-          </Button>
-        </Link>
+
+      <div className="text-muted-foreground space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/30">
+        <p className="text-sm">
+          📊 Google Trends 데이터는 완료된 전주까지 수집됩니다.
+        </p>
+        <p className="text-sm">
+          검색량 기반 지표, 13주 이동평균, 52주 전 대비 증감률은 주간 검색
+          관심도 기준으로 계산됩니다.
+        </p>
       </div>
     </div>
   )
@@ -455,18 +485,59 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
     <Container className="py-8 pb-24 sm:pb-8">
       {header}
 
-      <div className="flex gap-3">
-        {/* 좌측 사이드바: 언어 탭 + 인덱스 탭 */}
-        <KeywordIndexSidebar
-          grouped={grouped}
-          selectedIndex={selectedIndex}
-          onSelect={setSelectedIndex}
-          languageTab={languageTab}
-          onLanguageTabChange={setLanguageTab}
-        />
+      <div className="space-y-4">
+        <div className="bg-card rounded-lg border p-4">
+          <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto] lg:items-center">
+            <div className="relative">
+              <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+              <Input
+                value={searchQuery}
+                onChange={event => setSearchQuery(event.target.value)}
+                placeholder="키워드 검색"
+                className="pl-9"
+              />
+            </div>
 
-        {/* 우측: 키워드 그리드 + 액션바 */}
-        <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap gap-2">
+              {[
+                { value: 'all', label: '전체' },
+                { value: 'ko', label: '한글' },
+                { value: 'en', label: '영어' },
+                { value: 'symbol', label: '기타' },
+              ].map(option => (
+                <Button
+                  key={option.value}
+                  type="button"
+                  variant={
+                    keywordFilter === option.value ? 'default' : 'outline'
+                  }
+                  size="sm"
+                  onClick={() =>
+                    setKeywordFilter(option.value as KeywordFilter)
+                  }
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </div>
+
+            <Select
+              value={keywordSort}
+              onValueChange={value => setKeywordSort(value as KeywordSort)}
+            >
+              <SelectTrigger className="h-9 w-full lg:w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="custom">직접 설정순</SelectItem>
+                <SelectItem value="latest">최신순</SelectItem>
+                <SelectItem value="name">이름순</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="min-w-0">
           {keywords.length > 0 && (
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-muted-foreground text-sm">
@@ -479,26 +550,27 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
                   size="sm"
                   onClick={handleToggleEditMode}
                   disabled={displayedKeywords.length === 0}
+                  className="border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
                   <Pencil className="mr-2 h-4 w-4" />
                   편집
                 </Button>
-              ) : (
+              ) : editMode === 'none' ? (
                 <div className="flex flex-wrap gap-2">
                   <Button
-                    variant={editMode === 'delete' ? 'default' : 'outline'}
+                    variant="outline"
                     size="sm"
                     onClick={handleSelectDeleteMode}
-                    disabled={editMode === 'reorder'}
+                    className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300 dark:hover:bg-red-950/40"
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
                     삭제
                   </Button>
                   <Button
-                    variant={editMode === 'reorder' ? 'default' : 'outline'}
+                    variant="outline"
                     size="sm"
                     onClick={handleSelectReorderMode}
-                    disabled={editMode === 'delete'}
+                    className="border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-800 dark:border-indigo-900/60 dark:bg-indigo-950/20 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
                   >
                     <GripVertical className="mr-2 h-4 w-4" />
                     순서 변경
@@ -508,34 +580,70 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
                     size="sm"
                     onClick={closeEditMode}
                     disabled={isSavingOrder}
+                    className="text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
                   >
                     <X className="mr-2 h-4 w-4" />
                     완료
                   </Button>
                 </div>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleEditDone}
+                  disabled={isSavingOrder}
+                  className="text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  완료
+                </Button>
               )}
             </div>
           )}
 
           {editMode === 'delete' && displayedKeywords.length > 0 && (
-            <div className="mb-4 flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={handleSelectAll}>
-                전체 선택
-              </Button>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSelectAll}
+                  className="border-slate-300 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  전체 선택
+                </Button>
+                {selectedIds.size > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedIds(new Set())}
+                    className="border-slate-300 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    선택 해제
+                  </Button>
+                )}
+                <span className="text-muted-foreground text-sm">
+                  {selectedIds.size}개 선택됨
+                </span>
+              </div>
               {selectedIds.size > 0 && (
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
-                  onClick={() => setSelectedIds(new Set())}
+                  onClick={() => {
+                    setDeleteTarget('selected')
+                  }}
+                  className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300 dark:hover:bg-red-950/40"
                 >
-                  선택 해제
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  삭제
                 </Button>
               )}
             </div>
           )}
 
           {displayedKeywords.length === 0 ? (
-            <EmptyLanguageState language={languageTab} />
+            <EmptyFilteredState />
           ) : (
             <>
               {editMode === 'reorder' ? (
@@ -587,30 +695,17 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
                           mode={editMode === 'delete' ? 'delete' : 'normal'}
                           isSelected={selectedIds.has(keyword.id)}
                           isEditing={editingId === keyword.id}
-                          onDelete={() => {
-                            setDeleteTarget('single')
-                            setDeletingId(keyword.id)
-                          }}
                           onToggleSelect={() => handleToggleSelect(keyword.id)}
                           onEditStart={() => setEditingId(keyword.id)}
                           onEditSave={handleEditSave}
                           onEditCancel={() => setEditingId(null)}
+                          onRefresh={handleRefreshKeyword}
+                          isRefreshing={refreshingIds.has(keyword.id)}
                         />
                       </div>
                     )
                   })}
                 </div>
-              )}
-
-              {editMode !== 'none' && (
-                <KeywordManageActionBar
-                  selectedCount={selectedIds.size}
-                  mode={editMode}
-                  onDelete={() => {
-                    setDeleteTarget('selected')
-                  }}
-                  onDone={handleConfirmReorder}
-                />
               )}
             </>
           )}
@@ -623,17 +718,12 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
         onOpenChange={open => {
           if (!open) {
             setDeleteTarget(null)
-            setDeletingId(null)
           }
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {deleteTarget === 'selected'
-                ? '선택한 키워드를 삭제하시겠어요?'
-                : '키워드를 삭제하시겠어요?'}
-            </AlertDialogTitle>
+            <AlertDialogTitle>선택한 키워드를 삭제하시겠어요?</AlertDialogTitle>
             <AlertDialogDescription>
               이 작업은 되돌릴 수 없습니다. 저장된 키워드 데이터가 영구적으로
               삭제됩니다.

@@ -287,6 +287,7 @@ class SupabaseDbAdapter implements DbAdapter {
       yoy_change: data.yoy_change,
       price_data: priceData,
       trends_data: [],
+      last_updated_at: data.last_updated_at,
       searched_at: data.searched_at,
       created_at: data.created_at,
     }
@@ -328,6 +329,7 @@ class SupabaseDbAdapter implements DbAdapter {
       yoy_change: data.yoy_change,
       price_data: priceData,
       trends_data: [],
+      last_updated_at: data.last_updated_at,
       searched_at: data.searched_at,
       created_at: data.created_at,
     }
@@ -367,6 +369,7 @@ class SupabaseDbAdapter implements DbAdapter {
           yoy_change: row.yoy_change,
           price_data: priceData,
           trends_data: [],
+          last_updated_at: row.last_updated_at,
           searched_at: row.searched_at,
           created_at: row.created_at,
         }

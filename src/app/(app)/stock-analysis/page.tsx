@@ -42,8 +42,16 @@ export default async function StockAnalysisPage() {
 
   return (
     <Container className="py-8">
+      {/* 내 종목 제목 */}
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold">내 종목</h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          저장한 종목의 주간 지표와 분석 차트를 확인합니다.
+        </p>
+      </div>
+
       {/* 데이터 수집 기준 안내 */}
-      <div className="text-muted-foreground mb-12 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/30">
+      <div className="text-muted-foreground mb-6 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/30">
         <p className="text-sm">
           📊 모든 데이터는 지난주(금요일)까지 수집됩니다.
         </p>
@@ -51,11 +59,6 @@ export default async function StockAnalysisPage() {
           전주 대비 수익률, 최근 13주 평균, 52주 전 대비 수익률은 종가 기준으로
           계산됩니다.
         </p>
-      </div>
-
-      {/* 저장된 종목 제목 */}
-      <div className="mb-4">
-        <h1 className="text-3xl font-bold">저장된 종목</h1>
       </div>
 
       {/* Client Component에 데이터 전달 */}

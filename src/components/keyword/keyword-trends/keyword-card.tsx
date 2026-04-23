@@ -2,7 +2,14 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { GripVertical, X, Pencil, Check, Loader2 } from 'lucide-react'
+import {
+  GripVertical,
+  X,
+  Pencil,
+  Check,
+  Loader2,
+  RefreshCw,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -15,11 +22,12 @@ interface KeywordCardProps {
   mode?: 'normal' | 'delete' | 'reorder'
   isSelected: boolean
   isEditing: boolean
-  onDelete?: () => void
   onToggleSelect?: (id: string) => void
   onEditStart?: (id: string) => void
   onEditSave?: (id: string, newKeyword: string) => Promise<void>
   onEditCancel?: () => void
+  onRefresh?: (id: string) => Promise<void>
+  isRefreshing?: boolean
 }
 
 export function KeywordCard({
@@ -28,14 +36,16 @@ export function KeywordCard({
   mode = isManageMode ? 'delete' : 'normal',
   isSelected,
   isEditing,
-  onDelete,
   onToggleSelect,
   onEditStart,
   onEditSave,
   onEditCancel,
+  onRefresh,
+  isRefreshing = false,
 }: KeywordCardProps) {
   const [editValue, setEditValue] = useState(keyword.keyword)
   const [isSaving, setIsSaving] = useState(false)
+  const [showOverlay, setShowOverlay] = useState(false)
 
   // isEditing이 true로 바뀔 때 editValue 초기화
   useEffect(() => {
@@ -43,12 +53,6 @@ export function KeywordCard({
       setEditValue(keyword.keyword)
     }
   }, [isEditing, keyword.keyword])
-
-  const handleDelete = (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    onDelete?.()
-  }
 
   const handleEditStart = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -85,6 +89,12 @@ export function KeywordCard({
     }
   }
 
+  const handleRefresh = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    await onRefresh?.(keyword.id)
+  }
+
   const searchDate = new Date(keyword.searched_at)
   const formattedDate = searchDate.toLocaleDateString('ko-KR', {
     year: 'numeric',
@@ -93,11 +103,6 @@ export function KeywordCard({
   })
 
   // 최신 트렌드 데이터 추출
-
-  // 미조회 여부 판별 (last_viewed_at이 null이거나 searched_at보다 이전)
-  const isUnviewed =
-    !keyword.last_viewed_at ||
-    new Date(keyword.last_viewed_at) < new Date(keyword.searched_at)
 
   const isDeleteMode = mode === 'delete'
   const isReorderMode = mode === 'reorder'
@@ -108,29 +113,24 @@ export function KeywordCard({
       <Link href={`/keywords/${keyword.id}`}>
         <div
           className={cn(
-            'group border-border/50 from-card to-card/80 relative rounded-xl border bg-gradient-to-br p-4 transition-all duration-200',
+            'group border-border/50 from-card to-card/80 relative overflow-hidden rounded-xl border bg-gradient-to-br p-4 transition-all duration-200',
             'hover:border-primary/70 hover:shadow-primary/10 hover:shadow-md',
-            'cursor-pointer backdrop-blur-sm'
+            'cursor-pointer backdrop-blur-sm',
+            isRefreshing &&
+              'border-cyan-400 bg-cyan-50/50 shadow-md ring-2 ring-cyan-400/30 dark:bg-cyan-950/20'
           )}
+          onMouseEnter={() => setShowOverlay(true)}
+          onMouseLeave={() => setShowOverlay(false)}
+          onClick={() => setShowOverlay(prev => !prev)}
         >
-          {/* 삭제 버튼 - hover 시 표시 */}
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className={cn(
-              'absolute top-2 right-2 z-20 h-7 w-7 p-0',
-              'text-destructive transition-all duration-200',
-              'opacity-0 group-hover:opacity-100',
-              'hover:bg-destructive/15'
-            )}
-            onClick={handleDelete}
-            aria-label="키워드 삭제"
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          {isRefreshing && (
+            <div className="absolute top-3 right-3 z-20 inline-flex items-center gap-1 rounded-full border border-cyan-300 bg-cyan-50 px-2 py-1 text-xs font-medium text-cyan-700 shadow-sm dark:border-cyan-800 dark:bg-cyan-950 dark:text-cyan-200">
+              <RefreshCw className="h-3 w-3 animate-spin" />
+              최신화 중
+            </div>
+          )}
 
-          <div className="space-y-3 pr-6">
+          <div className="space-y-3">
             {/* 키워드 이름 */}
             <h3 className="text-foreground truncate leading-tight font-semibold">
               {keyword.keyword}
@@ -139,6 +139,24 @@ export function KeywordCard({
             {/* 기준 날짜 */}
             <p className="text-muted-foreground text-xs">{formattedDate}</p>
           </div>
+
+          {(showOverlay || isRefreshing) && (
+            <div className="bg-background/70 absolute inset-0 flex items-center justify-center backdrop-blur-sm transition-opacity">
+              <Button
+                type="button"
+                size="lg"
+                variant="outline"
+                className="bg-background/95 h-12 w-12 rounded-full border-cyan-300 text-cyan-700 shadow-md transition-all hover:border-cyan-400 hover:bg-cyan-50 hover:text-cyan-800 hover:shadow-lg dark:border-cyan-800 dark:text-cyan-200 dark:hover:bg-cyan-950"
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                aria-label="키워드 최신화"
+              >
+                <RefreshCw
+                  className={cn('h-5 w-5', isRefreshing && 'animate-spin')}
+                />
+              </Button>
+            </div>
+          )}
         </div>
       </Link>
     )
@@ -224,7 +242,6 @@ export function KeywordCard({
         {isReorderMode && (
           <GripVertical className="text-muted-foreground h-4 w-4" />
         )}
-        {isUnviewed && <div className="bg-primary h-2 w-2 rounded-full" />}
       </div>
 
       <div className="space-y-3 pl-8">
@@ -248,16 +265,6 @@ export function KeywordCard({
             aria-label="키워드 수정"
           >
             <Pencil className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="text-destructive hover:bg-destructive/15 h-7 w-7 p-0"
-            onClick={handleDelete}
-            aria-label="키워드 삭제"
-          >
-            <X className="h-4 w-4" />
           </Button>
         </div>
       )}
