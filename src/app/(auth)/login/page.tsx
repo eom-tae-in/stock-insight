@@ -14,7 +14,19 @@ import { OAuthLoginButton } from '@/components/auth/login-button'
 import { LoginForm } from '@/components/auth/login-form'
 import { Separator } from '@/components/ui/separator'
 
-export default function LoginPage() {
+function getSafeNextPath(input?: string): string {
+  if (!input || !input.startsWith('/')) return '/'
+  if (input.startsWith('//')) return '/'
+  return input
+}
+
+export default function LoginPage({
+  searchParams,
+}: {
+  searchParams?: { next?: string }
+}) {
+  const nextPath = getSafeNextPath(searchParams?.next)
+
   return (
     <div className="from-background via-background to-primary/5 flex min-h-screen flex-col bg-gradient-to-br">
       {/* 헤더 (테마 토글만) */}
@@ -41,7 +53,11 @@ export default function LoginPage() {
                 <div className="text-muted-foreground text-center text-sm font-medium">
                   SNS로 빠르게 로그인
                 </div>
-                <OAuthLoginButton provider="google" className="w-full" />
+                <OAuthLoginButton
+                  provider="google"
+                  className="w-full"
+                  nextPath={nextPath}
+                />
               </div>
 
               {/* 구분선 */}
@@ -54,7 +70,7 @@ export default function LoginPage() {
 
               {/* Email + Password 로그인 */}
               <div className="space-y-3">
-                <LoginForm />
+                <LoginForm nextPath={nextPath} />
               </div>
 
               {/* 이용 약관 */}
