@@ -1,5 +1,4 @@
 import { execFile } from 'child_process'
-import { existsSync } from 'fs'
 import { promisify } from 'util'
 import path from 'path'
 import { calculateTrendsMA13 } from '@/lib/indicators'
@@ -221,25 +220,7 @@ function getLocalPythonPath(): string {
   const configuredPythonPath = process.env.PYTRENDS_PYTHON_PATH?.trim()
   if (configuredPythonPath) return configuredPythonPath
 
-  const localPythonCandidates =
-    process.platform === 'win32'
-      ? [
-          path.join(process.cwd(), '.venv', 'Scripts', 'python.exe'),
-          path.join(process.cwd(), 'venv', 'Scripts', 'python.exe'),
-          'python',
-        ]
-      : [
-          path.join(process.cwd(), '.venv', 'bin', 'python3'),
-          path.join(process.cwd(), 'venv', 'bin', 'python3'),
-          'python3',
-        ]
-
-  return (
-    localPythonCandidates.find(candidate => {
-      if (candidate === 'python' || candidate === 'python3') return true
-      return existsSync(candidate)
-    }) ?? 'python3'
-  )
+  return process.platform === 'win32' ? 'python' : 'python3'
 }
 
 function parseRawTrendsData(data: unknown, source: string) {
