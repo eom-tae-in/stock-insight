@@ -42,12 +42,6 @@ export class TrendsProviderError extends Error {
   }
 }
 
-function maskSecret(secret: string | undefined): string {
-  if (!secret) return 'missing'
-
-  return `${secret.slice(0, 6)}... (len=${secret.length})`
-}
-
 function calculateBackoffWithJitter(attemptIndex: number): number {
   const baseMs = Math.pow(2, attemptIndex) * BASE_BACKOFF_MS
   const jitterMs = Math.floor(Math.random() * MAX_JITTER_MS)
@@ -283,9 +277,6 @@ class HttpPytrendsProvider implements TrendsProvider {
     }
 
     const baseUrl = await getPytrendsApiBaseUrl()
-    console.info(
-      `[trends] internal pytrends auth secret=${maskSecret(internalSecret)} baseUrl="${baseUrl}"`
-    )
     const response = await fetch(`${baseUrl}/api/pytrends`, {
       method: 'POST',
       headers: {
