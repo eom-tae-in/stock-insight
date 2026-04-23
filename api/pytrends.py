@@ -28,6 +28,25 @@ class handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         try:
+            internal_secret = os.environ.get('PYTRENDS_INTERNAL_SECRET')
+            request_secret = self.headers.get('x-internal-api-secret')
+
+            if not internal_secret:
+                self._send_json(500, {
+                    'success': False,
+                    'error': 'PYTRENDS_INTERNAL_SECRET is not configured',
+                    'code': 'CONFIG_ERROR',
+                })
+                return
+
+            if request_secret != internal_secret:
+                self._send_json(401, {
+                    'success': False,
+                    'error': 'Unauthorized',
+                    'code': 'UNAUTHORIZED',
+                })
+                return
+
             content_length = int(self.headers.get('Content-Length', 0))
             if content_length == 0:
                 self._send_json(400, {

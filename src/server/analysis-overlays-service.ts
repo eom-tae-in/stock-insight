@@ -230,28 +230,34 @@ export async function createAnalysisOverlay(
 
   if (error) throw error
 
-  let priceData = parsePriceData(input.price_data)
-  if (priceData.length === 0) {
-    const stockData = await fetchCachedStockData(ticker)
-    priceData = stockData.priceData.map(point => ({
-      date: point.date,
-      price: point.close,
-    }))
-  }
+  const overlayId = data.id
 
-  const records = toTimeseriesRecords(data.id, priceData)
-  if (records.length > 0) {
-    const { error: timeseriesError } = await supabase
-      .from('overlay_chart_timeseries')
-      .insert(records)
-
-    if (timeseriesError) {
-      await supabase.from('keyword_stock_overlays').delete().eq('id', data.id)
-      throw timeseriesError
+  try {
+    let priceData = parsePriceData(input.price_data)
+    if (priceData.length === 0) {
+      const stockData = await fetchCachedStockData(ticker)
+      priceData = stockData.priceData.map(point => ({
+        date: point.date,
+        price: point.close,
+      }))
     }
-  }
 
-  return { id: data.id }
+    const records = toTimeseriesRecords(overlayId, priceData)
+    if (records.length > 0) {
+      const { error: timeseriesError } = await supabase
+        .from('overlay_chart_timeseries')
+        .insert(records)
+
+      if (timeseriesError) {
+        throw timeseriesError
+      }
+    }
+
+    return { id: overlayId }
+  } catch (error) {
+    await supabase.from('keyword_stock_overlays').delete().eq('id', overlayId)
+    throw error
+  }
 }
 
 export async function updateAnalysisOverlayOrder(

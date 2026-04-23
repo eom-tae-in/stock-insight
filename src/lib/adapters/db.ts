@@ -23,7 +23,6 @@ import type {
 } from '@/types/database'
 import { getSupabaseClient } from '@/lib/supabase'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { normalizeKeywordSpacing } from '@/lib/utils/keyword-normalization'
 
 export interface DbAdapter {
   // ============ searches (종목) ============
@@ -145,56 +144,8 @@ export interface DbAdapter {
 // ============================================================================
 
 class SupabaseDbAdapter implements DbAdapter {
-  private async getOrCreateKeyword(
-    userId: string,
-    keywordName: string,
-    preferredId: string,
-    client?: SupabaseClient
-  ): Promise<string> {
-    const supabase = client ?? getSupabaseClient()
-
-    const { data: existingKeyword, error: existingError } = await supabase
-      .from('keywords')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('normalized_name', keywordName)
-      .single()
-
-    if (existingError && existingError.code !== 'PGRST116') {
-      throw existingError
-    }
-
-    if (existingKeyword) return existingKeyword.id
-
-    const { data: createdKeyword, error: createError } = await supabase
-      .from('keywords')
-      .insert({
-        id: preferredId,
-        user_id: userId,
-        name: keywordName,
-        normalized_name: keywordName,
-      })
-      .select('id')
-      .single()
-
-    if (createError?.code === '23505') {
-      const { data: racedKeyword, error: racedError } = await supabase
-        .from('keywords')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('normalized_name', keywordName)
-        .single()
-
-      if (racedError) throw racedError
-      return racedKeyword.id
-    }
-
-    if (createError) throw createError
-    return createdKeyword.id
-  }
-
-  private async resolveKeywordId(
-    keywordIdOrKeywordSearchId: string,
+  private async assertKeywordExists(
+    keywordId: string,
     client?: SupabaseClient
   ): Promise<string> {
     const supabase = client ?? getSupabaseClient()
@@ -202,7 +153,7 @@ class SupabaseDbAdapter implements DbAdapter {
     const { data: keyword, error: keywordError } = await supabase
       .from('keywords')
       .select('id')
-      .eq('id', keywordIdOrKeywordSearchId)
+      .eq('id', keywordId)
       .single()
 
     if (keywordError && keywordError.code !== 'PGRST116') {
@@ -211,24 +162,7 @@ class SupabaseDbAdapter implements DbAdapter {
 
     if (keyword) return keyword.id
 
-    const { data: keywordSearch, error: keywordSearchError } = await supabase
-      .from('keyword_searches')
-      .select('user_id, keyword, normalized_keyword')
-      .eq('id', keywordIdOrKeywordSearchId)
-      .single()
-
-    if (keywordSearchError) throw keywordSearchError
-
-    const keywordName = normalizeKeywordSpacing(
-      keywordSearch.normalized_keyword ?? keywordSearch.keyword
-    )
-
-    return this.getOrCreateKeyword(
-      keywordSearch.user_id,
-      keywordName,
-      keywordIdOrKeywordSearchId,
-      supabase
-    )
+    throw new Error('KEYWORD_NOT_FOUND')
   }
 
   private async getDefaultKeywordAnalysisId(
@@ -236,7 +170,7 @@ class SupabaseDbAdapter implements DbAdapter {
     client?: SupabaseClient
   ): Promise<string> {
     const supabase = client ?? getSupabaseClient()
-    const resolvedKeywordId = await this.resolveKeywordId(keywordId, supabase)
+    const resolvedKeywordId = await this.assertKeywordExists(keywordId, supabase)
 
     const { data: existingAnalysis, error: existingError } = await supabase
       .from('keyword_analysis')

@@ -297,9 +297,22 @@ class VercelPythonTrendsProvider implements TrendsProvider {
       )
     }
 
+    const internalSecret = process.env.PYTRENDS_INTERNAL_SECRET
+    if (!internalSecret) {
+      throw new TrendsProviderError(
+        'PYTRENDS_INTERNAL_SECRET_MISSING',
+        'PYTRENDS_INTERNAL_SECRET is not set; cannot call /api/pytrends safely',
+        'NO_DATA',
+        500
+      )
+    }
+
     const response = await fetch(`https://${vercelUrl}/api/pytrends`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-api-secret': internalSecret,
+      },
       body: JSON.stringify({ keyword, geo, timeframe, gprop }),
     })
 

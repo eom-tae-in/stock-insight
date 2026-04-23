@@ -39,6 +39,9 @@ declare namespace NodeJS {
     /** 저장 전 종목 미리보기 Redis 캐시 TTL 초 단위 (기본 86400) */
     PREVIEW_CACHE_TTL_SECONDS?: string
 
+    /** Vercel /api/pytrends 내부 서버 호출 인증 secret */
+    PYTRENDS_INTERNAL_SECRET?: string
+
     /** Vercel 런타임 표시 (Vercel 환경에서 자동 주입) */
     VERCEL?: string
 

@@ -70,9 +70,11 @@ npm install
 `.env.local` 파일 생성:
 
 ```
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_public_key
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_KEY=your_anon_public_key
-FINNHUB_API_KEY=your_finnhub_api_key_here  # 선택사항
+PYTRENDS_INTERNAL_SECRET=replace_with_a_long_random_secret
 ```
 
 **설정 정보:**
@@ -89,6 +91,8 @@ FINNHUB_API_KEY=your_finnhub_api_key_here  # 선택사항
 
 - **Google Trends**: 별도 API 키 불필요
   - 자동으로 검색 관심도 수집
+  - Vercel 배포 시 `/api/pytrends` 내부 호출 보호를 위해
+    `PYTRENDS_INTERNAL_SECRET` 값을 Vercel 환경 변수에도 동일하게 설정
 
 ### 3단계: 개발 서버 실행
 

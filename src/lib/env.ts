@@ -46,6 +46,10 @@ const envSchema = z.object({
     .string()
     .optional()
     .describe('저장 전 종목 미리보기 Redis 캐시 TTL 초 단위'),
+  PYTRENDS_INTERNAL_SECRET: z
+    .string()
+    .optional()
+    .describe('Vercel /api/pytrends 내부 서버 호출 인증 secret'),
 })
 
 /**
@@ -65,6 +69,7 @@ function validateEnv() {
         process.env.STOCK_DATA_CACHE_TTL_SECONDS,
       TRENDS_CACHE_TTL_SECONDS: process.env.TRENDS_CACHE_TTL_SECONDS,
       PREVIEW_CACHE_TTL_SECONDS: process.env.PREVIEW_CACHE_TTL_SECONDS,
+      PYTRENDS_INTERNAL_SECRET: process.env.PYTRENDS_INTERNAL_SECRET,
     })
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {

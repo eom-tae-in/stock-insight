@@ -12,14 +12,9 @@ import { createSupabaseMiddlewareClient } from '@/lib/supabase/middleware-client
 // 인증 없이 접근 가능한 경로
 // 참고: /set-password 는 이메일 OTP 인증 완료 후 세션이 있는 사용자만 접근하므로
 // 공개 경로에 포함하지 않음 (미들웨어 세션 갱신이 자동 처리)
-const PUBLIC_PATHS = [
-  '/login',
-  '/signup',
-  '/api/auth/callback',
-  '/api/health',
-  '/api/pytrends',
-  '/api/trends-internal',
-]
+const PUBLIC_PATHS = ['/login', '/signup', '/api/auth/callback', '/api/health']
+
+const INTERNAL_API_PATHS = ['/api/pytrends']
 
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next({ request })
@@ -34,6 +29,15 @@ export async function middleware(request: NextRequest) {
 
   // 공개 경로 확인
   const isPublicPath = PUBLIC_PATHS.some(p => pathname.startsWith(p))
+  const isInternalApiPath = INTERNAL_API_PATHS.some(p => pathname.startsWith(p))
+  const internalApiSecret = process.env.PYTRENDS_INTERNAL_SECRET
+  const hasValidInternalSecret =
+    Boolean(internalApiSecret) &&
+    request.headers.get('x-internal-api-secret') === internalApiSecret
+
+  if (isInternalApiPath && hasValidInternalSecret) {
+    return response
+  }
 
   // 미인증 + 보호된 경로 → 로그인 페이지로 리디렉션
   if (!user && !isPublicPath) {
