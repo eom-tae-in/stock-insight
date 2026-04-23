@@ -1,8 +1,7 @@
 """
 Vercel Python Serverless Function: Google Trends data provider
 
-- Local development runs src/lib/get_trends.py directly from Next.js.
-- Vercel runtime calls this function from src/server/trends-internal-service.ts.
+- All environments call this function from src/server/trends-internal-service.ts.
 - The actual Trends fetch logic is shared with src/lib/get_trends.py.
 
 POST /api/pytrends
@@ -20,7 +19,7 @@ _SRC_LIB_DIR = os.path.join(os.path.dirname(__file__), '..', 'src', 'lib')
 if _SRC_LIB_DIR not in sys.path:
     sys.path.insert(0, _SRC_LIB_DIR)
 
-from get_trends import get_trends  # noqa: E402
+from get_trends import TrendsFetchError, get_trends  # noqa: E402
 
 
 class handler(BaseHTTPRequestHandler):
@@ -60,7 +59,7 @@ class handler(BaseHTTPRequestHandler):
 
             keyword = (body.get('keyword') or '').strip()
             geo = body.get('geo', '') or ''
-            timeframe = body.get('timeframe', '5y') or '5y'
+            timeframe = body.get('timeframe', 'today 5-y') or 'today 5-y'
             gprop = body.get('gprop', '') or ''
 
             if not keyword:
@@ -88,12 +87,19 @@ class handler(BaseHTTPRequestHandler):
                 'error': 'Invalid JSON body',
                 'code': 'INVALID_INPUT',
             })
-        except Exception as exc:
-            self._send_json(500, {
+        except TrendsFetchError as exc:
+            print(traceback.format_exc(), file=sys.stderr)
+            self._send_json(exc.status, {
                 'success': False,
                 'error': str(exc),
+                'code': exc.code,
+            })
+        except Exception as exc:
+            print(traceback.format_exc(), file=sys.stderr)
+            self._send_json(500, {
+                'success': False,
+                'error': 'Internal server error',
                 'code': 'SERVER_ERROR',
-                'trace': traceback.format_exc(),
             })
 
     def _send_json(self, status_code: int, payload: dict) -> None:

@@ -99,25 +99,24 @@ API/스크립트:
 
 - `GET /api/trends` — Next.js keyword trends preview route
 - `POST /api/pytrends` — Vercel Python serverless (`api/pytrends.py`)
-- `GET/POST /api/trends-internal` — Next.js route, 환경 분기 호출
+- `GET/POST /api/trends-internal` — Next.js route, 내부 Trends 호출 래퍼
 - `src/lib/get_trends.py` — pytrends 호출 단일 진실
 - `src/lib/services/trends-service.ts`
-- `src/server/trends-internal-service.ts` — 환경 분기 (local spawn / Vercel fetch)
+- `src/server/trends-internal-service.ts` — `/api/pytrends` 호출 및 캐시/재시도 처리
 
 환경:
 
 - `package.json`의 기본 `npm run dev`는 Next.js만 실행한다.
-- 로컬: `PYTRENDS_PYTHON_PATH`가 있으면 그 Python을 사용하고, 없으면 `python3`로 `src/lib/get_trends.py`를 `child_process` spawn 으로 직접 실행한다.
-- Vercel: `api/pytrends.py` Python serverless function 으로 실행되며, Next.js route는 `https://${VERCEL_URL}/api/pytrends`로 fetch 한다.
+- Trends 수집은 `api/pytrends.py` Python serverless function 기준으로 동작한다.
+- 로컬에서 Trends까지 배포와 동일하게 검증하려면 `vercel dev` 사용이 필요하다.
 
 현재 흐름:
 
 - `src/server/trends-internal-service.ts` 의 `fetchInternalTrendsData()`가 단일 진입점이다.
-  - `process.env.VERCEL === '1'` 이면 Vercel Python function 호출 (fetch).
-  - 그 외(로컬)에서는 `python3` 로 `src/lib/get_trends.py` 를 spawn.
+  - 모든 환경에서 내부 `/api/pytrends` 호출로 통일한다.
 - `api/pytrends.py` 는 `src/lib/get_trends.py.get_trends()` 를 sys.path 확장 후 import 하여 동일 로직을 재사용한다 (코드 중복 없음).
 - `requirements.txt` 는 `pytrends` 만 명시하고, `.python-version` 은 `3.12` 로 고정한다.
-- `vercel.json` 은 `functions.api/**/*.py.excludeFiles` 로 `__pycache__`, `*.pyc`, `.venv` 를 번들에서 제외한다.
+- `vercel.json` 은 `functions.api/**/*.py.excludeFiles` 로 `__pycache__`, `*.pyc`, `.venv`, `venv` 를 번들에서 제외한다.
 - Trends provider 실패나 빈 결과는 200 + 빈 배열로 숨기지 않고 4xx/5xx 오류로 반환한다.
 
 개선 필요:

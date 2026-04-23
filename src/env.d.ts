@@ -42,9 +42,6 @@ declare namespace NodeJS {
     /** Vercel /api/pytrends 내부 서버 호출 인증 secret */
     PYTRENDS_INTERNAL_SECRET?: string
 
-    /** 로컬 pytrends 실행에 사용할 Python 경로 */
-    PYTRENDS_PYTHON_PATH?: string
-
     /** Vercel 런타임 표시 (Vercel 환경에서 자동 주입) */
     VERCEL?: string
 

@@ -106,14 +106,14 @@
 ### Task 2.3 Trends 서비스 단일화
 
 - `src/server/trends-internal-service.ts`를 Trends 수집 진입점으로 유지한다.
-- 로컬은 `.venv/bin/python3 src/lib/get_trends.py`를 직접 실행한다.
+- 모든 환경에서 `/api/pytrends` Python function을 호출한다.
 - Vercel은 `api/pytrends.py` Python serverless function이 같은 `src/lib/get_trends.py` 로직을 import해서 사용한다.
 - Flask/TRENDS_API_URL 기반 경로는 기본 실행 흐름에서 제외한다.
 
 수락 기준:
 
 - Trends 수집 진입점이 하나다.
-- 로컬 `npm run dev`에서 설정 그대로 Trends가 동작한다.
+- 배포와 동일한 Trends 검증은 `vercel dev` 또는 Vercel deployment에서 수행한다.
 - 실패 시 빈 배열로 성공 처리하지 않고 명확한 오류를 반환한다.
 
 ### Task 2.4 키워드 분석 API 재작성

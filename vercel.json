@@ -4,7 +4,7 @@
   "outputDirectory": ".next",
   "functions": {
     "api/**/*.py": {
-      "excludeFiles": "{**/__pycache__/**,**/*.pyc,.venv/**}"
+      "excludeFiles": "{**/__pycache__/**,**/*.pyc,.venv/**,venv/**}"
     }
   }
 }
