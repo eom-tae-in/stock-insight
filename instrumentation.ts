@@ -13,5 +13,8 @@ export async function register() {
     await initializeApp()
   } catch (error) {
     console.warn('앱 초기화 경고:', error)
+    if (process.env.NODE_ENV === 'production') {
+      throw error
+    }
   }
 }
