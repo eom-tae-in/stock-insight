@@ -2,6 +2,7 @@ import { calculateTrendsMA13 } from '@/lib/indicators'
 import { normalizeKeywordSpacing } from '@/lib/utils/keyword-normalization'
 import { getLastCompletedWeekKey } from '@/lib/utils/week-sync'
 import type { TrendsDataPoint } from '@/types/database'
+import { headers } from 'next/headers'
 const MAX_TRENDS_ATTEMPTS = 4
 const BASE_BACKOFF_MS = 1000
 const MAX_JITTER_MS = 500
@@ -213,7 +214,24 @@ function toRawTrendsDataPoint(point: unknown): RawTrendsDataPoint | null {
   }
 }
 
-function getPytrendsApiBaseUrl(): string {
+async function getPytrendsApiBaseUrl(): Promise<string> {
+  try {
+    const requestHeaders = await headers()
+    const forwardedHost = requestHeaders.get('x-forwarded-host')
+    const host = forwardedHost || requestHeaders.get('host')
+    const proto =
+      requestHeaders.get('x-forwarded-proto') ||
+      (host?.includes('localhost') || host?.startsWith('127.0.0.1')
+        ? 'http'
+        : 'https')
+
+    if (host) {
+      return `${proto}://${host}`
+    }
+  } catch {
+    // headers() is unavailable outside a request context. Fall back below.
+  }
+
   const vercelUrl = process.env.VERCEL_URL?.trim()
   if (vercelUrl) {
     return `https://${vercelUrl}`
@@ -264,7 +282,7 @@ class HttpPytrendsProvider implements TrendsProvider {
       )
     }
 
-    const baseUrl = getPytrendsApiBaseUrl()
+    const baseUrl = await getPytrendsApiBaseUrl()
     console.info(
       `[trends] internal pytrends auth secret=${maskSecret(internalSecret)} baseUrl="${baseUrl}"`
     )
