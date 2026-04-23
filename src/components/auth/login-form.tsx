@@ -12,7 +12,17 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 
-export function LoginForm() {
+function getSafeNextPath(input: string | null): string {
+  if (!input || !input.startsWith('/')) return '/'
+  if (input.startsWith('//')) return '/'
+  return input
+}
+
+interface LoginFormProps {
+  nextPath?: string
+}
+
+export function LoginForm({ nextPath = '/' }: LoginFormProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -50,7 +60,9 @@ export function LoginForm() {
       }
 
       toast.success('로그인 성공했습니다!')
-      router.push('/')
+      const next = getSafeNextPath(nextPath)
+      router.push(next)
+      router.refresh()
     } catch (error) {
       console.error('로그인 오류:', error)
       toast.error('오류가 발생했습니다. 다시 시도해주세요.')
@@ -88,7 +100,12 @@ export function LoginForm() {
       </Button>
       <p className="text-muted-foreground text-center text-xs">
         아직 계정이 없으신가요?{' '}
-        <a href="/signup" className="text-primary hover:underline">
+        <a
+          href={`/signup${
+            nextPath ? `?next=${encodeURIComponent(nextPath)}` : ''
+          }`}
+          className="text-primary hover:underline"
+        >
           회원가입
         </a>
       </p>

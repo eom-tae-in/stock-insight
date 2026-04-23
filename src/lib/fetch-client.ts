@@ -31,7 +31,8 @@ export async function apiFetch(
   const res = await fetch(input, init)
 
   if (res.status === 401) {
-    window.location.href = '/login'
+    const next = `${window.location.pathname}${window.location.search}`
+    window.location.href = `/login?next=${encodeURIComponent(next)}`
     // 호출부에서 추가 처리를 막기 위해 pending Promise 반환
     return new Promise(() => {})
   }

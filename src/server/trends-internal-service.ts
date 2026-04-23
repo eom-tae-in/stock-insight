@@ -294,6 +294,12 @@ class HttpPytrendsProvider implements TrendsProvider {
       const classification: TrendsErrorClassification =
         response.status === 429 ? 'RATE_LIMIT' : 'NO_DATA'
 
+      if (response.status === 404 && !process.env.VERCEL_URL?.trim()) {
+        errorCode = 'PYTRENDS_ROUTE_UNAVAILABLE'
+        errorMessage =
+          'The /api/pytrends runtime is unavailable in this environment. Use `vercel dev` for local Trends requests.'
+      }
+
       throw new TrendsProviderError(
         errorCode,
         errorMessage,

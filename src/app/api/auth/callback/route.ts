@@ -7,10 +7,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
+function getSafeNextPath(input: string | null): string {
+  if (!input || !input.startsWith('/')) return '/'
+  if (input.startsWith('//')) return '/'
+  return input
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/'
+  const next = getSafeNextPath(searchParams.get('next'))
 
   if (code) {
     const supabase = await createSupabaseServerClient()
@@ -23,5 +29,7 @@ export async function GET(request: NextRequest) {
   }
 
   // 인증 실패 → 로그인 페이지로 리디렉션 (에러 쿼리 파라미터 포함)
-  return NextResponse.redirect(`${origin}/login?error=auth_error`)
+  return NextResponse.redirect(
+    `${origin}/login?error=auth_error&next=${encodeURIComponent(next)}`
+  )
 }
