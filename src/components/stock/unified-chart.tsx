@@ -12,6 +12,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { calculateWeeklyYoY } from '@/lib/calculations'
+import { CHART_SERIES_COLORS } from '@/lib/constants/chart-series'
 import { captureChartAsPng } from '@/lib/export'
 import { getCurrencySymbol, formatPrice } from '@/lib/utils/currency'
 import { useChartTheme } from '@/hooks/use-chart-theme'
@@ -30,7 +31,7 @@ import type { UnifiedChartProps } from '@/types'
 const SERIES_CONFIG = {
   open: {
     name: '시가',
-    color: '#fbbf24',
+    color: CHART_SERIES_COLORS.open,
     yAxisId: 'left',
     type: 'line',
     enabled: true,
@@ -38,7 +39,7 @@ const SERIES_CONFIG = {
   },
   close: {
     name: '종가',
-    color: '#3b82f6',
+    color: CHART_SERIES_COLORS.price,
     yAxisId: 'left',
     type: 'line',
     enabled: true,
@@ -46,7 +47,7 @@ const SERIES_CONFIG = {
   },
   low: {
     name: '저가',
-    color: '#4ade80',
+    color: CHART_SERIES_COLORS.low,
     yAxisId: 'left',
     type: 'line',
     enabled: false,
@@ -54,7 +55,7 @@ const SERIES_CONFIG = {
   },
   high: {
     name: '고가',
-    color: '#f87171',
+    color: CHART_SERIES_COLORS.high,
     yAxisId: 'left',
     type: 'line',
     enabled: false,
@@ -62,7 +63,7 @@ const SERIES_CONFIG = {
   },
   ma13: {
     name: '13주 MA',
-    color: '#a78bfa',
+    color: CHART_SERIES_COLORS.ma13,
     yAxisId: 'left',
     type: 'area',
     enabled: true,
@@ -70,7 +71,7 @@ const SERIES_CONFIG = {
   },
   yoy: {
     name: '52주 YoY',
-    color: '#f97316',
+    color: CHART_SERIES_COLORS.yoy,
     yAxisId: 'right',
     type: 'area',
     enabled: true,

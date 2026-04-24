@@ -15,7 +15,7 @@ import { format, parseISO, differenceInDays } from 'date-fns'
 import type { TrendsDataPoint, SearchRecord } from '@/types/database'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { OVERLAY_COLORS } from '@/lib/constants/trends'
+import { CHART_SERIES_COLORS } from '@/lib/constants/chart-series'
 
 type KeywordSeriesKey = 'trendsValue' | 'ma13' | 'yoyValue'
 
@@ -207,8 +207,11 @@ export default function KeywordTrendsChart({
             onClick={() => toggleSeries('trendsValue')}
             variant={visibleSeries.trendsValue ? 'default' : 'outline'}
             size="sm"
-            className={
-              visibleSeries.trendsValue ? 'bg-blue-500 hover:bg-blue-600' : ''
+            className={visibleSeries.trendsValue ? 'text-white' : ''}
+            style={
+              visibleSeries.trendsValue
+                ? { backgroundColor: CHART_SERIES_COLORS.googleTrends }
+                : undefined
             }
           >
             {KEYWORD_SERIES_LABELS.trendsValue}
@@ -218,8 +221,11 @@ export default function KeywordTrendsChart({
             onClick={() => toggleSeries('ma13')}
             variant={visibleSeries.ma13 ? 'default' : 'outline'}
             size="sm"
-            className={
-              visibleSeries.ma13 ? 'bg-orange-500 hover:bg-orange-600' : ''
+            className={visibleSeries.ma13 ? 'text-white' : ''}
+            style={
+              visibleSeries.ma13
+                ? { backgroundColor: CHART_SERIES_COLORS.ma13 }
+                : undefined
             }
           >
             {KEYWORD_SERIES_LABELS.ma13}
@@ -230,8 +236,11 @@ export default function KeywordTrendsChart({
               onClick={() => toggleSeries('yoyValue')}
               variant={visibleSeries.yoyValue ? 'default' : 'outline'}
               size="sm"
-              className={
-                visibleSeries.yoyValue ? 'bg-pink-500 hover:bg-pink-600' : ''
+              className={visibleSeries.yoyValue ? 'text-white' : ''}
+              style={
+                visibleSeries.yoyValue
+                  ? { backgroundColor: CHART_SERIES_COLORS.yoy }
+                  : undefined
               }
             >
               {KEYWORD_SERIES_LABELS.yoyValue}
@@ -303,7 +312,7 @@ export default function KeywordTrendsChart({
                 yAxisId="left"
                 type="monotone"
                 dataKey="trendsValue"
-                stroke="#3b82f6"
+                stroke={CHART_SERIES_COLORS.googleTrends}
                 name={KEYWORD_SERIES_LABELS.trendsValue}
                 dot={false}
                 strokeWidth={2}
@@ -317,7 +326,7 @@ export default function KeywordTrendsChart({
                 yAxisId="left"
                 type="monotone"
                 dataKey="ma13"
-                stroke="#f97316"
+                stroke={CHART_SERIES_COLORS.ma13}
                 name={KEYWORD_SERIES_LABELS.ma13}
                 dot={false}
                 strokeWidth={2}
@@ -331,7 +340,7 @@ export default function KeywordTrendsChart({
                 yAxisId="right"
                 type="monotone"
                 dataKey="yoyValue"
-                stroke="#ec4899"
+                stroke={CHART_SERIES_COLORS.yoy}
                 name={KEYWORD_SERIES_LABELS.yoyValue}
                 dot={false}
                 strokeWidth={2}
@@ -346,7 +355,7 @@ export default function KeywordTrendsChart({
                 yAxisId="left"
                 type="monotone"
                 dataKey={`overlay${idx}`}
-                stroke={OVERLAY_COLORS[idx % OVERLAY_COLORS.length]}
+                stroke={CHART_SERIES_COLORS.price}
                 name={`${search.ticker} 주가`}
                 dot={false}
                 strokeWidth={2}
@@ -360,30 +369,37 @@ export default function KeywordTrendsChart({
         <div className="text-muted-foreground mt-6 space-y-2 text-sm">
           {visibleSeries.trendsValue && (
             <p>
-              <span className="mr-2 inline-block h-0.5 w-8 bg-blue-500" />
+              <span
+                className="mr-2 inline-block h-0.5 w-8"
+                style={{ backgroundColor: CHART_SERIES_COLORS.googleTrends }}
+              />
               검색량 기반: Google Trends 검색 관심도 (0-100)
             </p>
           )}
           {visibleSeries.ma13 && (
             <p>
-              <span className="mr-2 inline-block h-0.5 w-8 bg-orange-500" />
+              <span
+                className="mr-2 inline-block h-0.5 w-8"
+                style={{ backgroundColor: CHART_SERIES_COLORS.ma13 }}
+              />
               13주 이동평균(13주 MA): 검색량 기반 값의 13주 이동평균
             </p>
           )}
           {visibleSeries.yoyValue && hasYoYData && (
             <p>
-              <span className="mr-2 inline-block h-0.5 w-8 bg-pink-500" />
+              <span
+                className="mr-2 inline-block h-0.5 w-8"
+                style={{ backgroundColor: CHART_SERIES_COLORS.yoy }}
+              />
               전년동기 대비 증감률(52주 YoY): 52주 전 대비 검색량 기반 값의
               변화율 (%)
             </p>
           )}
-          {overlays.map((search, idx) => (
+          {overlays.map(search => (
             <p key={search.id}>
               <span
                 className="mr-2 inline-block h-0.5 w-8"
-                style={{
-                  backgroundColor: OVERLAY_COLORS[idx % OVERLAY_COLORS.length],
-                }}
+                style={{ backgroundColor: CHART_SERIES_COLORS.price }}
               />
               {search.ticker} 주가: 5년 주가 정규화 값 (0-100)
             </p>

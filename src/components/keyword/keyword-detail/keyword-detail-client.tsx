@@ -2,7 +2,15 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  type CSSProperties,
+} from 'react'
+import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
 import {
   LineChart,
@@ -13,7 +21,14 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
-import { GripVertical, Pencil, RefreshCw, Trash2, X } from 'lucide-react'
+import {
+  ChevronLeft,
+  GripVertical,
+  Pencil,
+  RefreshCw,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   DndContext,
@@ -65,7 +80,136 @@ import {
 } from '@/components/ui/alert-dialog'
 import { generateKeywordAnalysisExcelFile } from '@/lib/export/excel'
 import { captureChartAsPng } from '@/lib/export/image'
+import { CHART_SERIES_COLORS } from '@/lib/constants/chart-series'
 import { KeywordStandaloneChart } from './keyword-standalone-chart'
+
+type MiniChartTooltipEntry = {
+  color?: string
+  dataKey?: string | number
+  name?: string
+  value?: number | string | null
+}
+
+type MiniChartTooltipState = {
+  label?: string | number
+  payload: MiniChartTooltipEntry[]
+}
+
+type MiniChartPoint = {
+  date: string
+  trendsValue: number | null
+  ma13Value: number | null
+  normalizedPrice: number
+  yoyValue: number | null
+}
+
+function buildMiniChartTooltipPayload(
+  point: MiniChartPoint,
+  ticker: string
+): MiniChartTooltipEntry[] {
+  return [
+    {
+      color: CHART_SERIES_COLORS.ma13,
+      dataKey: 'ma13Value',
+      name: '13주 이동평균(13주 MA)',
+      value: point.ma13Value,
+    },
+    {
+      color: CHART_SERIES_COLORS.yoy,
+      dataKey: 'yoyValue',
+      name: '전년동기 대비 증감률(52주 YoY)',
+      value: point.yoyValue,
+    },
+    {
+      color: CHART_SERIES_COLORS.price,
+      dataKey: 'normalizedPrice',
+      name: `${ticker} 주가`,
+      value: point.normalizedPrice,
+    },
+    {
+      color: CHART_SERIES_COLORS.googleTrends,
+      dataKey: 'trendsValue',
+      name: '검색량 기반',
+      value: point.trendsValue,
+    },
+  ]
+}
+
+function formatMiniChartTooltipValue(entry: MiniChartTooltipEntry) {
+  if (typeof entry.value !== 'number') return entry.value ?? '-'
+  if (entry.dataKey === 'yoyValue') return `${entry.value.toFixed(1)}%`
+  if (entry.dataKey === 'normalizedPrice') return entry.value.toFixed(2)
+  return Number.isInteger(entry.value)
+    ? entry.value.toString()
+    : entry.value.toFixed(2)
+}
+
+function MiniChartTooltipContent({
+  active,
+  label,
+  payload,
+}: {
+  active?: boolean
+  label?: string | number
+  payload?: MiniChartTooltipEntry[]
+}) {
+  if (!active || !payload || payload.length === 0) return null
+
+  const visiblePayload = payload.filter(
+    entry => entry.value !== null && entry.value !== undefined
+  )
+
+  if (visiblePayload.length === 0) return null
+
+  return (
+    <div className="min-w-52 rounded-md border border-slate-300/80 bg-white/82 px-3 py-2 shadow-lg ring-1 ring-slate-200/60 backdrop-blur-md dark:border-slate-700/80 dark:bg-slate-950/78 dark:ring-slate-800/70">
+      <div className="text-[11px] font-semibold tracking-tight text-slate-700 dark:text-slate-200">
+        {label}
+      </div>
+      <div className="mt-2 grid gap-1.5">
+        {visiblePayload.map(entry => (
+          <div
+            key={`${String(entry.dataKey)}-${entry.name}`}
+            className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3"
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              <span
+                className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-black/10"
+                style={{ backgroundColor: entry.color ?? 'currentColor' }}
+              />
+              <span className="truncate text-[11px] font-medium text-slate-700 dark:text-slate-200">
+                {entry.name}
+              </span>
+            </div>
+            <span className="text-[11px] font-semibold text-slate-950 tabular-nums dark:text-slate-50">
+              {formatMiniChartTooltipValue(entry)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function getMiniChartTooltipStyle(rect: DOMRect): CSSProperties {
+  const tooltipWidth = 248
+  const gap = 12
+  const viewportWidth =
+    typeof window !== 'undefined'
+      ? window.innerWidth
+      : rect.right + tooltipWidth
+
+  const hasRightSpace = viewportWidth - rect.right >= tooltipWidth + gap
+  const left = hasRightSpace
+    ? rect.right + gap
+    : Math.max(12, rect.left - tooltipWidth - gap)
+
+  return {
+    top: Math.max(12, rect.top),
+    left,
+    width: tooltipWidth,
+  }
+}
 
 // 차트 데이터 포인트 타입
 type ChartDataPoint = {
@@ -137,6 +281,8 @@ const PERIOD_MAX_YEARS: Record<Period, number> = {
   ALL: 25,
 }
 
+const MAX_TIMEFRAME_WEEKS = 260
+
 function formatDisplayDate(value?: string | null) {
   if (!value) return ''
 
@@ -189,26 +335,28 @@ function DragOverlayComponent({
 
   return (
     <DragOverlay>
-      <Card className="flex h-96 w-96 flex-col bg-blue-100 shadow-2xl transition-all duration-300 ease-in-out dark:bg-blue-900/30">
-        <CardHeader className="pb-3 pl-8">
+      <Card className="flex h-[18rem] w-[18rem] flex-col bg-blue-100 shadow-2xl transition-all duration-300 ease-in-out dark:bg-blue-900/30">
+        <CardHeader className="pt-3 pr-3 pb-1.5 pl-5">
           <CardTitle className="flex items-center justify-between">
             <div>
-              <p className="text-lg font-semibold">{draggedOverlay.ticker}</p>
-              <p className="text-muted-foreground text-xs font-normal">
+              <p className="text-lg leading-tight font-semibold">
+                {draggedOverlay.ticker}
+              </p>
+              <p className="text-muted-foreground mt-0.5 line-clamp-1 text-sm leading-tight font-normal">
                 {draggedOverlay.companyName}
               </p>
             </div>
           </CardTitle>
         </CardHeader>
 
-        <CardContent className="flex flex-1 flex-col">
+        <CardContent className="flex flex-1 flex-col px-2.5 pb-1.5">
           {/* 4개 라인 차트 */}
           {mergedData.length > 0 ? (
-            <div className="mb-4 flex-1">
-              <ResponsiveContainer width="100%" height={180}>
+            <div className="mb-1.5 flex-1">
+              <ResponsiveContainer width="100%" height={165}>
                 <LineChart
                   data={mergedData}
-                  margin={{ top: 5, right: 10, left: -20, bottom: 5 }}
+                  margin={{ top: 4, right: 6, left: -22, bottom: 0 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis
@@ -235,7 +383,7 @@ function DragOverlayComponent({
                   <Line
                     type="monotone"
                     dataKey="ma13Value"
-                    stroke="hsl(38 92% 50%)"
+                    stroke={CHART_SERIES_COLORS.ma13}
                     strokeWidth={2}
                     isAnimationActive={false}
                     dot={false}
@@ -245,7 +393,7 @@ function DragOverlayComponent({
                   <Line
                     type="monotone"
                     dataKey="yoyValue"
-                    stroke="hsl(289 100% 58%)"
+                    stroke={CHART_SERIES_COLORS.yoy}
                     strokeWidth={2}
                     isAnimationActive={false}
                     dot={false}
@@ -255,7 +403,7 @@ function DragOverlayComponent({
                   <Line
                     type="monotone"
                     dataKey="normalizedPrice"
-                    stroke="hsl(142 72% 29%)"
+                    stroke={CHART_SERIES_COLORS.price}
                     strokeWidth={2}
                     isAnimationActive={false}
                     dot={false}
@@ -265,7 +413,7 @@ function DragOverlayComponent({
                   <Line
                     type="monotone"
                     dataKey="trendsValue"
-                    stroke="hsl(211 100% 50%)"
+                    stroke={CHART_SERIES_COLORS.googleTrends}
                     strokeWidth={2}
                     isAnimationActive={false}
                     dot={false}
@@ -275,14 +423,14 @@ function DragOverlayComponent({
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="text-muted-foreground bg-muted flex items-center justify-center rounded py-8 text-sm">
+            <div className="text-muted-foreground bg-muted flex items-center justify-center rounded py-4 text-xs">
               데이터 없음
             </div>
           )}
 
           {/* 메타정보: 좌하 + 우하 */}
-          <div className="text-muted-foreground flex items-center justify-between border-t pt-3 text-xs">
-            <span>1년치 차트</span>
+          <div className="text-muted-foreground flex items-center justify-between border-t pt-0.5 text-[10px] leading-none">
+            <span>5년치 차트</span>
             <span>{formattedDate}</span>
           </div>
         </CardContent>
@@ -324,6 +472,10 @@ function SortableOverlayCard({
   onRefresh: (id: string) => Promise<void>
   isRefreshing: boolean
 }) {
+  const router = useRouter()
+  const [activeTooltip, setActiveTooltip] =
+    useState<MiniChartTooltipState | null>(null)
+  const wrapperRef = useRef<HTMLDivElement>(null)
   const {
     attributes,
     listeners,
@@ -342,192 +494,238 @@ function SortableOverlayCard({
   }
 
   const mergedData = mergeChartData(chartData, overlay.chartData)
-
-  // delete 모드에서는 Link 제거
-  const cardElement = (
-    <Card
-      ref={setNodeRef}
-      style={style}
-      onClick={mode === 'delete' ? () => onToggleSelect(overlay.id) : undefined}
-      className={cn(
-        'relative flex h-full flex-col overflow-hidden transition-all',
-        mode === 'normal' && 'cursor-pointer hover:shadow-lg',
-        isRefreshing &&
-          'border-cyan-400 bg-cyan-50/50 shadow-md ring-2 ring-cyan-400/30 dark:bg-cyan-950/20',
-        mode === 'delete' && 'cursor-pointer hover:shadow-lg',
-        mode === 'delete' &&
-          isSelected &&
-          'border-2 border-cyan-400 bg-cyan-50 dark:bg-cyan-950/20',
-        mode === 'reorder' && 'cursor-grab hover:cursor-grab',
-        mode === 'reorder' &&
-          isDraggingCard &&
-          'cursor-grabbing border-2 border-blue-500 bg-blue-100 shadow-lg dark:bg-blue-900/30'
-      )}
-      {...(mode === 'reorder' ? { ...attributes, ...listeners } : {})}
-    >
-      {isRefreshing && (
-        <div className="absolute top-3 right-3 z-20 inline-flex items-center gap-1 rounded-full border border-cyan-300 bg-cyan-50 px-2 py-1 text-xs font-medium text-cyan-700 shadow-sm dark:border-cyan-800 dark:bg-cyan-950 dark:text-cyan-200">
-          <RefreshCw className="h-3 w-3 animate-spin" />
-          최신화 중
-        </div>
-      )}
-
-      {/* delete 모드: 토글 스위치 (카드 클릭으로도 토글 가능) */}
-      {mode === 'delete' && (
-        <div
-          className="absolute top-4 left-4 z-20"
-          onClick={e => e.stopPropagation()}
-        >
-          <Checkbox
-            checked={isSelected}
-            onCheckedChange={() => onToggleSelect(overlay.id)}
-            aria-label={`${overlay.ticker} 선택`}
-          />
-        </div>
-      )}
-
-      {/* reorder 모드: 드래그 핸들 제거 (카드 전체가 드래그 가능) */}
-
-      <CardHeader className="pb-3 pl-8">
-        <CardTitle className="flex items-center justify-between">
-          <div>
-            <p className="text-lg font-semibold">{overlay.ticker}</p>
-            <p className="text-muted-foreground text-xs font-normal">
-              {overlay.companyName}
-            </p>
-          </div>
-        </CardTitle>
-      </CardHeader>
-
-      <CardContent className="flex flex-1 flex-col">
-        {/* 4개 라인 차트 */}
-        {mergedData.length > 0 ? (
-          <div className="mb-4 flex-1">
-            <ResponsiveContainer width="100%" height={180}>
-              <LineChart
-                data={mergedData}
-                margin={{ top: 5, right: 10, left: -20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis
-                  dataKey="date"
-                  tick={false}
-                  axisLine={false}
-                  height={0}
-                />
-                <YAxis
-                  domain={[0, 100]}
-                  tick={false}
-                  axisLine={false}
-                  width={30}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'var(--background)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '6px',
-                    padding: '6px 8px',
-                  }}
-                />
-                {/* 라인1: 13주 이동평균(13주 MA) (주황색) */}
-                <Line
-                  type="monotone"
-                  dataKey="ma13Value"
-                  stroke="hsl(38 92% 50%)"
-                  strokeWidth={2}
-                  isAnimationActive={false}
-                  dot={false}
-                  name="13주 이동평균(13주 MA)"
-                />
-                {/* 라인2: 전년동기 대비 증감률(52주 YoY) (분홍색) */}
-                <Line
-                  type="monotone"
-                  dataKey="yoyValue"
-                  stroke="hsl(289 100% 58%)"
-                  strokeWidth={2}
-                  isAnimationActive={false}
-                  dot={false}
-                  name="전년동기 대비 증감률(52주 YoY)"
-                />
-                {/* 라인3: 종목 주가 (초록색) - ticker 포함 */}
-                <Line
-                  type="monotone"
-                  dataKey="normalizedPrice"
-                  stroke="hsl(142 72% 29%)"
-                  strokeWidth={2}
-                  isAnimationActive={false}
-                  dot={false}
-                  name={`${overlay.ticker} 주가`}
-                />
-                {/* 라인4: 검색량 기반 (파란색) */}
-                <Line
-                  type="monotone"
-                  dataKey="trendsValue"
-                  stroke="hsl(211 100% 50%)"
-                  strokeWidth={2}
-                  isAnimationActive={false}
-                  dot={false}
-                  name="검색량 기반"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        ) : (
-          <div className="text-muted-foreground bg-muted flex items-center justify-center rounded py-8 text-sm">
-            데이터 없음
+  const tooltipRect = wrapperRef.current?.getBoundingClientRect()
+  return (
+    <div ref={wrapperRef} className="group relative z-0 hover:z-30">
+      {activeTooltip &&
+        tooltipRect &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            className="pointer-events-none fixed z-[9999]"
+            style={getMiniChartTooltipStyle(tooltipRect)}
+          >
+            <MiniChartTooltipContent
+              active
+              label={activeTooltip.label}
+              payload={activeTooltip.payload}
+            />
+          </div>,
+          document.body
+        )}
+      <Card
+        ref={setNodeRef}
+        style={style}
+        onClick={
+          mode === 'delete'
+            ? () => onToggleSelect(overlay.id)
+            : mode === 'normal'
+              ? () =>
+                  router.push(`/keywords/${keywordId}/overlays/${overlay.id}`)
+              : undefined
+        }
+        className={cn(
+          'relative flex h-full flex-col overflow-hidden transition-all',
+          mode === 'normal' && 'cursor-pointer hover:shadow-lg',
+          isRefreshing &&
+            'border-cyan-400 bg-cyan-50/50 shadow-md ring-2 ring-cyan-400/30 dark:bg-cyan-950/20',
+          mode === 'delete' && 'cursor-pointer hover:shadow-lg',
+          mode === 'delete' &&
+            isSelected &&
+            'border-2 border-cyan-400 bg-cyan-50 dark:bg-cyan-950/20',
+          mode === 'reorder' && 'cursor-grab hover:cursor-grab',
+          mode === 'reorder' &&
+            isDraggingCard &&
+            'cursor-grabbing border-2 border-blue-500 bg-blue-100 shadow-lg dark:bg-blue-900/30'
+        )}
+        {...(mode === 'reorder' ? { ...attributes, ...listeners } : {})}
+      >
+        {mode === 'delete' && (
+          <div
+            className="absolute top-3 left-3 z-20"
+            onClick={e => e.stopPropagation()}
+          >
+            <Checkbox
+              checked={isSelected}
+              onCheckedChange={() => onToggleSelect(overlay.id)}
+              aria-label={`${overlay.ticker} 선택`}
+            />
           </div>
         )}
 
-        {/* 메타정보: 좌하 + 우하 */}
-        <div className="text-muted-foreground flex items-center justify-between border-t pt-3 text-xs">
-          <span>1년치 차트</span>
-          <span>{formattedDate}</span>
-        </div>
-      </CardContent>
-
-      {mode === 'normal' && (
-        <div
+        <CardHeader
           className={cn(
-            'bg-background/70 absolute inset-0 flex items-center justify-center backdrop-blur-sm transition-opacity',
-            isRefreshing ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+            'pt-3 pr-3 pb-1.5',
+            mode === 'delete' ? 'pl-7' : 'px-3'
           )}
         >
-          <Button
-            type="button"
-            size="lg"
-            variant="outline"
-            className="bg-background/95 h-12 w-12 rounded-full border-cyan-300 text-cyan-700 shadow-md transition-all hover:border-cyan-400 hover:bg-cyan-50 hover:text-cyan-800 hover:shadow-lg dark:border-cyan-800 dark:text-cyan-200 dark:hover:bg-cyan-950"
-            onClick={event => {
-              event.preventDefault()
-              event.stopPropagation()
-              void onRefresh(overlay.id)
-            }}
-            disabled={isRefreshing}
-            aria-label={`${overlay.ticker} 최신화`}
-          >
-            <RefreshCw
-              className={cn('h-5 w-5', isRefreshing && 'animate-spin')}
-            />
-          </Button>
-        </div>
-      )}
-    </Card>
+          <CardTitle className="flex items-start justify-between gap-2">
+            {mode === 'normal' ? (
+              <Link
+                href={`/keywords/${keywordId}/overlays/${overlay.id}`}
+                className="group/title min-w-0 flex-1 rounded-md pr-1 outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+                onClick={event => event.stopPropagation()}
+              >
+                <div>
+                  <p className="text-lg leading-none font-semibold transition-colors group-hover/title:text-cyan-700 dark:group-hover/title:text-cyan-300">
+                    {overlay.ticker}
+                  </p>
+                  <p className="text-muted-foreground mt-0.5 line-clamp-1 text-sm leading-tight font-normal">
+                    {overlay.companyName}
+                  </p>
+                </div>
+              </Link>
+            ) : (
+              <div>
+                <p className="text-lg leading-none font-semibold">
+                  {overlay.ticker}
+                </p>
+                <p className="text-muted-foreground mt-0.5 line-clamp-1 text-sm leading-tight font-normal">
+                  {overlay.companyName}
+                </p>
+              </div>
+            )}
+
+            {mode === 'normal' && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-9 w-9 shrink-0 border-cyan-300 p-0 text-cyan-700 hover:border-cyan-400 hover:bg-cyan-50 hover:text-cyan-800 dark:border-cyan-800 dark:text-cyan-200 dark:hover:bg-cyan-950"
+                onClick={event => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  void onRefresh(overlay.id)
+                }}
+                disabled={isRefreshing}
+                aria-label={`${overlay.ticker} 최신화`}
+              >
+                <RefreshCw
+                  className={cn('size-4.5', isRefreshing && 'animate-spin')}
+                />
+              </Button>
+            )}
+          </CardTitle>
+        </CardHeader>
+
+        <CardContent className="flex flex-1 flex-col px-2.5 pb-1.5">
+          {mergedData.length > 0 ? (
+            <div
+              className="mb-1.5 flex-1"
+              onClick={event => event.stopPropagation()}
+              onMouseDown={event => event.stopPropagation()}
+              onPointerDown={event => event.stopPropagation()}
+            >
+              <ResponsiveContainer width="100%" height={165}>
+                <LineChart
+                  data={mergedData}
+                  margin={{ top: 4, right: 6, left: -22, bottom: 0 }}
+                  onMouseMove={state => {
+                    const tooltipState = state as {
+                      activeTooltipIndex?: number | string
+                      activeLabel?: string | number
+                      isTooltipActive?: boolean
+                    }
+                    const rawIndex = tooltipState.activeTooltipIndex
+                    const index =
+                      typeof rawIndex === 'number'
+                        ? rawIndex
+                        : typeof rawIndex === 'string'
+                          ? Number(rawIndex)
+                          : NaN
+                    const point =
+                      Number.isInteger(index) && index >= 0
+                        ? mergedData[index]
+                        : undefined
+
+                    if (!tooltipState.isTooltipActive || !point) {
+                      setActiveTooltip(null)
+                      return
+                    }
+
+                    setActiveTooltip({
+                      label: tooltipState.activeLabel ?? point.date,
+                      payload: buildMiniChartTooltipPayload(
+                        point,
+                        overlay.ticker
+                      ),
+                    })
+                  }}
+                  onMouseLeave={() => setActiveTooltip(null)}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="date"
+                    tick={false}
+                    axisLine={false}
+                    height={0}
+                  />
+                  <YAxis
+                    domain={[0, 100]}
+                    tick={false}
+                    axisLine={false}
+                    width={30}
+                  />
+                  <Tooltip
+                    content={() => null}
+                    cursor={{
+                      stroke: 'hsl(var(--border))',
+                      strokeDasharray: '3 3',
+                    }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="ma13Value"
+                    stroke={CHART_SERIES_COLORS.ma13}
+                    strokeWidth={2}
+                    isAnimationActive={false}
+                    dot={false}
+                    name="13주 이동평균(13주 MA)"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="yoyValue"
+                    stroke={CHART_SERIES_COLORS.yoy}
+                    strokeWidth={2}
+                    isAnimationActive={false}
+                    dot={false}
+                    name="전년동기 대비 증감률(52주 YoY)"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="normalizedPrice"
+                    stroke={CHART_SERIES_COLORS.price}
+                    strokeWidth={2}
+                    isAnimationActive={false}
+                    dot={false}
+                    name={`${overlay.ticker} 주가`}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="trendsValue"
+                    stroke={CHART_SERIES_COLORS.googleTrends}
+                    strokeWidth={2}
+                    isAnimationActive={false}
+                    dot={false}
+                    name="검색량 기반"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="text-muted-foreground bg-muted flex items-center justify-center rounded py-4 text-xs">
+              데이터 없음
+            </div>
+          )}
+
+          <div className="text-muted-foreground flex items-center justify-between border-t pt-0.5 text-[10px] leading-none">
+            <span>5년치 차트</span>
+            <span>{formattedDate}</span>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   )
-
-  // normal 모드에서만 Link로 감싸기
-  if (mode === 'normal') {
-    return (
-      <Link
-        href={`/keywords/${keywordId}/overlays/${overlay.id}`}
-        className="group relative"
-      >
-        {cardElement}
-      </Link>
-    )
-  }
-
-  // delete, reorder 모드에서는 Link 없이
-  return <div className="group relative">{cardElement}</div>
 }
 
 export function KeywordDetailClient({
@@ -748,12 +946,15 @@ export function KeywordDetailClient({
   >([])
   const [selectedAutocompleteIndex, setSelectedAutocompleteIndex] = useState(-1)
   const [showAutocomplete, setShowAutocomplete] = useState(false)
+  const [isSearchingStock, setIsSearchingStock] = useState(false)
+  const [isAddingStock, setIsAddingStock] = useState(false)
   const [visibleLines, setVisibleLines] = useState({
     trendsValue: true,
     ma13Value: true,
     yoyValue: true,
     stockPrice: true,
   })
+  const [isTimeframeEditorOpen, setIsTimeframeEditorOpen] = useState(false)
   const [timeframeType, setTimeframeType] = useState<'weeks' | 'years'>('years')
   const [timeframeValue, setTimeframeValue] = useState(5)
   const [timeframeInput, setTimeframeInput] = useState('5')
@@ -768,6 +969,32 @@ export function KeywordDetailClient({
       setTimeframeInput(currentMax.toString())
     }
   }, [period, timeframeType, timeframeValue])
+
+  useEffect(() => {
+    if (!isTimeframeEditorOpen) return
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target
+      if (
+        target instanceof Element &&
+        target.closest('.timeframe-unit-select-content')
+      ) {
+        return
+      }
+
+      if (
+        timeframeEditorRef.current &&
+        !timeframeEditorRef.current.contains(target as Node)
+      ) {
+        setIsTimeframeEditorOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+    }
+  }, [isTimeframeEditorOpen])
 
   // 종목 필터 및 정렬
   const [overlayFilterText, setOverlayFilterText] = useState('')
@@ -790,6 +1017,7 @@ export function KeywordDetailClient({
 
   // 차트 ref (PNG 다운로드)
   const chartRef = useRef<HTMLDivElement>(null)
+  const timeframeEditorRef = useRef<HTMLDivElement>(null)
 
   // 드래그 센서 설정
   const sensors = useSensors(
@@ -799,7 +1027,7 @@ export function KeywordDetailClient({
     })
   )
 
-  // 차트 데이터 병합 (date 기준, 1년치=52주)
+  // 차트 데이터 병합 (date 기준, 5년치 전체 범위)
   const mergeChartData = (
     keywordData: typeof chartData,
     overlayData: OverlayItem['chartData']
@@ -819,8 +1047,7 @@ export function KeywordDetailClient({
       yoyValue: keywordMap.get(point.date)?.yoyValue ?? null,
     }))
 
-    // 마지막 52개만 (1년)
-    return merged.slice(Math.max(0, merged.length - 52))
+    return merged
   }
 
   // 모드 전환
@@ -1016,6 +1243,7 @@ export function KeywordDetailClient({
 
     setTimeframeValue(value)
     setTimeframeInput(value.toString())
+    setIsTimeframeEditorOpen(false)
     toast.success(
       `${value}${timeframeType === 'weeks' ? '주' : '년'} 기간으로 설정했습니다`
     )
@@ -1186,10 +1414,12 @@ export function KeywordDetailClient({
       setAutocompleteResults([])
       setShowAutocomplete(false)
       setSelectedAutocompleteIndex(-1)
+      setIsSearchingStock(false)
       return
     }
 
     try {
+      setIsSearchingStock(true)
       const res = await fetch(`/api/stocks/search?q=${query.toUpperCase()}`)
       if (!res.ok) throw new Error('Search failed')
 
@@ -1200,6 +1430,8 @@ export function KeywordDetailClient({
     } catch (error) {
       console.error('Stock search error:', error)
       setAutocompleteResults([])
+    } finally {
+      setIsSearchingStock(false)
     }
   }
 
@@ -1215,6 +1447,8 @@ export function KeywordDetailClient({
   // 자동완성 항목 선택 후 즉시 검색 (Enter 시)
   const handleSelectAndSearch = async (ticker: string, companyName: string) => {
     void companyName
+    if (isAddingStock) return
+
     setStockSearchInput(ticker)
     setShowAutocomplete(false)
     setAutocompleteResults([])
@@ -1222,6 +1456,7 @@ export function KeywordDetailClient({
 
     // 즉시 종목 데이터 가져오기 (임시 조회, DB 저장 안 함)
     try {
+      setIsAddingStock(true)
       const res = await fetch(`/api/stocks/${ticker}`)
 
       if (!res.ok) {
@@ -1239,6 +1474,8 @@ export function KeywordDetailClient({
     } catch (error) {
       console.error('Stock data error:', error)
       toast.error('종목 데이터를 불러오지 못했습니다')
+    } finally {
+      setIsAddingStock(false)
     }
   }
 
@@ -1298,12 +1535,22 @@ export function KeywordDetailClient({
   }
 
   const handleAddStock = async () => {
+    if (isAddingStock || isSearchingStock) {
+      return
+    }
+
+    if (selectedStock) {
+      toast.info('비교 종목은 1개까지만 추가할 수 있습니다')
+      return
+    }
+
     if (!stockSearchInput.trim()) {
       toast.error('종목 심볼을 입력하세요')
       return
     }
 
     try {
+      setIsAddingStock(true)
       // API에서 종목 데이터 조회 (임시 조회, DB 저장 안 함)
       const res = await fetch(`/api/stocks/${stockSearchInput}`)
 
@@ -1318,11 +1565,24 @@ export function KeywordDetailClient({
 
       const data = await res.json()
       setSelectedStock(data.data)
+      setShowAutocomplete(false)
+      setAutocompleteResults([])
+      setSelectedAutocompleteIndex(-1)
       toast.success(`${stockSearchInput} 종목이 추가되었습니다`)
     } catch (error) {
       console.error('Stock data error:', error)
       toast.error('종목 데이터를 불러오지 못했습니다')
+    } finally {
+      setIsAddingStock(false)
     }
+  }
+
+  const handleRemoveSelectedStock = () => {
+    setSelectedStock(null)
+    setStockSearchInput('')
+    setShowAutocomplete(false)
+    setAutocompleteResults([])
+    setSelectedAutocompleteIndex(-1)
   }
 
   const handleSaveCustomChart = async () => {
@@ -1394,17 +1654,17 @@ export function KeywordDetailClient({
   const selectedAnalysisLabel = `${REGION_LABEL[region]} · ${SEARCH_TYPE_LABEL[searchType]} · 5Y`
 
   return (
-    <div className="bg-background min-h-screen p-6">
+    <div className="bg-background min-h-screen px-4 py-4 lg:px-6 lg:py-5">
       <div className="mx-auto max-w-7xl">
         {/* 헤더 */}
-        <div className="mb-8">
+        <div className="mb-5">
           <Link
             href="/trends"
-            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm transition-colors"
+            className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 transition-colors hover:border-blue-300 hover:bg-blue-100 hover:text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200 dark:hover:bg-blue-950/50"
           >
-            ← 내 키워드로 돌아가기
+            <ChevronLeft className="h-4 w-4" />내 키워드 목록으로
           </Link>
-          <div className="mt-6 space-y-1">
+          <div className="mt-3 space-y-1">
             <h1 className="text-5xl font-extrabold tracking-tight">
               <span className="text-blue-600 dark:text-blue-400">
                 {keyword.keyword}
@@ -1419,9 +1679,9 @@ export function KeywordDetailClient({
         </div>
 
         {/* 분석 선택 및 현재 분석 액션 */}
-        <div className="mb-8 grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="bg-card rounded-lg border p-5">
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="mb-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="bg-card rounded-lg border p-4">
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h3 className="text-sm font-semibold">저장된 분석</h3>
                 <p className="text-muted-foreground mt-1 text-xs">
@@ -1498,12 +1758,12 @@ export function KeywordDetailClient({
 
           <div
             className={cn(
-              'bg-card rounded-lg border p-5 transition-all',
+              'bg-card rounded-lg border p-4 transition-all',
               isRefreshingAnalysis &&
                 'border-cyan-400 bg-cyan-50/50 ring-2 ring-cyan-400/20 dark:bg-cyan-950/20'
             )}
           >
-            <div className="mb-4 flex items-start justify-between gap-3">
+            <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <p className="text-muted-foreground text-xs font-medium">
                   현재 분석
@@ -1593,169 +1853,7 @@ export function KeywordDetailClient({
         {/* 섹션1: 현재 키워드 차트(단독) + 종목 오버레이 */}
         {!analysisNotFound && !isLoadingAnalysis && (
           <>
-            <div className="mb-12 space-y-4">
-              {/* 종목 선택 섹션 */}
-              <div className="relative">
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <input
-                      type="text"
-                      placeholder="종목 심볼 입력 (예: AAPL, TSLA)"
-                      value={stockSearchInput}
-                      onChange={e => {
-                        const newValue = e.target.value.toUpperCase()
-                        setStockSearchInput(newValue)
-                        handleStockSearch(newValue)
-                      }}
-                      onKeyDown={handleStockInputKeyDown}
-                      onBlur={() =>
-                        setTimeout(() => setShowAutocomplete(false), 200)
-                      }
-                      className="border-input bg-background w-full rounded border px-3 py-2 text-sm"
-                    />
-
-                    {/* 자동완성 드롭다운 */}
-                    {showAutocomplete && autocompleteResults.length > 0 && (
-                      <div className="absolute top-full right-0 left-0 z-50 mt-1 max-h-48 overflow-y-auto rounded border border-gray-300 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
-                        {autocompleteResults.map((result, index) => (
-                          <div
-                            key={`${result.ticker}-${index}`}
-                            onClick={() =>
-                              handleSelectAutocomplete(
-                                result.ticker,
-                                result.companyName
-                              )
-                            }
-                            className={`cursor-pointer px-3 py-2 text-sm transition-colors ${
-                              index === selectedAutocompleteIndex
-                                ? 'bg-blue-500 text-white'
-                                : 'hover:bg-gray-100 dark:hover:bg-slate-800'
-                            }`}
-                          >
-                            <div className="font-semibold">{result.ticker}</div>
-                            <div className="text-xs text-gray-600 dark:text-gray-400">
-                              {result.companyName}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <Button
-                    onClick={() => handleAddStock()}
-                    disabled={!stockSearchInput || !!selectedStock}
-                  >
-                    종목 추가
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setSelectedStock(null)
-                      setStockSearchInput('')
-                      setShowAutocomplete(false)
-                    }}
-                    variant="outline"
-                    disabled={!selectedStock}
-                  >
-                    종목 제거
-                  </Button>
-                </div>
-              </div>
-
-              {/* 기간 설정 */}
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={timeframeInput}
-                  onChange={e => {
-                    let value = e.target.value
-
-                    // 숫자만 추출
-                    value = value.replace(/[^\d]/g, '')
-
-                    const maxYears = PERIOD_MAX_YEARS[period]
-
-                    if (timeframeType === 'weeks') {
-                      // 주 단위: period 기반 범위 강제
-                      const maxWeeks = maxYears * 52
-                      const intValue = parseInt(value)
-                      if (!isNaN(intValue)) {
-                        if (intValue < 1) {
-                          value = '1'
-                        } else if (intValue > maxWeeks) {
-                          value = maxWeeks.toString()
-                        } else {
-                          value = intValue.toString()
-                        }
-                      }
-                    } else {
-                      // 년 단위: period 기반 범위 강제
-                      const intValue = parseInt(value)
-                      if (!isNaN(intValue)) {
-                        if (intValue < 1) {
-                          value = '1'
-                        } else if (intValue > maxYears) {
-                          value = maxYears.toString()
-                        } else {
-                          value = intValue.toString()
-                        }
-                      }
-                    }
-
-                    setTimeframeInput(value)
-                  }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      handleApplyTimeframe()
-                    }
-                  }}
-                  className="border-input bg-background w-20 rounded border px-3 py-2 text-sm"
-                  placeholder={
-                    timeframeType === 'weeks'
-                      ? `1-${PERIOD_MAX_YEARS[period] * 52}`
-                      : `1-${PERIOD_MAX_YEARS[period]}`
-                  }
-                />
-                <select
-                  value={timeframeType}
-                  onChange={e => {
-                    const newType = e.target.value as 'weeks' | 'years'
-                    setTimeframeType(newType)
-
-                    if (newType === 'weeks') {
-                      // 년에서 주로 변경: 현재 값을 주 단위로 변환
-                      const currentValue = parseInt(timeframeInput)
-                      if (!isNaN(currentValue) && currentValue > 0) {
-                        const weeks = currentValue * 52
-                        setTimeframeInput(
-                          Math.max(1, Math.min(weeks, 260)).toString()
-                        )
-                      } else {
-                        setTimeframeInput('52')
-                      }
-                    } else {
-                      // 주에서 년으로 변경: 기본값 '1'로 초기화
-                      setTimeframeInput('1')
-                    }
-                  }}
-                  className="border-input bg-background rounded border px-3 py-2 text-sm"
-                >
-                  <option value="weeks">주</option>
-                  <option value="years">년</option>
-                </select>
-                <Button
-                  onClick={handleApplyTimeframe}
-                  variant="outline"
-                  size="sm"
-                >
-                  적용
-                </Button>
-                <span className="text-muted-foreground text-sm">
-                  {getTimeframeDisplayText()}
-                </span>
-              </div>
-
+            <div className="mb-10 space-y-3">
               {/* 차트 */}
               <div ref={chartRef}>
                 <KeywordStandaloneChart
@@ -1766,23 +1864,263 @@ export function KeywordDetailClient({
                   overlays={[]}
                   timeframeType={timeframeType}
                   timeframeValue={timeframeValue}
+                  headerActions={
+                    <div
+                      ref={timeframeEditorRef}
+                      className="relative flex flex-col items-end gap-2 text-right"
+                    >
+                      <p className="text-muted-foreground text-sm">
+                        현재 보기: {getTimeframeDisplayText()}
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsTimeframeEditorOpen(prev => !prev)}
+                      >
+                        {isTimeframeEditorOpen ? '기간 설정 닫기' : '기간 변경'}
+                      </Button>
+                      {isTimeframeEditorOpen && (
+                        <div className="bg-background absolute top-full right-0 z-20 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-lg border p-4 text-left shadow-lg">
+                          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_120px]">
+                            <div>
+                              <label className="mb-2 block text-sm font-medium">
+                                표시 기간
+                              </label>
+                              <Input
+                                type="text"
+                                inputMode="numeric"
+                                value={timeframeInput}
+                                onChange={e => {
+                                  let value = e.target.value
+
+                                  value = value.replace(/[^\d]/g, '')
+
+                                  const maxYears = PERIOD_MAX_YEARS[period]
+
+                                  if (timeframeType === 'weeks') {
+                                    const intValue = parseInt(value)
+                                    if (!isNaN(intValue)) {
+                                      if (intValue < 1) {
+                                        value = '1'
+                                      } else if (
+                                        intValue > MAX_TIMEFRAME_WEEKS
+                                      ) {
+                                        value = MAX_TIMEFRAME_WEEKS.toString()
+                                      } else {
+                                        value = intValue.toString()
+                                      }
+                                    }
+                                  } else {
+                                    const intValue = parseInt(value)
+                                    if (!isNaN(intValue)) {
+                                      if (intValue < 1) {
+                                        value = '1'
+                                      } else if (intValue > maxYears) {
+                                        value = maxYears.toString()
+                                      } else {
+                                        value = intValue.toString()
+                                      }
+                                    }
+                                  }
+
+                                  setTimeframeInput(value)
+                                }}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') {
+                                    handleApplyTimeframe()
+                                  }
+                                }}
+                                placeholder={
+                                  timeframeType === 'weeks'
+                                    ? `1-${MAX_TIMEFRAME_WEEKS}`
+                                    : `1-${PERIOD_MAX_YEARS[period]}`
+                                }
+                                className="h-9"
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-2 block text-sm font-medium">
+                                단위
+                              </label>
+                              <Select
+                                value={timeframeType}
+                                onValueChange={value => {
+                                  const newType = value as 'weeks' | 'years'
+                                  setTimeframeType(newType)
+
+                                  if (newType === 'weeks') {
+                                    const currentValue =
+                                      parseInt(timeframeInput)
+                                    if (
+                                      !isNaN(currentValue) &&
+                                      currentValue > 0
+                                    ) {
+                                      const weeks = currentValue * 52
+                                      setTimeframeInput(
+                                        Math.max(
+                                          1,
+                                          Math.min(weeks, MAX_TIMEFRAME_WEEKS)
+                                        ).toString()
+                                      )
+                                    } else {
+                                      setTimeframeInput('52')
+                                    }
+                                  } else {
+                                    setTimeframeInput('1')
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="h-9">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="timeframe-unit-select-content">
+                                  <SelectItem value="weeks">주</SelectItem>
+                                  <SelectItem value="years">년</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          <div className="mt-3 flex justify-end gap-2">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setIsTimeframeEditorOpen(false)}
+                            >
+                              취소
+                            </Button>
+                            <Button
+                              type="button"
+                              onClick={handleApplyTimeframe}
+                              variant="outline"
+                              size="sm"
+                            >
+                              기간 적용
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  }
+                  controls={
+                    <div className="space-y-4">
+                      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+                        <div className="relative">
+                          <label className="mb-2 block text-sm font-medium">
+                            종목 비교
+                          </label>
+                          <Input
+                            type="text"
+                            placeholder={
+                              selectedStock
+                                ? `현재 ${selectedStock.ticker} 비교 중`
+                                : '종목 심볼 입력 (예: AAPL, TSLA)'
+                            }
+                            value={stockSearchInput}
+                            disabled={!!selectedStock}
+                            onChange={e => {
+                              const newValue = e.target.value.toUpperCase()
+                              setStockSearchInput(newValue)
+                              handleStockSearch(newValue)
+                            }}
+                            onKeyDown={handleStockInputKeyDown}
+                            onBlur={() =>
+                              setTimeout(() => setShowAutocomplete(false), 200)
+                            }
+                            className="disabled:cursor-not-allowed disabled:opacity-60"
+                          />
+
+                          {showAutocomplete &&
+                            autocompleteResults.length > 0 &&
+                            !selectedStock && (
+                              <div className="absolute top-full right-0 left-0 z-50 mt-1 max-h-48 overflow-y-auto rounded border border-gray-300 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                                {autocompleteResults.map((result, index) => (
+                                  <div
+                                    key={`${result.ticker}-${index}`}
+                                    onClick={() =>
+                                      handleSelectAutocomplete(
+                                        result.ticker,
+                                        result.companyName
+                                      )
+                                    }
+                                    className={`cursor-pointer px-3 py-2 text-sm transition-colors ${
+                                      index === selectedAutocompleteIndex
+                                        ? 'bg-blue-500 text-white'
+                                        : 'hover:bg-gray-100 dark:hover:bg-slate-800'
+                                    }`}
+                                  >
+                                    <div className="font-semibold">
+                                      {result.ticker}
+                                    </div>
+                                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                                      {result.companyName}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          <p className="text-muted-foreground mt-2 text-xs">
+                            비교 종목은 최대 1개까지만 추가할 수 있습니다.
+                          </p>
+                          {selectedStock && (
+                            <p className="mt-1 text-xs font-medium text-slate-700 dark:text-slate-300">
+                              현재 비교 중: {selectedStock.ticker}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex flex-col">
+                          <span className="mb-2 block text-sm font-medium opacity-0">
+                            액션
+                          </span>
+                          {selectedStock ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={handleRemoveSelectedStock}
+                              className="h-9 w-full border-red-200 bg-red-50 text-red-700 hover:border-red-300 hover:bg-red-100 hover:text-red-800 lg:w-auto dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200 dark:hover:bg-red-950/50"
+                            >
+                              종목 제거
+                            </Button>
+                          ) : stockSearchInput.trim() ? (
+                            <Button
+                              type="button"
+                              onClick={handleAddStock}
+                              disabled={isSearchingStock || isAddingStock}
+                              className="h-9 w-full lg:w-auto"
+                            >
+                              {isAddingStock
+                                ? '추가 중...'
+                                : isSearchingStock
+                                  ? '검색 중...'
+                                  : '종목 추가'}
+                            </Button>
+                          ) : (
+                            <div className="h-9" />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  }
                   visibleLines={visibleLines}
+                  chartActions={
+                    selectedStock ? (
+                      <Button
+                        onClick={handleSaveCustomChart}
+                        disabled={isSavingCustomChart}
+                        className="h-9"
+                        size="sm"
+                      >
+                        {isSavingCustomChart
+                          ? '저장 중...'
+                          : '커스텀 차트 저장'}
+                      </Button>
+                    ) : null
+                  }
                   onToggleLine={handleToggleLine}
                 />
               </div>
-
-              {/* 커스텀 차트 저장 버튼 */}
-              {selectedStock && (
-                <div className="flex justify-end">
-                  <Button
-                    onClick={handleSaveCustomChart}
-                    disabled={isSavingCustomChart}
-                    className="h-10"
-                  >
-                    {isSavingCustomChart ? '저장 중...' : '커스텀 차트 저장'}
-                  </Button>
-                </div>
-              )}
             </div>
 
             <div className="border-border my-12 border-t" />
@@ -1792,7 +2130,10 @@ export function KeywordDetailClient({
               <div className="mb-6 flex items-center justify-between">
                 <div>
                   <h1 className="mb-2 text-3xl font-bold">
-                    {keyword.keyword} 키워드 커스텀 목록
+                    <span className="text-blue-600 dark:text-blue-400">
+                      {keyword.keyword}
+                    </span>
+                    <span> 키워드 커스텀 목록</span>
                   </h1>
                   <p className="text-muted-foreground text-sm">
                     {chartData.length > 0
@@ -1968,7 +2309,7 @@ export function KeywordDetailClient({
                         items={filteredOverlays.map(o => o.id)}
                         strategy={rectSortingStrategy}
                       >
-                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                           {filteredOverlays.map(overlay => (
                             <SortableOverlayCard
                               key={overlay.id}

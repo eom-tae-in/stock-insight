@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
+import { ChevronLeft } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import type {
@@ -513,14 +514,16 @@ export default function KeywordTrendsClient() {
               <Button
                 asChild
                 variant="outline"
-                className="border-primary/25 bg-primary/10 text-foreground hover:bg-primary/15 shadow-sm"
+                className="border-blue-200 bg-blue-50 text-blue-700 shadow-sm hover:border-blue-300 hover:bg-blue-100 hover:text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200 dark:hover:bg-blue-950/50"
               >
-                <Link href="/keyword-analysis">← 내 키워드로 돌아가기</Link>
+                <Link href="/keyword-analysis">
+                  <ChevronLeft className="h-4 w-4" />내 키워드로 돌아가기
+                </Link>
               </Button>
               <Button
                 onClick={() => router.push('/keyword-analysis/new')}
                 variant="outline"
-                className="border-primary/25 bg-primary/10 text-foreground hover:bg-primary/15 shadow-sm"
+                className="border-blue-200 bg-blue-50 text-blue-700 shadow-sm hover:border-blue-300 hover:bg-blue-100 hover:text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200 dark:hover:bg-blue-950/50"
               >
                 키워드 검색하기
               </Button>

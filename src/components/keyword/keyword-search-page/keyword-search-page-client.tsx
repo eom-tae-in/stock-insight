@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { ChevronLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -58,9 +59,11 @@ export default function KeywordSearchPageClient() {
           <Button
             asChild
             variant="outline"
-            className="border-primary/25 bg-primary/10 text-foreground hover:bg-primary/15 shadow-sm"
+            className="border-blue-200 bg-blue-50 text-blue-700 hover:border-blue-300 hover:bg-blue-100 hover:text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200 dark:hover:bg-blue-950/50"
           >
-            <Link href="/keyword-analysis">← 내 키워드로 돌아가기</Link>
+            <Link href="/keyword-analysis">
+              <ChevronLeft className="h-4 w-4" />내 키워드로 돌아가기
+            </Link>
           </Button>
         </div>
 
