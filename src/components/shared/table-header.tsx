@@ -11,7 +11,7 @@ interface TableExcelRow {
   close: number
   trends: number
   ma13: number | null
-  yoy: number
+  yoy: number | null
 }
 
 interface TableHeaderProps {

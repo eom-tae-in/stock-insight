@@ -30,9 +30,9 @@ const AVAILABLE_SERIES = [
   },
   {
     key: 'yoy',
-    label: '52주 YoY',
+    label: '13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)',
     color: CHART_SERIES_COLORS.yoy,
-    minWeeks: 52,
+    minWeeks: 65,
   },
 ]
 

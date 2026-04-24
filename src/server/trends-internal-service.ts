@@ -461,9 +461,15 @@ export function buildTrendsDataWithIndicators(
     let yoyValue: number | null = null
 
     if (idx >= 52) {
-      const previousYearValue = trendPoints[idx - 52].value
-      if (previousYearValue !== 0) {
-        yoyValue = ((point.value - previousYearValue) / previousYearValue) * 100
+      const currentMA13 = ma13Values[idx]
+      const previousYearMA13 = ma13Values[idx - 52]
+      if (
+        currentMA13 !== null &&
+        previousYearMA13 !== null &&
+        previousYearMA13 !== 0
+      ) {
+        yoyValue = ((currentMA13 - previousYearMA13) / previousYearMA13) * 100
+        yoyValue = Math.round(yoyValue * 100) / 100
       }
     }
 

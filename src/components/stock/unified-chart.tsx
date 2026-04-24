@@ -70,12 +70,12 @@ const SERIES_CONFIG = {
     minWeeks: 13,
   },
   yoy: {
-    name: '52주 YoY',
+    name: '13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)',
     color: CHART_SERIES_COLORS.yoy,
     yAxisId: 'right',
     type: 'area',
     enabled: true,
-    minWeeks: 52,
+    minWeeks: 65,
   },
 }
 
@@ -168,7 +168,7 @@ export function UnifiedChart({
     }
   }
 
-  // 주별 YoY 계산
+  // 주별 13주 이동평균 기준 52주 YoY 계산
   const weeklyYoY = calculateWeeklyYoY(priceData)
 
   // 모든 데이터 병합
@@ -370,13 +370,14 @@ export function UnifiedChart({
               />
             )}
 
-            {/* 우측 Y축: YoY (%) */}
+            {/* 우측 Y축: 13주 이동평균 기준 52주 YoY (%) */}
             {enabledSeries.yoy && (
               <YAxis
                 yAxisId="right"
                 orientation="right"
                 label={{
-                  value: 'YoY (%)',
+                  value:
+                    '13주 이동평균 기준 전년동기 대비 증감률(52주 YoY) (%)',
                   angle: 90,
                   position: 'insideRight',
                   offset: -10,
@@ -484,7 +485,7 @@ export function UnifiedChart({
               />
             )}
 
-            {/* 52주 YoY 영역 */}
+            {/* 13주 이동평균 기준 52주 YoY 영역 */}
             {enabledSeries.yoy && (
               <Area
                 yAxisId="right"
@@ -494,7 +495,7 @@ export function UnifiedChart({
                 fill={SERIES_CONFIG.yoy.color}
                 fillOpacity={0.2}
                 dot={false}
-                name="52주 YoY"
+                name="13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)"
                 isAnimationActive={false}
               />
             )}
@@ -507,8 +508,9 @@ export function UnifiedChart({
         <p>
           💡 위의 토글 버튼을 클릭하여 원하는 데이터를 표시/숨길 수 있습니다.
           선(Line)은 일일 가격(시가/종가/저가/고가), 영역(Area)은 이동평균과
-          YoY(%)를 표시합니다. 좌측 Y축은 주가(
-          {getCurrencySymbol(currency || ticker || '')}) 우측은 YoY(%)입니다.
+          13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)을 표시합니다. 좌측
+          Y축은 주가({getCurrencySymbol(currency || ticker || '')}) 우측은 13주
+          이동평균 기준 전년동기 대비 증감률(52주 YoY, %)입니다.
         </p>
       </div>
     </div>

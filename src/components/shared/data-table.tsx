@@ -38,7 +38,7 @@ export function DataTable({
       date: price.date,
       close: price.close,
       ma13: ma13Values[index] ?? 0,
-      yoy: weeklyYoY[index] ?? 0,
+      yoy: weeklyYoY[index] ?? null,
     }))
   }, [priceData, ma13Values])
 
@@ -135,7 +135,7 @@ export function DataTable({
       date: '일정',
       close: '주가',
       ma13: '13주 MA',
-      yoy: '전년도 대비',
+      yoy: '13주 이동평균 기준 전년동기 대비',
     }
 
     const label = labelMap[sortConfig.key] || '일정'
@@ -177,7 +177,10 @@ export function DataTable({
               </th>
               <th className="px-4 py-3">
                 <div className="flex items-center justify-center">
-                  <SortHeader label="전년도 대비 (%)" sortKey="yoy" />
+                  <SortHeader
+                    label="13주 이동평균 기준 전년동기 대비 증감률(52주 YoY) (%)"
+                    sortKey="yoy"
+                  />
                 </div>
               </th>
             </tr>
@@ -206,13 +209,16 @@ export function DataTable({
                   <div
                     className={cn(
                       'text-center font-semibold',
-                      row.yoy >= 0
-                        ? 'text-blue-600 dark:text-blue-400'
-                        : 'text-red-600 dark:text-red-400'
+                      row.yoy == null
+                        ? 'text-muted-foreground'
+                        : row.yoy >= 0
+                          ? 'text-blue-600 dark:text-blue-400'
+                          : 'text-red-600 dark:text-red-400'
                     )}
                   >
-                    {row.yoy >= 0 ? '+' : ''}
-                    {row.yoy.toFixed(2)}%
+                    {row.yoy == null
+                      ? 'N/A'
+                      : `${row.yoy >= 0 ? '+' : ''}${row.yoy.toFixed(2)}%`}
                   </div>
                 </td>
               </tr>

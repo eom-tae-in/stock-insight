@@ -45,7 +45,7 @@ export function MetricsSummary({
           unit={currencyInfo.symbol}
         />
         <MetricsCard
-          label="1년 전 대비 수익률 (52주 YoY)"
+          label="13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)"
           value={metrics.yoyChange}
           unit="%"
           isPositive={isYoYPositive}
@@ -58,7 +58,8 @@ export function MetricsSummary({
           <p className="leading-relaxed">
             💡 <strong>기준점:</strong> {formatDate(lastUpdatedAt)} (전주 기준)
             · <strong>최근 13주 평균:</strong> 최근 13주의 평균 종가 ·{' '}
-            <strong>52주 YoY:</strong> 1년 전 대비 변화율
+            <strong>13주 이동평균 기준 전년동기 대비 증감률(52주 YoY):</strong>{' '}
+            최근 13주 평균 종가를 52주 전 같은 시점과 비교한 변화율
           </p>
         </div>
       )}

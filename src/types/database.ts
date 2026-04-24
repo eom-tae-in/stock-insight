@@ -23,7 +23,7 @@ export interface TrendsDataPoint {
   date: string // ISO 8601 (YYYY-MM-DD)
   value: number // 0-100
   ma13Value: number | null // 13주 이동평균 (0-100)
-  yoyValue: number | null // 52주 YoY 변화율 (%)
+  yoyValue: number | null // 13주 이동평균 기준 52주 YoY 변화율 (%)
 }
 
 /**
@@ -109,7 +109,7 @@ export interface KeywordRecord {
   region: Region // 지역
   search_type: SearchType // 검색 타입
   ma13?: number // 트렌드 지수 기반 13주 이동평균 (0-100)
-  yoy_change?: number // 트렌드 지수 기반 52주 YoY (%)
+  yoy_change?: number // 트렌드 지수 기반 13주 이동평균 기준 52주 YoY (%)
   trends_data: TrendsDataPoint[] // 5년 주간 트렌드 배열
   searched_at: string // ISO 8601 타임스탬프
   created_at: string // ISO 8601 타임스탬프
@@ -131,7 +131,7 @@ export interface KeywordStockOverlay {
 
 /**
  * F021: 키워드 트렌드 분석 지표
- * Google Trends 데이터의 현재 값, MA13, YoY 변화율을 담음
+ * Google Trends 데이터의 현재 값, MA13, 13주 이동평균 기준 YoY 변화율을 담음
  */
 export interface KeywordTrendsMetrics {
   currentKeywordValue: number // 현재 트렌드 지수 (0-100)
@@ -211,7 +211,7 @@ export interface Keyword {
  * 필드:
  * - trends_data: 해당 조건의 Google Trends 시계열 데이터
  * - ma13_data: 해당 조건의 13주 이동평균
- * - yoy_data: 해당 조건의 52주 YoY
+ * - yoy_data: 해당 조건의 13주 이동평균 기준 52주 YoY
  *
  * 예:
  * - KeywordAnalysis(keyword_id=축구, region=US, period=5Y, type=WEB)
@@ -234,7 +234,7 @@ export interface KeywordAnalysis {
 
   // 지표 (최신값)
   ma13_data?: number // 13주 이동평균 (0-100)
-  yoy_data?: number // 52주 YoY (%)
+  yoy_data?: number // 13주 이동평균 기준 52주 YoY (%)
 
   created_at: string // ISO 8601 타임스탬프
   updated_at?: string // ISO 8601 타임스탬프

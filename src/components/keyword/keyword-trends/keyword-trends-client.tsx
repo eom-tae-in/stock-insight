@@ -386,17 +386,27 @@ export default function KeywordTrendsClient() {
     [trendsData, ma13Values]
   )
 
-  // F027: 차트용 52주 YoY 라인 값 배열 (각 포인트별 전년동기 대비 변화율)
+  // F027: 차트용 13주 이동평균 기준 52주 YoY 라인 값 배열
   const yoyValuesArray = useMemo(() => {
     const weeksInYear = 52
-    return trendsData.map((point, idx) => {
+    return ma13Values.map((currentMA13, idx) => {
       if (idx < weeksInYear) return null
-      const currentValue = point.value
-      const previousYearValue = trendsData[idx - weeksInYear].value
-      if (previousYearValue === 0) return null
-      return ((currentValue - previousYearValue) / previousYearValue) * 100
+      const previousYearMA13 = ma13Values[idx - weeksInYear]
+      if (
+        currentMA13 === null ||
+        previousYearMA13 === null ||
+        previousYearMA13 === 0
+      ) {
+        return null
+      }
+
+      return (
+        Math.round(
+          ((currentMA13 - previousYearMA13) / previousYearMA13) * 100 * 100
+        ) / 100
+      )
     })
-  }, [trendsData])
+  }, [ma13Values])
 
   // P0-2: 401 처리를 apiFetchJson으로 위임
   const fetchSavedKeywords = async () => {
@@ -571,11 +581,11 @@ export default function KeywordTrendsClient() {
                 </CardContent>
               </Card>
 
-              {/* P1-7: YoY 다크모드 색상 - dark: 프리픽스 추가 */}
+              {/* P1-7: 13주 이동평균 기준 52주 YoY 다크모드 색상 - dark: 프리픽스 추가 */}
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-muted-foreground text-sm font-medium">
-                    전년동기 대비 증감률(52주 YoY)
+                    13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)
                   </CardTitle>
                 </CardHeader>
                 <CardContent>

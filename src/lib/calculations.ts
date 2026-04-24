@@ -3,7 +3,7 @@
  *
  * Task 011: 지표 계산 로직
  * - MA13 (13주 이동평균)
- * - YoY (52주 대비 변화율)
+ * - 13주 이동평균 기준 전년동기 대비 증감률 (52주 YoY)
  * - 52주 최고/최저가
  * - 종합 지표 계산
  * - 가격-트렌드 데이터 매칭
@@ -20,19 +20,21 @@ import type { PriceDataPoint, Metrics } from '@/types'
 export { calculateMA13, calculateTrendsMA13, calculateTrendsYoY }
 
 /**
- * YoY(Year over Year) 계산
- * 52주 전 종가 대비 현재 종가의 변화율 (%)
+ * 13주 이동평균 기준 52주 YoY 계산
+ * 최신 13주 이동평균과 52주 전 같은 시점의 13주 이동평균을 비교합니다.
  */
 export function calculateYoY(priceData: PriceDataPoint[]): number {
   if (priceData.length === 0) return 0
 
-  const currentPrice = priceData[priceData.length - 1].close
-  const week52AgoIndex = Math.max(0, priceData.length - 52)
-  const week52AgoPrice = priceData[week52AgoIndex].close
+  const ma13Values = calculateMA13(priceData)
+  const currentMA13 = ma13Values[ma13Values.length - 1]
+  const week52AgoMA13 = ma13Values[ma13Values.length - 1 - 52]
 
-  if (week52AgoPrice === 0) return 0
+  if (currentMA13 == null || week52AgoMA13 == null || week52AgoMA13 === 0) {
+    return 0
+  }
 
-  const yoyChange = ((currentPrice - week52AgoPrice) / week52AgoPrice) * 100
+  const yoyChange = ((currentMA13 - week52AgoMA13) / week52AgoMA13) * 100
   return Math.round(yoyChange * 100) / 100
 }
 
@@ -78,7 +80,7 @@ export function calculateMetrics(priceData: PriceDataPoint[]): Metrics {
   const ma13Array = calculateMA13(priceData)
   const ma13 = ma13Array[ma13Array.length - 1] || 0
 
-  // YoY: 52주 대비 변화율
+  // 13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)
   const yoyChange = calculateYoY(priceData)
 
   return {
@@ -90,24 +92,27 @@ export function calculateMetrics(priceData: PriceDataPoint[]): Metrics {
 }
 
 /**
- * 주별 YoY(Year over Year) 계산
- * 각 주차별로 52주 전 종가 대비 변화율을 배열로 반환합니다.
- * 52주 미만의 데이터는 0으로 채웁니다.
+ * 주별 13주 이동평균 기준 52주 YoY 계산
+ * 각 주차별로 해당 시점의 13주 이동평균과 52주 전의 13주 이동평균을 비교합니다.
+ * 13주 이동평균 또는 52주 전 비교값이 없으면 null을 반환합니다.
  */
-export function calculateWeeklyYoY(priceData: PriceDataPoint[]): number[] {
+export function calculateWeeklyYoY(
+  priceData: PriceDataPoint[]
+): (number | null)[] {
   if (priceData.length === 0) return []
 
-  return priceData.map((point, index) => {
-    const week52AgoIndex = index - 52
+  const ma13Values = calculateMA13(priceData)
 
-    if (week52AgoIndex < 0) {
-      return 0
+  return ma13Values.map((currentMA13, index) => {
+    const week52AgoIndex = index - 52
+    const week52AgoMA13 =
+      week52AgoIndex >= 0 ? ma13Values[week52AgoIndex] : null
+
+    if (currentMA13 == null || week52AgoMA13 == null || week52AgoMA13 === 0) {
+      return null
     }
 
-    const week52AgoPrice = priceData[week52AgoIndex].close
-    if (week52AgoPrice === 0) return 0
-
-    const yoyChange = ((point.close - week52AgoPrice) / week52AgoPrice) * 100
+    const yoyChange = ((currentMA13 - week52AgoMA13) / week52AgoMA13) * 100
     return Math.round(yoyChange * 100) / 100
   })
 }
