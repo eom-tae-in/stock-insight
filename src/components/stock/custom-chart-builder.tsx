@@ -12,12 +12,28 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { CHART_SERIES_COLORS } from '@/lib/constants/chart-series'
 import type { CustomChart, CustomChartBuilderProps } from '@/types'
 
 const AVAILABLE_SERIES = [
-  { key: 'close', label: '종가', color: '#3b82f6', minWeeks: 0 },
-  { key: 'ma13', label: '13주 MA', color: '#f97316', minWeeks: 13 },
-  { key: 'yoy', label: '52주 YoY', color: '#f59e0b', minWeeks: 52 },
+  {
+    key: 'close',
+    label: '종가',
+    color: CHART_SERIES_COLORS.price,
+    minWeeks: 0,
+  },
+  {
+    key: 'ma13',
+    label: '13주 MA',
+    color: CHART_SERIES_COLORS.ma13,
+    minWeeks: 13,
+  },
+  {
+    key: 'yoy',
+    label: '52주 YoY',
+    color: CHART_SERIES_COLORS.yoy,
+    minWeeks: 52,
+  },
 ]
 
 const TIME_RANGES = [

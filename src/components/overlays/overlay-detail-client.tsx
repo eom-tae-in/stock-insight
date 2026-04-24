@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useMemo } from 'react'
+import { ChevronLeft } from 'lucide-react'
 import {
   LineChart,
   Line,
@@ -13,7 +14,9 @@ import {
   Legend,
 } from 'recharts'
 import type { KeywordRecord } from '@/types/database'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { CHART_SERIES_COLORS } from '@/lib/constants/chart-series'
 
 interface OverlayDetailClientProps {
   keyword: KeywordRecord
@@ -83,12 +86,16 @@ export function OverlayDetailClient({
       <div className="mx-auto max-w-6xl">
         {/* 헤더 */}
         <div className="mb-6">
-          <Link
-            href={`/keywords/${keyword.id}`}
-            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm transition-colors"
+          <Button
+            asChild
+            variant="outline"
+            className="border-blue-200 bg-blue-50 text-blue-700 hover:border-blue-300 hover:bg-blue-100 hover:text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200 dark:hover:bg-blue-950/50"
           >
-            ← {keyword.keyword} 목록으로 돌아가기
-          </Link>
+            <Link href={`/keywords/${keyword.id}`}>
+              <ChevronLeft className="h-4 w-4" />
+              키워드 분석으로 이동
+            </Link>
+          </Button>
         </div>
 
         <h1 className="mb-2 text-3xl font-bold">
@@ -174,7 +181,7 @@ export function OverlayDetailClient({
                     <Line
                       type="monotone"
                       dataKey="ma13Value"
-                      stroke="hsl(38 92% 50%)"
+                      stroke={CHART_SERIES_COLORS.ma13}
                       strokeWidth={2}
                       isAnimationActive={false}
                       dot={false}
@@ -184,7 +191,7 @@ export function OverlayDetailClient({
                     <Line
                       type="monotone"
                       dataKey="yoyValue"
-                      stroke="hsl(289 100% 58%)"
+                      stroke={CHART_SERIES_COLORS.yoy}
                       strokeWidth={2}
                       isAnimationActive={false}
                       dot={false}
@@ -194,21 +201,21 @@ export function OverlayDetailClient({
                     <Line
                       type="monotone"
                       dataKey="normalizedPrice"
-                      stroke="hsl(142 72% 29%)"
+                      stroke={CHART_SERIES_COLORS.price}
                       strokeWidth={2}
                       isAnimationActive={false}
                       dot={false}
                       name={`${overlay.ticker} 주가`}
                     />
-                    {/* 라인4: 트렌드 지수 (파란색) */}
+                    {/* 라인4: 검색량 기반 (파란색) */}
                     <Line
                       type="monotone"
                       dataKey="trendsValue"
-                      stroke="hsl(211 100% 50%)"
+                      stroke={CHART_SERIES_COLORS.googleTrends}
                       strokeWidth={2}
                       isAnimationActive={false}
                       dot={false}
-                      name="트렌드 지수"
+                      name="검색량 기반"
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -233,9 +240,9 @@ export function OverlayDetailClient({
                   <span className="mt-0.5 font-bold text-green-500">✓</span>
                   <span>
                     4개 라인: <span className="font-medium">13주 이동평균</span>
-                    (주황색), <span className="font-medium">52주 YoY</span>
-                    (분홍색), <span className="font-medium">종목 주가</span>
-                    (초록색), <span className="font-medium">트렌드 지수</span>
+                    (빨간색), <span className="font-medium">52주 YoY</span>
+                    (노란색), <span className="font-medium">종목 주가</span>
+                    (검은색), <span className="font-medium">검색량 기반</span>
                     (파란색)
                   </span>
                 </li>
@@ -252,7 +259,7 @@ export function OverlayDetailClient({
                   const csv = [
                     [
                       '날짜',
-                      '트렌드 지수',
+                      '검색량 기반',
                       '13주 이동평균',
                       '정규화 주가',
                       '52주 YoY',

@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import {
   LineChart,
   Line,
@@ -12,6 +13,86 @@ import {
 } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { CHART_SERIES_COLORS } from '@/lib/constants/chart-series'
+
+type ChartTooltipEntry = {
+  color?: string
+  dataKey?: string | number
+  name?: string
+  value?: number | string | null
+}
+
+function formatTooltipValue(entry: ChartTooltipEntry) {
+  if (typeof entry.value !== 'number') {
+    return entry.value ?? '-'
+  }
+
+  if (entry.dataKey === 'yoyValue') {
+    return `${entry.value.toFixed(1)}%`
+  }
+
+  if (entry.dataKey === 'stockPrice') {
+    return `$${entry.value.toFixed(2)}`
+  }
+
+  if (
+    typeof entry.dataKey === 'string' &&
+    entry.dataKey.startsWith('overlay_')
+  ) {
+    return entry.value.toFixed(2)
+  }
+
+  return Number.isInteger(entry.value)
+    ? entry.value.toString()
+    : entry.value.toFixed(2)
+}
+
+function ChartTooltipContent({
+  active,
+  label,
+  payload,
+}: {
+  active?: boolean
+  label?: string | number
+  payload?: ChartTooltipEntry[]
+}) {
+  if (!active || !payload || payload.length === 0) return null
+
+  const visiblePayload = payload.filter(
+    entry => entry.value !== null && entry.value !== undefined
+  )
+
+  if (visiblePayload.length === 0) return null
+
+  return (
+    <div className="bg-background/95 border-border/80 min-w-56 rounded-md border px-3 py-2.5 shadow-lg backdrop-blur-sm">
+      <div className="text-xs font-medium tracking-tight text-slate-700 dark:text-slate-200">
+        {label}
+      </div>
+      <div className="mt-2 space-y-1.5">
+        {visiblePayload.map(entry => (
+          <div
+            key={`${String(entry.dataKey)}-${entry.name}`}
+            className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3"
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              <span
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: entry.color ?? 'currentColor' }}
+              />
+              <span className="truncate text-xs font-medium text-slate-700 dark:text-slate-200">
+                {entry.name}
+              </span>
+            </div>
+            <span className="text-right text-xs font-semibold text-slate-950 tabular-nums dark:text-slate-50">
+              {formatTooltipValue(entry)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 interface KeywordStandaloneChartProps {
   keyword: string
@@ -43,6 +124,9 @@ interface KeywordStandaloneChartProps {
   }>
   timeframeType?: 'weeks' | 'years'
   timeframeValue?: number
+  headerActions?: ReactNode
+  controls?: ReactNode
+  chartActions?: ReactNode
   visibleLines: {
     trendsValue: boolean
     ma13Value: boolean
@@ -62,6 +146,9 @@ export function KeywordStandaloneChart({
   overlays = [],
   timeframeType = 'years',
   timeframeValue = 5,
+  headerActions,
+  controls,
+  chartActions,
   visibleLines,
   onToggleLine,
 }: KeywordStandaloneChartProps) {
@@ -166,64 +253,84 @@ export function KeywordStandaloneChart({
 
   return (
     <Card>
-      <CardHeader className="pb-4">
+      <CardHeader className="flex flex-row items-start justify-between gap-4 pb-2">
         <CardTitle className="text-2xl">
           <span className="font-bold text-blue-600 dark:text-blue-400">
             {keyword}
           </span>
           <span className="text-foreground"> 트렌드</span>
         </CardTitle>
+        {headerActions && (
+          <div className="flex shrink-0 justify-end">{headerActions}</div>
+        )}
       </CardHeader>
-      <CardContent className="space-y-4">
-        {/* 라인 토글 버튼 */}
-        <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={() => onToggleLine('trendsValue')}
-            variant={visibleLines.trendsValue ? 'default' : 'outline'}
-            size="sm"
-            className={
-              visibleLines.trendsValue ? 'bg-blue-500 hover:bg-blue-600' : ''
-            }
-          >
-            검색량 기반
-          </Button>
-          <Button
-            onClick={() => onToggleLine('ma13Value')}
-            variant={visibleLines.ma13Value ? 'default' : 'outline'}
-            size="sm"
-            className={
-              visibleLines.ma13Value ? 'bg-orange-500 hover:bg-orange-600' : ''
-            }
-          >
-            13주 이동평균(13주 MA)
-          </Button>
-          <Button
-            onClick={() => onToggleLine('yoyValue')}
-            variant={visibleLines.yoyValue ? 'default' : 'outline'}
-            size="sm"
-            className={
-              visibleLines.yoyValue ? 'bg-pink-500 hover:bg-pink-600' : ''
-            }
-          >
-            전년동기 대비 증감률(52주 YoY)
-          </Button>
-          {overlayStock && (
+      <CardContent className="space-y-2">
+        {controls && <div>{controls}</div>}
+        <div className="flex flex-col gap-2 xl:flex-row xl:items-start xl:justify-between">
+          <div className="flex flex-wrap gap-2">
             <Button
-              onClick={() => onToggleLine('stockPrice')}
-              variant={visibleLines.stockPrice ? 'default' : 'outline'}
+              onClick={() => onToggleLine('trendsValue')}
+              variant={visibleLines.trendsValue ? 'default' : 'outline'}
               size="sm"
-              className={
-                visibleLines.stockPrice
-                  ? 'bg-purple-500 hover:bg-purple-600'
-                  : ''
+              className={visibleLines.trendsValue ? 'text-white' : ''}
+              style={
+                visibleLines.trendsValue
+                  ? { backgroundColor: CHART_SERIES_COLORS.googleTrends }
+                  : undefined
               }
             >
-              {overlayStock.ticker} 주가
+              검색량 기반
             </Button>
+            <Button
+              onClick={() => onToggleLine('ma13Value')}
+              variant={visibleLines.ma13Value ? 'default' : 'outline'}
+              size="sm"
+              className={visibleLines.ma13Value ? 'text-white' : ''}
+              style={
+                visibleLines.ma13Value
+                  ? { backgroundColor: CHART_SERIES_COLORS.ma13 }
+                  : undefined
+              }
+            >
+              13주 이동평균(13주 MA)
+            </Button>
+            <Button
+              onClick={() => onToggleLine('yoyValue')}
+              variant={visibleLines.yoyValue ? 'default' : 'outline'}
+              size="sm"
+              className={visibleLines.yoyValue ? 'text-white' : ''}
+              style={
+                visibleLines.yoyValue
+                  ? { backgroundColor: CHART_SERIES_COLORS.yoy }
+                  : undefined
+              }
+            >
+              전년동기 대비 증감률(52주 YoY)
+            </Button>
+            {overlayStock && (
+              <Button
+                onClick={() => onToggleLine('stockPrice')}
+                variant={visibleLines.stockPrice ? 'default' : 'outline'}
+                size="sm"
+                className={visibleLines.stockPrice ? 'text-white' : ''}
+                style={
+                  visibleLines.stockPrice
+                    ? { backgroundColor: CHART_SERIES_COLORS.price }
+                    : undefined
+                }
+              >
+                {overlayStock.ticker} 주가
+              </Button>
+            )}
+          </div>
+          {chartActions && (
+            <div className="flex justify-start xl:-mt-8 xl:justify-end">
+              {chartActions}
+            </div>
           )}
         </div>
 
-        <ResponsiveContainer width="100%" height={400}>
+        <ResponsiveContainer width="100%" height={520}>
           <LineChart
             data={mergedData}
             margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
@@ -260,14 +367,7 @@ export function KeywordStandaloneChart({
                 }}
               />
             )}
-            <Tooltip
-              contentStyle={{
-                backgroundColor: 'hsl(var(--background))',
-                border: '1px solid hsl(var(--border))',
-                borderRadius: '4px',
-                color: 'hsl(var(--foreground))',
-              }}
-            />
+            <Tooltip content={<ChartTooltipContent />} />
             <Legend />
 
             {/* 검색량 기반 (파란색) */}
@@ -275,7 +375,7 @@ export function KeywordStandaloneChart({
               <Line
                 type="monotone"
                 dataKey="trendsValue"
-                stroke="#3b82f6"
+                stroke={CHART_SERIES_COLORS.googleTrends}
                 name="검색량 기반"
                 dot={false}
                 strokeWidth={2}
@@ -289,7 +389,7 @@ export function KeywordStandaloneChart({
               <Line
                 type="monotone"
                 dataKey="ma13Value"
-                stroke="#f97316"
+                stroke={CHART_SERIES_COLORS.ma13}
                 name="13주 이동평균(13주 MA)"
                 dot={false}
                 strokeWidth={2}
@@ -303,7 +403,7 @@ export function KeywordStandaloneChart({
               <Line
                 type="monotone"
                 dataKey="yoyValue"
-                stroke="#ec4899"
+                stroke={CHART_SERIES_COLORS.yoy}
                 name="전년동기 대비 증감률(52주 YoY)"
                 dot={false}
                 strokeWidth={2}
@@ -317,7 +417,7 @@ export function KeywordStandaloneChart({
               <Line
                 type="monotone"
                 dataKey="stockPrice"
-                stroke="#a855f7"
+                stroke={CHART_SERIES_COLORS.price}
                 name={`${overlayStock.ticker} 주가`}
                 dot={false}
                 strokeWidth={2}
@@ -326,16 +426,8 @@ export function KeywordStandaloneChart({
               />
             )}
 
-            {/* DB 저장된 overlays (여러 색상) */}
-            {overlays.map((overlay, index) => {
-              const colors = [
-                '#06b6d4', // cyan
-                '#10b981', // emerald
-                '#f59e0b', // amber
-                '#ef4444', // red
-                '#8b5cf6', // violet
-              ]
-              const color = colors[index % colors.length]
+            {/* DB 저장된 overlays */}
+            {overlays.map(overlay => {
               const dataKey = `overlay_${overlay.id}`
 
               return (
@@ -343,7 +435,7 @@ export function KeywordStandaloneChart({
                   key={overlay.id}
                   type="monotone"
                   dataKey={dataKey}
-                  stroke={color}
+                  stroke={CHART_SERIES_COLORS.price}
                   name={`${overlay.ticker}`}
                   dot={false}
                   strokeWidth={2}
