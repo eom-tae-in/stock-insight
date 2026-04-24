@@ -1,47 +1,51 @@
-# 🤖 Claude Code 개발 지침
+# Claude Code 개발 지침
 
-**StockInsight**는 Yahoo Finance + Google Trends 데이터를 결합하여 종목의 5년 가격 흐름과 대중 검색 관심도를 비교 분석하는 로컬 주식 분석 도구입니다.
+이 문서는 StockInsight 저장소에서 AI 작업 시 참고하는 최소 기준 문서다.
 
-📋 상세 프로젝트 요구사항은 @/docs/PRD.md 참조
+## 프로젝트 요약
 
-## 🛠️ 핵심 기술 스택
+- StockInsight는 종목 분석과 키워드 분석을 함께 제공하는 Next.js 앱이다.
+- 인증과 저장은 Supabase를 사용한다.
+- Google Trends 수집은 Vercel Python Function `/api/pytrends` 를 사용한다.
 
-- **Framework**: Next.js 15.5.3 (App Router + Turbopack)
-- **Runtime**: React 19.1.0 + TypeScript 5
-- **Styling**: TailwindCSS v4 + shadcn/ui (new-york style)
-- **Database**: Supabase (PostgreSQL 기반 클라우드 DB)
-- **Data Sources**: yahoo-finance2 (주가), pytrends (Google Trends)
-- **Forms**: React Hook Form + Zod
-- **UI Components**: Radix UI + Lucide Icons
-- **Development**: ESLint + Prettier + Husky + lint-staged
+상세 제품 요구사항은 [docs/PRD.md](./docs/PRD.md), 기술 구조는 [docs/TRD.md](./docs/TRD.md)를 우선 참고한다.
 
-## 📚 개발 가이드
+## 문서 우선순위
 
-- **🗺️ 개발 로드맵**: `@/docs/ROADMAP.md`
-- **📋 프로젝트 요구사항**: `@/docs/PRD.md`
-- **📁 프로젝트 구조**: `@/docs/guides/project-structure.md`
-- **🎨 스타일링 가이드**: `@/docs/guides/styling-guide.md`
-- **🧩 컴포넌트 패턴**: `@/docs/guides/component-patterns.md`
-- **⚡ Next.js 15.5.3 전문 가이드**: `@/docs/guides/nextjs-15.md`
-- **📝 폼 처리 완전 가이드**: `@/docs/guides/forms-react-hook-form.md`
+1. `docs/PRD.md`
+2. `docs/TRD.md`
+3. `docs/ROADMAP.md`
+4. `docs/API_CONVENTIONS.md`
+5. `README.md`
 
-## ⚡ 자주 사용하는 명령어
+## 작업 원칙
 
-```bash
-# 개발
-npm run dev         # 개발 서버 실행 (Turbopack)
-npm run build       # 프로덕션 빌드
-npm run check-all   # 모든 검사 통합 실행 (권장)
+- 현재 코드 기준으로 문서와 구현을 맞춘다.
+- 미래 목표보다 현재 실제 동작을 우선 설명한다.
+- 보호 API는 401 JSON, 보호 페이지는 로그인 리다이렉트 규칙을 유지한다.
+- 키워드 Trends 경로는 `/api/pytrends` 단일 런타임 기준으로 생각한다.
+- 로컬 Trends 검증은 `vercel dev` 기준이 더 정확하다.
 
-# UI 컴포넌트
-npx shadcn@latest add button    # 새 컴포넌트 추가
-```
+## 품질 게이트
 
-## ✅ 작업 완료 체크리스트
+기본 확인:
 
 ```bash
-npm run check-all   # 모든 검사 통과 확인
-npm run build       # 빌드 성공 확인
+npm run typecheck
+npm run lint
+npm run build
 ```
 
-💡 **상세 규칙은 위 개발 가이드 문서들을 참조하세요**
+빠른 통합 확인:
+
+```bash
+npm run check-all
+```
+
+## 수정 시 같이 봐야 하는 것
+
+- API 변경 시 `docs/API_CONVENTIONS.md`
+- 제품 흐름 변경 시 `docs/PRD.md`
+- 런타임/배포 구조 변경 시 `docs/TRD.md`
+- 우선순위 변경 시 `docs/ROADMAP.md`
+- 실행 방법/환경 변수 변경 시 `README.md`
