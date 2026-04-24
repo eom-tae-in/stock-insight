@@ -121,7 +121,7 @@ export function CustomChartView({
                       const seriesMap: Record<string, string> = {
                         close: '종가',
                         ma13: '13주 MA',
-                        yoy: '52주 YoY',
+                        yoy: '13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)',
                       }
                       return seriesMap[key] || key
                     })
@@ -161,7 +161,7 @@ export function CustomChartView({
                         const seriesMap: Record<string, string> = {
                           close: '종가',
                           ma13: '13주 MA',
-                          yoy: '52주 YoY',
+                          yoy: '13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)',
                         }
                         return seriesMap[key] || key
                       })

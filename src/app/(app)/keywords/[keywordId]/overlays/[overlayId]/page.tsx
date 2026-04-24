@@ -2,8 +2,8 @@
  * Overlay 상세 페이지
  * Route: /keywords/[keywordId]/overlays/[overlayId]
  * - 전체 5년 데이터 차트 표시
- * - 4개 라인 (MA13, YoY, 종목 주가, 트렌드)
- * - MA13, YoY 계산 표시
+ * - 4개 라인 (MA13, 13주 이동평균 기준 52주 YoY, 종목 주가, 트렌드)
+ * - MA13, 13주 이동평균 기준 52주 YoY 계산 표시
  * - 다운로드 기능
  */
 

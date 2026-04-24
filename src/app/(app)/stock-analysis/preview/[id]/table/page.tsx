@@ -39,7 +39,7 @@ export default async function PreviewTablePage({ params }: TablePageProps) {
     close: price.close,
     trends: 0, // 엑셀 다운로드 타입 호환성 유지 (사용되지 않음)
     ma13: ma13Values[index] ?? null,
-    yoy: weeklyYoY[index] ?? 0,
+    yoy: weeklyYoY[index] ?? null,
   }))
 
   return (

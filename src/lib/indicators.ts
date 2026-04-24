@@ -53,13 +53,13 @@ export function calculateTrendsMA13(
 }
 
 /**
- * F019: 트렌드 지수 기반 52주 YoY(Year-over-Year) 변화율 계산
+ * F019: 트렌드 지수 기반 13주 이동평균 기준 52주 YoY 변화율 계산
  *
- * 최근 주(마지막 데이터)의 MA13 값과 52주(약 1년) 전의 MA13 값을 비교하여 변화율 계산
+ * 최근 주(마지막 데이터)의 MA13 값과 52주(약 1년) 전 같은 시점의 MA13 값을 비교합니다.
  * 52주 이전 데이터가 없으면 null 반환
  *
  * @param precomputedMA13 - 선택적 사전계산된 MA13 값 (중복 계산 방지)
- * @returns YoY 변화율 (%)
+ * @returns 13주 이동평균 기준 전년동기 대비 증감률 (%)
  */
 export function calculateTrendsYoY(
   trendsData: TrendsDataPoint[],
@@ -85,7 +85,7 @@ export function calculateTrendsYoY(
     return null
   }
 
-  // YoY 계산: ((현재 - 과거) / 과거) * 100
+  // 13주 이동평균 기준 52주 YoY 계산: ((현재 MA13 - 과거 MA13) / 과거 MA13) * 100
   if (pastMA === 0) {
     return null
   }

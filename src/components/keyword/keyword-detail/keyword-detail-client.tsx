@@ -117,7 +117,7 @@ function buildMiniChartTooltipPayload(
     {
       color: CHART_SERIES_COLORS.yoy,
       dataKey: 'yoyValue',
-      name: '전년동기 대비 증감률(52주 YoY)',
+      name: '13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)',
       value: point.yoyValue,
     },
     {
@@ -389,7 +389,7 @@ function DragOverlayComponent({
                     dot={false}
                     name="13주 이동평균(13주 MA)"
                   />
-                  {/* 라인2: 전년동기 대비 증감률(52주 YoY) (분홍색) */}
+                  {/* 라인2: 13주 이동평균 기준 전년동기 대비 증감률(52주 YoY) (분홍색) */}
                   <Line
                     type="monotone"
                     dataKey="yoyValue"
@@ -397,7 +397,7 @@ function DragOverlayComponent({
                     strokeWidth={2}
                     isAnimationActive={false}
                     dot={false}
-                    name="전년동기 대비 증감률(52주 YoY)"
+                    name="13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)"
                   />
                   {/* 라인3: 종목 주가 (초록색) - ticker 포함 */}
                   <Line
@@ -689,7 +689,7 @@ function SortableOverlayCard({
                     strokeWidth={2}
                     isAnimationActive={false}
                     dot={false}
-                    name="전년동기 대비 증감률(52주 YoY)"
+                    name="13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)"
                   />
                   <Line
                     type="monotone"
@@ -2391,7 +2391,7 @@ export function KeywordDetailClient({
                       </span>
                       (주황색),{' '}
                       <span className="font-medium">
-                        전년동기 대비 증감률(52주 YoY)
+                        13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)
                       </span>
                       (분홍색),{' '}
                       <span className="font-medium">

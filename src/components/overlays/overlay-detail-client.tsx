@@ -68,7 +68,7 @@ export function OverlayDetailClient({
     return null
   }, [mergedChartData])
 
-  // 현재 YoY 값 (서버에서 계산된 값 사용)
+  // 현재 13주 이동평균 기준 52주 YoY 값 (서버에서 계산된 값 사용)
   const yoyChange = useMemo(() => {
     if (mergedChartData.length === 0) return null
     for (let i = mergedChartData.length - 1; i >= 0; i--) {
@@ -123,7 +123,7 @@ export function OverlayDetailClient({
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-muted-foreground text-sm font-medium">
-                52주 YoY
+                13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -187,7 +187,7 @@ export function OverlayDetailClient({
                       dot={false}
                       name="13주 이동평균"
                     />
-                    {/* 라인2: 52주 YoY (분홍색) */}
+                    {/* 라인2: 13주 이동평균 기준 52주 YoY (분홍색) */}
                     <Line
                       type="monotone"
                       dataKey="yoyValue"
@@ -195,7 +195,7 @@ export function OverlayDetailClient({
                       strokeWidth={2}
                       isAnimationActive={false}
                       dot={false}
-                      name="52주 YoY"
+                      name="13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)"
                     />
                     {/* 라인3: 종목 주가 (초록색) */}
                     <Line
@@ -240,7 +240,10 @@ export function OverlayDetailClient({
                   <span className="mt-0.5 font-bold text-green-500">✓</span>
                   <span>
                     4개 라인: <span className="font-medium">13주 이동평균</span>
-                    (빨간색), <span className="font-medium">52주 YoY</span>
+                    (빨간색),{' '}
+                    <span className="font-medium">
+                      13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)
+                    </span>
                     (노란색), <span className="font-medium">종목 주가</span>
                     (검은색), <span className="font-medium">검색량 기반</span>
                     (파란색)
@@ -262,7 +265,7 @@ export function OverlayDetailClient({
                       '검색량 기반',
                       '13주 이동평균',
                       '정규화 주가',
-                      '52주 YoY',
+                      '13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)',
                     ],
                     ...mergedChartData.map(d => [
                       d.date,

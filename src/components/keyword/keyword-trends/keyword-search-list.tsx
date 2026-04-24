@@ -58,7 +58,9 @@ export default function KeywordSearchList({
                     </p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">YoY</p>
+                    <p className="text-muted-foreground">
+                      13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)
+                    </p>
                     <p
                       className={`font-mono font-semibold ${
                         keyword.yoy_change == null

@@ -45,9 +45,11 @@ export function OverlayCard({ overlay, keywordId }: OverlayCardProps) {
               </span>
             </div>
 
-            {/* YoY */}
+            {/* 13주 이동평균 기준 52주 YoY */}
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground text-xs">YoY</span>
+              <span className="text-muted-foreground text-xs">
+                13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)
+              </span>
               <span
                 className={cn(
                   'font-mono text-sm font-semibold',

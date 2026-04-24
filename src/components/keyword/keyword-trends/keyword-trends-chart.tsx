@@ -22,7 +22,7 @@ type KeywordSeriesKey = 'trendsValue' | 'ma13' | 'yoyValue'
 const KEYWORD_SERIES_LABELS: Record<KeywordSeriesKey, string> = {
   trendsValue: '검색량 기반',
   ma13: '13주 이동평균(13주 MA)',
-  yoyValue: '전년동기 대비 증감률(52주 YoY)',
+  yoyValue: '13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)',
 }
 
 /**
@@ -69,7 +69,7 @@ interface KeywordTrendsChartProps {
   overlays: SearchRecord[]
   // P1-9: 부모에서 이미 계산된 ma13Values를 받아 중복 계산 방지
   ma13Values: (number | null)[]
-  // F027: 52주 YoY 값 배열 (차트에 표시)
+  // F027: 13주 이동평균 기준 52주 YoY 값 배열 (차트에 표시)
   yoyValuesArray?: (number | null)[]
 }
 
@@ -279,7 +279,8 @@ export default function KeywordTrendsChart({
                 orientation="right"
                 tick={{ fontSize: 12, fill: 'hsl(var(--foreground))' }}
                 label={{
-                  value: '52주 YoY (%)',
+                  value:
+                    '13주 이동평균 기준 전년동기 대비 증감률(52주 YoY) (%)',
                   angle: 90,
                   position: 'insideRight',
                   fill: 'hsl(var(--foreground))',
@@ -334,7 +335,7 @@ export default function KeywordTrendsChart({
               />
             )}
 
-            {/* 52주 YoY 라인 */}
+            {/* 13주 이동평균 기준 52주 YoY 라인 */}
             {visibleSeries.yoyValue && hasYoYData && (
               <Line
                 yAxisId="right"
@@ -391,8 +392,8 @@ export default function KeywordTrendsChart({
                 className="mr-2 inline-block h-0.5 w-8"
                 style={{ backgroundColor: CHART_SERIES_COLORS.yoy }}
               />
-              전년동기 대비 증감률(52주 YoY): 52주 전 대비 검색량 기반 값의
-              변화율 (%)
+              13주 이동평균 기준 전년동기 대비 증감률(52주 YoY): 검색량 기반
+              13주 이동평균 값을 52주 전 같은 시점과 비교한 변화율 (%)
             </p>
           )}
           {overlays.map(search => (

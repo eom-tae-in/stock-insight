@@ -305,7 +305,7 @@ export function KeywordStandaloneChart({
                   : undefined
               }
             >
-              전년동기 대비 증감률(52주 YoY)
+              13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)
             </Button>
             {overlayStock && (
               <Button
@@ -398,13 +398,13 @@ export function KeywordStandaloneChart({
               />
             )}
 
-            {/* 52주 YoY (분홍색) */}
+            {/* 13주 이동평균 기준 52주 YoY (분홍색) */}
             {visibleLines.yoyValue && (
               <Line
                 type="monotone"
                 dataKey="yoyValue"
                 stroke={CHART_SERIES_COLORS.yoy}
-                name="전년동기 대비 증감률(52주 YoY)"
+                name="13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)"
                 dot={false}
                 strokeWidth={2}
                 isAnimationActive={false}

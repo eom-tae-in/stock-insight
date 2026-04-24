@@ -50,7 +50,10 @@ export function generateExcelFile({
     ['지표', '값'],
     ['현재 종가', formatPrice(metrics.currentPrice, ticker)],
     ['13주 이동평균', formatPrice(metrics.ma13, ticker)],
-    ['전년도 대비 (%)', `${metrics.yoyChange.toFixed(2)}%`],
+    [
+      '13주 이동평균 기준 전년동기 대비 증감률(52주 YoY) (%)',
+      `${metrics.yoyChange.toFixed(2)}%`,
+    ],
   ]
 
   // 워크북 생성
@@ -64,7 +67,7 @@ export function generateExcelFile({
   // 열 너비 설정
   priceSheet['!cols'] = [{ wch: 12 }, { wch: 15 }, { wch: 15 }]
   trendsSheet['!cols'] = [{ wch: 12 }, { wch: 20 }]
-  metricsSheet['!cols'] = [{ wch: 15 }, { wch: 20 }]
+  metricsSheet['!cols'] = [{ wch: 48 }, { wch: 20 }]
 
   XLSX.utils.book_append_sheet(workbook, priceSheet, '주가 데이터')
   XLSX.utils.book_append_sheet(workbook, trendsSheet, '트렌드 데이터')
@@ -82,12 +85,12 @@ interface TableExcelRow {
   close: number
   trends: number
   ma13: number | null
-  yoy: number
+  yoy: number | null
 }
 
 /**
  * 테이블 데이터를 xlsx 파일로 생성하고 다운로드합니다.
- * 단일 시트: 일자, 종가, 13주 MA, YoY
+ * 단일 시트: 일자, 종가, 13주 MA, 13주 이동평균 기준 52주 YoY
  */
 export function generateTableExcelFile(
   ticker: string,
@@ -106,13 +109,13 @@ export function generateTableExcelFile(
       '일자',
       `종가 (${currencySymbol})`,
       `13주 MA (${currencySymbol})`,
-      'YoY (%)',
+      '13주 이동평균 기준 전년동기 대비 증감률(52주 YoY) (%)',
     ],
     ...tableData.map(row => [
       row.date,
       formatPrice(row.close, ticker),
       row.ma13 !== null ? formatPrice(row.ma13, ticker) : '',
-      row.yoy.toFixed(2),
+      row.yoy !== null ? row.yoy.toFixed(2) : '',
     ]),
   ]
 
@@ -121,7 +124,7 @@ export function generateTableExcelFile(
   const tableSheet = XLSX.utils.aoa_to_sheet(tableSheetData)
 
   // 열 너비 설정
-  tableSheet['!cols'] = [{ wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 12 }]
+  tableSheet['!cols'] = [{ wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 48 }]
 
   XLSX.utils.book_append_sheet(workbook, tableSheet, '데이터')
 
@@ -167,7 +170,12 @@ export function generateKeywordAnalysisExcelFile({
 
   // 1. 트렌드 데이터 시트
   const trendsSheetData = [
-    ['일자', '관심도 (0-100)', '13주 MA', 'YoY (%)'],
+    [
+      '일자',
+      '관심도 (0-100)',
+      '13주 MA',
+      '13주 이동평균 기준 전년동기 대비 증감률(52주 YoY) (%)',
+    ],
     ...trendsData.map(item => [
       item.date,
       item.value,
@@ -189,7 +197,7 @@ export function generateKeywordAnalysisExcelFile({
       ma13Data !== null && ma13Data !== undefined ? ma13Data.toFixed(2) : '',
     ],
     [
-      'YoY (%)',
+      '13주 이동평균 기준 전년동기 대비 증감률(52주 YoY) (%)',
       yoyData !== null && yoyData !== undefined ? yoyData.toFixed(2) : '',
     ],
   ]
@@ -199,11 +207,11 @@ export function generateKeywordAnalysisExcelFile({
 
   // 트렌드 데이터 시트
   const trendsSheet = XLSX.utils.aoa_to_sheet(trendsSheetData)
-  trendsSheet['!cols'] = [{ wch: 12 }, { wch: 15 }, { wch: 12 }, { wch: 12 }]
+  trendsSheet['!cols'] = [{ wch: 12 }, { wch: 15 }, { wch: 12 }, { wch: 48 }]
 
   // 지표 요약 시트
   const metricsSheet = XLSX.utils.aoa_to_sheet(metricsSheetData)
-  metricsSheet['!cols'] = [{ wch: 15 }, { wch: 30 }]
+  metricsSheet['!cols'] = [{ wch: 48 }, { wch: 30 }]
 
   XLSX.utils.book_append_sheet(workbook, trendsSheet, '트렌드 데이터')
   XLSX.utils.book_append_sheet(workbook, metricsSheet, '지표 요약')

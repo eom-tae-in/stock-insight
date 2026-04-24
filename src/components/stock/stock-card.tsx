@@ -145,7 +145,7 @@ export function StockCard({
           {/* 지난 주 종가 기반 지표 */}
           <div className="mb-6">
             <p className="text-muted-foreground mb-3 text-xs font-semibold">
-              지난 주 종가 기반 지표
+              지난 주 종가 및 13주 이동평균 기반 지표
             </p>
             <div className="grid grid-cols-3 gap-2">
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-center dark:border-slate-700 dark:bg-slate-900/30">
@@ -173,7 +173,7 @@ export function StockCard({
               </div>
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-center dark:border-slate-700 dark:bg-slate-900/30">
                 <p className="text-muted-foreground text-xs">
-                  52주 전 대비 수익률
+                  13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)
                 </p>
                 <p
                   className={cn(

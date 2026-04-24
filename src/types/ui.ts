@@ -114,7 +114,7 @@ export interface Downloadable {
 }
 
 /**
- * 통합 차트 Props (가격 + YoY를 하나로)
+ * 통합 차트 Props (가격 + 13주 이동평균 기준 52주 YoY를 하나로)
  */
 export interface UnifiedChartProps {
   ticker?: string
