@@ -475,7 +475,7 @@ function KeywordConditionCard({
           {chartData.length > 0 ? (
             <div
               ref={chartWrapperRef}
-              className="mt-3 h-32 cursor-default"
+              className="mt-3 h-40 cursor-default"
               onClick={event => {
                 event.preventDefault()
                 event.stopPropagation()
@@ -576,7 +576,7 @@ function KeywordConditionCard({
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="text-muted-foreground bg-muted mt-3 flex h-32 items-center justify-center rounded text-xs">
+            <div className="text-muted-foreground bg-muted mt-3 flex h-40 items-center justify-center rounded text-xs">
               데이터 없음
             </div>
           )}
@@ -1408,7 +1408,7 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
             {[
               { value: 'keyword', label: '키워드만' },
               { value: 'condition', label: '키워드 + 분석 조건' },
-              { value: 'ticker', label: '키워드 + 조건 + 티커 연동' },
+              { value: 'ticker', label: '키워드 + 분석 조건 + 티커 연동' },
             ].map(option => (
               <Button
                 key={option.value}
@@ -1500,8 +1500,8 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
                       searchMode === 'keyword'
                         ? '키워드 검색'
                         : searchMode === 'ticker'
-                          ? '키워드, 조건, 티커 검색'
-                          : '키워드 또는 조건 검색'
+                          ? '키워드, 분석 조건, 티커 검색'
+                          : '키워드 또는 분석 조건 검색'
                     }
                     className="pl-9"
                   />
@@ -1703,7 +1703,7 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
           {activeDisplayCount === 0 ? (
             <EmptyFilteredState />
           ) : searchMode === 'ticker' ? (
-            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3">
               {displayedTickerEntries.map((entry, index) => {
                 const isLastElement =
                   index === displayedTickerEntries.length - 1
@@ -1728,7 +1728,7 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
                   items={displayedConditionEntries.map(entry => entry.id)}
                   strategy={rectSortingStrategy}
                 >
-                  <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                  <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3">
                     {displayedConditionEntries.map((entry, index) => {
                       const isLastElement =
                         index === displayedConditionEntries.length - 1
@@ -1750,7 +1750,7 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
                 </SortableContext>
               </DndContext>
             ) : (
-              <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+              <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3">
                 {displayedConditionEntries.map((entry, index) => {
                   const isLastElement =
                     index === displayedConditionEntries.length - 1
