@@ -19,6 +19,7 @@ import {
   listKeywordOverlays,
   updateKeywordOverlayOrder,
 } from '@/server/keyword-overlays-service'
+import { listAnalysisOverlays } from '@/server/analysis-overlays-service'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,7 +33,7 @@ function handleOverlayError(error: unknown, fallbackMessage: string) {
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ keywordId: string }> }
 ) {
   try {
@@ -43,7 +44,10 @@ export async function GET(
     }
 
     const { keywordId } = await params
-    const overlays = await listKeywordOverlays(supabase, keywordId)
+    const analysisId = request.nextUrl.searchParams.get('analysisId')
+    const overlays = analysisId
+      ? await listAnalysisOverlays(supabase, authResult.userId, analysisId)
+      : await listKeywordOverlays(supabase, keywordId)
     return createSuccessResponse(overlays, 200)
   } catch (error) {
     return handleOverlayError(error, '오버레이 목록을 불러오지 못했습니다.')

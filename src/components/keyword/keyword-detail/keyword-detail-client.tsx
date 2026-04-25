@@ -99,15 +99,15 @@ type MiniChartPoint = {
   date: string
   trendsValue: number | null
   ma13Value: number | null
-  normalizedPrice: number
+  normalizedPrice?: number
   yoyValue: number | null
 }
 
 function buildMiniChartTooltipPayload(
   point: MiniChartPoint,
-  ticker: string
+  ticker?: string
 ): MiniChartTooltipEntry[] {
-  return [
+  const payload: MiniChartTooltipEntry[] = [
     {
       color: CHART_SERIES_COLORS.ma13,
       dataKey: 'ma13Value',
@@ -121,18 +121,23 @@ function buildMiniChartTooltipPayload(
       value: point.yoyValue,
     },
     {
-      color: CHART_SERIES_COLORS.price,
-      dataKey: 'normalizedPrice',
-      name: `${ticker} 주가`,
-      value: point.normalizedPrice,
-    },
-    {
       color: CHART_SERIES_COLORS.googleTrends,
       dataKey: 'trendsValue',
       name: '검색량 기반',
       value: point.trendsValue,
     },
   ]
+
+  if (ticker && typeof point.normalizedPrice === 'number') {
+    payload.splice(2, 0, {
+      color: CHART_SERIES_COLORS.price,
+      dataKey: 'normalizedPrice',
+      name: `${ticker} 주가`,
+      value: point.normalizedPrice,
+    })
+  }
+
+  return payload
 }
 
 function formatMiniChartTooltipValue(entry: MiniChartTooltipEntry) {
@@ -237,9 +242,16 @@ type OverlayItem = {
 // 분석 조합 타입
 type AnalysisSummary = {
   id: string
+  keyword_id?: string
   region: Region
   period: Period
   search_type: SearchType
+  trends_data?: TrendsDataPoint[]
+  ma13_data?: number
+  yoy_data?: number
+  display_order?: number
+  created_at?: string
+  updated_at?: string
 }
 
 // 레이블 매핑
@@ -436,6 +448,181 @@ function DragOverlayComponent({
         </CardContent>
       </Card>
     </DragOverlay>
+  )
+}
+
+function AnalysisConditionChartCard({
+  analysis,
+  isSelected,
+  onSelect,
+}: {
+  analysis: AnalysisSummary
+  isSelected: boolean
+  onSelect: () => void
+}) {
+  const [activeTooltip, setActiveTooltip] =
+    useState<MiniChartTooltipState | null>(null)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const chartData =
+    analysis.trends_data?.map(
+      (point): MiniChartPoint => ({
+        date: point.date,
+        trendsValue: point.value,
+        ma13Value: point.ma13Value,
+        yoyValue: point.yoyValue,
+      })
+    ) ?? []
+  const tooltipRect = wrapperRef.current?.getBoundingClientRect()
+  const dateRange =
+    chartData.length > 0
+      ? `${chartData[0].date} ~ ${chartData[chartData.length - 1].date}`
+      : '데이터 없음'
+
+  return (
+    <div ref={wrapperRef} className="group relative z-0 hover:z-30">
+      {activeTooltip &&
+        tooltipRect &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            className="pointer-events-none fixed z-[9999]"
+            style={getMiniChartTooltipStyle(tooltipRect)}
+          >
+            <MiniChartTooltipContent
+              active
+              label={activeTooltip.label}
+              payload={activeTooltip.payload}
+            />
+          </div>,
+          document.body
+        )}
+      <Card
+        onClick={onSelect}
+        className={cn(
+          'relative flex h-full cursor-pointer flex-col overflow-hidden transition-all hover:shadow-lg',
+          isSelected
+            ? 'border-cyan-400 bg-cyan-50 ring-2 ring-cyan-400/20 dark:bg-cyan-950/30'
+            : 'border-border bg-background'
+        )}
+      >
+        <CardHeader className="px-3 pt-3 pr-3 pb-1.5">
+          <CardTitle className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-lg leading-none font-semibold">
+                {REGION_LABEL[analysis.region]}
+              </p>
+              <p className="text-muted-foreground mt-1 line-clamp-1 text-sm leading-tight font-normal">
+                {SEARCH_TYPE_LABEL[analysis.search_type]} · 5Y
+              </p>
+            </div>
+            {isSelected && (
+              <span className="shrink-0 rounded-full bg-cyan-600 px-2 py-0.5 text-xs font-medium text-white">
+                선택됨
+              </span>
+            )}
+          </CardTitle>
+        </CardHeader>
+
+        <CardContent className="flex flex-1 flex-col px-2.5 pb-1.5">
+          {chartData.length > 0 ? (
+            <div className="mb-1.5 flex-1">
+              <ResponsiveContainer width="100%" height={165}>
+                <LineChart
+                  data={chartData}
+                  margin={{ top: 4, right: 6, left: -22, bottom: 0 }}
+                  onMouseMove={state => {
+                    const tooltipState = state as {
+                      activeTooltipIndex?: number | string
+                      activeLabel?: string | number
+                      isTooltipActive?: boolean
+                    }
+                    const rawIndex = tooltipState.activeTooltipIndex
+                    const index =
+                      typeof rawIndex === 'number'
+                        ? rawIndex
+                        : typeof rawIndex === 'string'
+                          ? Number(rawIndex)
+                          : NaN
+                    const point =
+                      Number.isInteger(index) && index >= 0
+                        ? chartData[index]
+                        : undefined
+
+                    if (!tooltipState.isTooltipActive || !point) {
+                      setActiveTooltip(null)
+                      return
+                    }
+
+                    setActiveTooltip({
+                      label: tooltipState.activeLabel ?? point.date,
+                      payload: buildMiniChartTooltipPayload(point),
+                    })
+                  }}
+                  onMouseLeave={() => setActiveTooltip(null)}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="date"
+                    tick={false}
+                    axisLine={false}
+                    height={0}
+                  />
+                  <YAxis
+                    domain={[0, 100]}
+                    tick={false}
+                    axisLine={false}
+                    width={30}
+                  />
+                  <Tooltip
+                    content={() => null}
+                    cursor={{
+                      stroke: 'hsl(var(--border))',
+                      strokeDasharray: '3 3',
+                    }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="ma13Value"
+                    stroke={CHART_SERIES_COLORS.ma13}
+                    strokeWidth={2}
+                    isAnimationActive={false}
+                    dot={false}
+                    name="13주 이동평균(13주 MA)"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="yoyValue"
+                    stroke={CHART_SERIES_COLORS.yoy}
+                    strokeWidth={2}
+                    isAnimationActive={false}
+                    dot={false}
+                    name="13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="trendsValue"
+                    stroke={CHART_SERIES_COLORS.googleTrends}
+                    strokeWidth={2}
+                    isAnimationActive={false}
+                    dot={false}
+                    name="검색량 기반"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="text-muted-foreground bg-muted flex items-center justify-center rounded py-4 text-xs">
+              데이터 없음
+            </div>
+          )}
+
+          <div className="text-muted-foreground flex items-center justify-between gap-2 border-t pt-0.5 text-[10px] leading-none">
+            <span>5년치 차트</span>
+            <span className="truncate text-right">{dateRange}</span>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
 
@@ -761,6 +948,7 @@ export function KeywordDetailClient({
     useState<KeywordAnalysis | null>(null)
   const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(true) // 초기 로드 상태
   const [analysisNotFound, setAnalysisNotFound] = useState(false)
+  const [isSelectionResolved, setIsSelectionResolved] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const visibleAnalysesList = useMemo(
     () => analysesList.filter(analysis => analysis.period === '5Y'),
@@ -787,6 +975,30 @@ export function KeywordDetailClient({
 
     loadAnalysesList()
   }, [keywordId])
+
+  useEffect(() => {
+    if (isLoadingList) return
+
+    if (visibleAnalysesList.length === 0) {
+      setIsSelectionResolved(true)
+      return
+    }
+
+    const hasCurrentSelection = visibleAnalysesList.some(
+      analysis =>
+        analysis.region === region && analysis.search_type === searchType
+    )
+
+    if (hasCurrentSelection) {
+      setIsSelectionResolved(true)
+      return
+    }
+
+    const fallbackAnalysis = visibleAnalysesList[0]
+    setRegion(fallbackAnalysis.region)
+    setSearchType(fallbackAnalysis.search_type)
+    setIsSelectionResolved(true)
+  }, [isLoadingList, region, searchType, visibleAnalysesList])
 
   const loadOverlays = useCallback(async (analysisId: string) => {
     try {
@@ -919,6 +1131,8 @@ export function KeywordDetailClient({
 
   // 필터 변경 시 URL 동기화 + 데이터 로드
   useEffect(() => {
+    if (!isSelectionResolved || isLoadingList) return
+
     const newUrl = `/keywords/${keywordId}?region=${region}&searchType=${searchType}`
     window.history.replaceState(null, '', newUrl)
 
@@ -929,7 +1143,14 @@ export function KeywordDetailClient({
 
     // Analysis 조회
     loadAnalysis()
-  }, [region, searchType, keywordId, loadAnalysis])
+  }, [
+    isLoadingList,
+    isSelectionResolved,
+    region,
+    searchType,
+    keywordId,
+    loadAnalysis,
+  ])
 
   const [selectedStock, setSelectedStock] = useState<{
     ticker: string
@@ -1659,7 +1880,7 @@ export function KeywordDetailClient({
         {/* 헤더 */}
         <div className="mb-5">
           <Link
-            href="/trends"
+            href="/keyword-analysis"
             className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 transition-colors hover:border-blue-300 hover:bg-blue-100 hover:text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200 dark:hover:bg-blue-950/50"
           >
             <ChevronLeft className="h-4 w-4" />내 키워드 목록으로
@@ -1703,43 +1924,22 @@ export function KeywordDetailClient({
             </div>
 
             {!isLoadingList && visibleAnalysesList.length > 0 ? (
-              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {visibleAnalysesList.map(analysis => {
                   const isSelected =
                     analysis.region === region &&
                     analysis.search_type === searchType
 
                   return (
-                    <button
-                      key={`${analysis.region}-${analysis.search_type}`}
-                      type="button"
-                      onClick={() => {
+                    <AnalysisConditionChartCard
+                      key={analysis.id}
+                      analysis={analysis}
+                      isSelected={isSelected}
+                      onSelect={() => {
                         setRegion(analysis.region)
                         setSearchType(analysis.search_type)
                       }}
-                      className={cn(
-                        'rounded-lg border p-3 text-left transition-all',
-                        'hover:border-cyan-300 hover:bg-cyan-50/60 dark:hover:bg-cyan-950/20',
-                        isSelected
-                          ? 'border-cyan-400 bg-cyan-50 ring-2 ring-cyan-400/20 dark:bg-cyan-950/30'
-                          : 'border-border bg-background'
-                      )}
-                      aria-pressed={isSelected}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-sm font-semibold">
-                          {REGION_LABEL[analysis.region]}
-                        </span>
-                        {isSelected && (
-                          <span className="rounded-full bg-cyan-600 px-2 py-0.5 text-xs font-medium text-white">
-                            선택됨
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-muted-foreground mt-1 text-xs">
-                        {SEARCH_TYPE_LABEL[analysis.search_type]} · 5Y
-                      </p>
-                    </button>
+                    />
                   )
                 })}
               </div>

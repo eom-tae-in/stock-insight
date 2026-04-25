@@ -68,6 +68,7 @@ interface TrendsFetchErrorState {
 }
 
 type KeywordOverlayResponse = KeywordStockOverlay & {
+  analysis_id?: string
   companyName?: string
   displayOrder?: number
   chartData?: Array<{
@@ -260,49 +261,71 @@ export default function KeywordTrendsClient() {
         const keywordSearch = state.savedKeywords.find(k => k.id === keywordId)
         if (!keywordSearch) throw new Error('Keyword not found')
 
-        // 1단계: 오버레이 데이터 로드
-        const overlayRes = await apiFetch(`/api/keywords/${keywordId}/overlays`)
-        if (!overlayRes.ok) throw new Error('Failed to fetch overlays')
+        // 1단계: 저장된 분석 목록 로드
+        const analysesResult = await apiFetchJson<
+          Array<{
+            id: string
+            region: GeoValue
+            search_type: GpropValue
+            period: string
+          }>
+        >(`/api/keywords/${keywordId}/analyses`)
 
-        const overlayData = await overlayRes.json()
-        const overlays = overlayData.data as KeywordOverlayResponse[]
+        const analyses = Array.isArray(analysesResult) ? analysesResult : []
+        if (analyses.length === 0) {
+          throw new Error('No saved analyses found')
+        }
 
-        // overlayId가 있으면 해당 overlay만 필터링
-        const targetOverlays = overlayId
-          ? overlays.filter(o => o.id === overlayId)
-          : overlays
+        // 2단계: overlayId가 있으면 실제 소속 analysis를 찾고, 없으면 첫 분석 사용
+        let activeAnalysis = analyses[0]
+        let targetOverlays: KeywordOverlayResponse[] = []
+
+        if (overlayId) {
+          let matched = false
+
+          for (const analysis of analyses) {
+            const overlayResult = await apiFetchJson<KeywordOverlayResponse[]>(
+              `/api/analyses/${analysis.id}/overlays`
+            )
+            const overlays = Array.isArray(overlayResult) ? overlayResult : []
+            const target = overlays.filter(overlay => overlay.id === overlayId)
+
+            if (target.length > 0) {
+              activeAnalysis = analysis
+              targetOverlays = target
+              matched = true
+              break
+            }
+          }
+
+          if (!matched) {
+            throw new Error('Overlay not found in saved analyses')
+          }
+        } else {
+          const overlayResult = await apiFetchJson<KeywordOverlayResponse[]>(
+            `/api/analyses/${activeAnalysis.id}/overlays`
+          )
+          targetOverlays = Array.isArray(overlayResult) ? overlayResult : []
+        }
 
         const overlaySearches = targetOverlays.map(overlayToSearchRecord)
 
-        // 2단계: 5y 데이터 재조회
-        const params = new URLSearchParams({
-          keyword: keywordSearch.keyword,
-          geo: DEFAULT_GEO,
-          timeframe: DEFAULT_TIMEFRAME_VALUE,
-          gprop: DEFAULT_GPROP,
-        })
+        // 3단계: 실제 저장 분석의 트렌드 데이터 복원
+        const analysisResult = await apiFetchJson<{
+          id: string
+          trends_data: TrendsDataPoint[]
+        }>(
+          `/api/keywords/${keywordId}/analyses?region=${activeAnalysis.region}&searchType=${activeAnalysis.search_type}`
+        )
 
-        const res = await apiFetch(`/api/trends?${params.toString()}`)
-        if (!res.ok) {
-          const errorData = await res.json().catch(() => ({}))
-          const errorCode = errorData?.error?.code
-          const errorMessage =
-            errorData?.error?.message ?? 'Failed to fetch trends'
-
-          if (errorCode === 'PYTRENDS_RATE_LIMIT') {
-            throw new ApiRequestError(errorMessage, res.status, errorCode)
-          }
-
-          throw new Error(errorMessage)
-        }
-
-        const data = await res.json()
-        const raw = data?.data?.trendsData
-        if (!Array.isArray(raw)) throw new Error('Invalid response format')
+        const raw = analysisResult?.trends_data
+        if (!Array.isArray(raw)) throw new Error('Invalid analysis response')
 
         setState(prev => ({
           ...prev,
           keyword: keywordSearch.keyword,
+          geo: activeAnalysis.region,
+          gprop: activeAnalysis.search_type,
           fullTrendsData: raw as TrendsDataPoint[],
           selectedSearches: overlaySearches,
           isLoading: false,
@@ -312,9 +335,9 @@ export default function KeywordTrendsClient() {
         // URL 업데이트 (keywordId 제거)
         const urlParams = new URLSearchParams({
           keyword: keywordSearch.keyword,
-          geo: DEFAULT_GEO,
+          geo: activeAnalysis.region,
           timeframe: DEFAULT_TIMEFRAME_VALUE,
-          gprop: DEFAULT_GPROP,
+          gprop: activeAnalysis.search_type,
         })
         router.push(`/keyword-analysis/search?${urlParams.toString()}`)
 

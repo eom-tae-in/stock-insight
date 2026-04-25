@@ -18,8 +18,38 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CHART_SERIES_COLORS } from '@/lib/constants/chart-series'
 
+const REGION_LABEL: Record<string, string> = {
+  GLOBAL: '전체',
+  US: '미국',
+  KR: '한국',
+  JP: '일본',
+  GB: '영국',
+  DE: '독일',
+  FR: '프랑스',
+  CA: '캐나다',
+  AU: '호주',
+  IN: '인도',
+  BR: '브라질',
+  CN: '중국',
+  TW: '대만',
+  HK: '홍콩',
+  SG: '싱가포르',
+}
+
+const SEARCH_TYPE_LABEL: Record<string, string> = {
+  WEB: '웹 검색',
+  IMAGES: '이미지',
+  NEWS: '뉴스',
+  YOUTUBE: '유튜브',
+  SHOPPING: '쇼핑',
+}
+
 interface OverlayDetailClientProps {
   keyword: KeywordRecord
+  analysisContext: {
+    region: string
+    searchType: string
+  }
   overlay: {
     id: string
     ticker: string
@@ -41,6 +71,7 @@ interface OverlayDetailClientProps {
 
 export function OverlayDetailClient({
   keyword,
+  analysisContext,
   overlay,
   chartData,
   overlayChartData,
@@ -80,6 +111,9 @@ export function OverlayDetailClient({
   }, [mergedChartData])
 
   const isPositiveYoY = yoyChange != null && yoyChange >= 0
+  const analysisLabel = `${REGION_LABEL[analysisContext.region] ?? analysisContext.region} · ${
+    SEARCH_TYPE_LABEL[analysisContext.searchType] ?? analysisContext.searchType
+  } · 5Y`
 
   return (
     <div className="bg-background min-h-screen p-6">
@@ -91,7 +125,9 @@ export function OverlayDetailClient({
             variant="outline"
             className="border-blue-200 bg-blue-50 text-blue-700 hover:border-blue-300 hover:bg-blue-100 hover:text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200 dark:hover:bg-blue-950/50"
           >
-            <Link href={`/keywords/${keyword.id}`}>
+            <Link
+              href={`/keywords/${keyword.id}?region=${analysisContext.region}&searchType=${analysisContext.searchType}`}
+            >
               <ChevronLeft className="h-4 w-4" />
               키워드 분석으로 이동
             </Link>
@@ -101,8 +137,9 @@ export function OverlayDetailClient({
         <h1 className="mb-2 text-3xl font-bold">
           {overlay.ticker} / {keyword.keyword}
         </h1>
-        <p className="text-muted-foreground mb-8 text-sm">
-          {overlay.companyName}
+        <p className="text-muted-foreground text-sm">{overlay.companyName}</p>
+        <p className="text-muted-foreground mt-2 mb-8 text-sm">
+          현재 분석 조건: {analysisLabel}
         </p>
 
         {/* 지표 카드 */}

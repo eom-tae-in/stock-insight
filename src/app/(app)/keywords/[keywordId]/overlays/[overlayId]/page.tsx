@@ -11,10 +11,8 @@ import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { OverlayDetailClient } from '@/components/overlays/overlay-detail-client'
 import { getOverlayChartTimeseries } from '@/lib/db/queries'
-import { getKeywordAnalysis } from '@/server/keyword-analyses-service'
-import { listAnalysisOverlays } from '@/server/analysis-overlays-service'
 import { getKeyword } from '@/server/keywords-service'
-import type { TrendsDataPoint } from '@/types/database'
+import type { Region, SearchType, TrendsDataPoint } from '@/types/database'
 
 interface OverlayDetailPageProps {
   params: Promise<{
@@ -55,23 +53,45 @@ export default async function OverlayDetailPage({
   // 1. 키워드 조회
   const keyword = await getKeyword(supabase, user.id, keywordId)
   if (!keyword) {
-    redirect('/trends')
+    redirect('/keyword-analysis')
   }
 
-  // 2. 기본 분석 기준의 키워드 차트 시계열 조회
-  const analysis = await getKeywordAnalysis(supabase, user.id, keywordId)
-  if (!analysis) {
+  // 2. overlayId가 실제 속한 analysis 조회
+  const { data: overlayRecord, error: overlayError } = await supabase
+    .from('keyword_stock_overlays')
+    .select(
+      `
+        id,
+        ticker,
+        company_name,
+        analysis_id,
+        keyword_analysis!inner(
+          id,
+          keyword_id,
+          region,
+          search_type,
+          trends_data
+        )
+      `
+    )
+    .eq('id', overlayId)
+    .single()
+
+  if (overlayError || !overlayRecord) {
     redirect(`/keywords/${keywordId}`)
   }
-  const chartTimeseries = toChartTimeseries(analysis.trends_data)
 
-  // 3. 분석 기준의 오버레이 정보 조회
-  const overlays = await listAnalysisOverlays(supabase, user.id, analysis.id)
-  const overlay = overlays.find(item => item.id === overlayId)
+  const analysis = Array.isArray(overlayRecord.keyword_analysis)
+    ? overlayRecord.keyword_analysis[0]
+    : overlayRecord.keyword_analysis
 
-  if (!overlay) {
+  if (!analysis || analysis.keyword_id !== keywordId) {
     redirect(`/keywords/${keywordId}`)
   }
+
+  const chartTimeseries = toChartTimeseries(
+    (analysis.trends_data as TrendsDataPoint[]) ?? []
+  )
 
   // 4. 오버레이 차트 시계열 조회
   const overlayChartData = await getOverlayChartTimeseries(overlayId, supabase)
@@ -79,10 +99,14 @@ export default async function OverlayDetailPage({
   return (
     <OverlayDetailClient
       keyword={keyword}
+      analysisContext={{
+        region: analysis.region as Region,
+        searchType: analysis.search_type as SearchType,
+      }}
       overlay={{
-        id: overlay.id,
-        ticker: overlay.ticker,
-        companyName: overlay.company_name,
+        id: overlayRecord.id,
+        ticker: overlayRecord.ticker,
+        companyName: overlayRecord.company_name,
       }}
       chartData={chartTimeseries}
       overlayChartData={overlayChartData}

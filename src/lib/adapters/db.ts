@@ -76,9 +76,16 @@ export interface DbAdapter {
   ): Promise<
     Array<{
       id: string
+      keyword_id: string
       region: Region
       period: Period
       search_type: SearchType
+      trends_data: TrendsDataPoint[]
+      ma13_data?: number
+      yoy_data?: number
+      display_order?: number
+      created_at?: string
+      updated_at?: string
     }>
   >
 
@@ -657,6 +664,7 @@ class SupabaseDbAdapter implements DbAdapter {
       trends_data: data.trends_data as TrendsDataPoint[],
       ma13_data: data.ma13_data,
       yoy_data: data.yoy_data,
+      display_order: data.display_order,
       created_at: data.created_at,
       updated_at: data.updated_at,
     }
@@ -684,6 +692,7 @@ class SupabaseDbAdapter implements DbAdapter {
       trends_data: row.trends_data as TrendsDataPoint[],
       ma13_data: row.ma13_data,
       yoy_data: row.yoy_data,
+      display_order: row.display_order,
       created_at: row.created_at,
       updated_at: row.updated_at,
     }))
@@ -696,9 +705,16 @@ class SupabaseDbAdapter implements DbAdapter {
   ): Promise<
     Array<{
       id: string
+      keyword_id: string
       region: Region
       period: Period
       search_type: SearchType
+      trends_data: TrendsDataPoint[]
+      ma13_data?: number
+      yoy_data?: number
+      display_order?: number
+      created_at?: string
+      updated_at?: string
     }>
   > {
     const supabase = client ?? getSupabaseClient()
@@ -715,17 +731,28 @@ class SupabaseDbAdapter implements DbAdapter {
 
     const { data, error } = await supabase
       .from('keyword_analysis')
-      .select('id, region, period, search_type')
+      .select(
+        'id, keyword_id, region, period, search_type, trends_data, ma13_data, yoy_data, display_order, created_at, updated_at'
+      )
       .eq('keyword_id', keywordId)
+      .order('display_order', { ascending: true })
+      .order('updated_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
 
     if (error) throw error
 
     return (data || []).map(row => ({
       id: row.id,
+      keyword_id: row.keyword_id,
       region: row.region as Region,
       period: row.period as Period,
       search_type: row.search_type as SearchType,
+      trends_data: row.trends_data as TrendsDataPoint[],
+      ma13_data: row.ma13_data as number | undefined,
+      yoy_data: row.yoy_data as number | undefined,
+      display_order: row.display_order as number | undefined,
+      created_at: row.created_at as string | undefined,
+      updated_at: row.updated_at as string | undefined,
     }))
   }
 
@@ -765,6 +792,28 @@ class SupabaseDbAdapter implements DbAdapter {
       return existing.id
     }
 
+    const { data: keywordOwner, error: keywordOwnerError } = await supabase
+      .from('keywords')
+      .select('user_id')
+      .eq('id', data.keyword_id)
+      .single()
+
+    if (keywordOwnerError) throw keywordOwnerError
+
+    const { data: orderRows, error: orderError } = await supabase
+      .from('keyword_analysis')
+      .select('display_order, keywords!inner(user_id)')
+      .eq('keywords.user_id', keywordOwner.user_id)
+      .order('display_order', { ascending: false })
+      .limit(1)
+
+    if (orderError) throw orderError
+
+    const nextDisplayOrder =
+      orderRows && orderRows.length > 0
+        ? Number(orderRows[0].display_order ?? 0) + 1
+        : 1
+
     const { data: result, error } = await supabase
       .from('keyword_analysis')
       .insert({
@@ -775,6 +824,7 @@ class SupabaseDbAdapter implements DbAdapter {
         trends_data: trendsData,
         ma13_data: data.ma13_data,
         yoy_data: data.yoy_data,
+        display_order: nextDisplayOrder,
       })
       .select('id')
       .single()

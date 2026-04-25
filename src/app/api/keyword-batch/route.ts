@@ -30,12 +30,15 @@ import { getKeywordAnalysis } from '@/server/keyword-analyses-service'
 import { createSuccessResponse, createErrorResponse } from '@/lib/api-helpers'
 import type { TrendsDataPoint } from '@/types'
 import type { StockDataResult } from '@/lib/services/stock-service'
+import type { Region, SearchType } from '@/types/database'
 
 export const dynamic = 'force-dynamic'
 
 interface KeywordBatchRequest {
   keywordId: string
   symbols: string[]
+  region?: Region
+  searchType?: SearchType
 }
 
 interface KeywordBatchResponse {
@@ -76,10 +79,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 1. 기본 키워드 분석 트렌드 데이터 조회
+    // 1. 요청된 분석 조건 기준 키워드 트렌드 데이터 조회
     let trendsData: TrendsDataPoint[] = []
     try {
-      const analysis = await getKeywordAnalysis(supabase, user.id, keywordId)
+      const analysis = await getKeywordAnalysis(
+        supabase,
+        user.id,
+        keywordId,
+        body.region ?? 'GLOBAL',
+        '5Y',
+        body.searchType ?? 'WEB'
+      )
       if (!analysis) {
         return createErrorResponse(
           'KEYWORD_NOT_FOUND',

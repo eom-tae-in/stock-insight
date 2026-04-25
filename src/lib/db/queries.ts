@@ -9,6 +9,7 @@ import type {
   PriceDataPoint,
   KeywordStockOverlay,
   KeywordAnalysis,
+  TrendsDataPoint,
   Region,
   Period,
   SearchType,
@@ -135,7 +136,19 @@ export const getKeywordAnalysesByKeywordId = async (
   userId: string,
   client?: SupabaseClient
 ): Promise<
-  Array<{ id: string; region: Region; period: Period; search_type: SearchType }>
+  Array<{
+    id: string
+    keyword_id: string
+    region: Region
+    period: Period
+    search_type: SearchType
+    trends_data: TrendsDataPoint[]
+    ma13_data?: number
+    yoy_data?: number
+    display_order?: number
+    created_at?: string
+    updated_at?: string
+  }>
 > => db.getKeywordAnalysesByKeywordId(keywordId, userId, client)
 
 export const createKeywordAnalysis = async (

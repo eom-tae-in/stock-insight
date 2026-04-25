@@ -124,7 +124,19 @@ export async function getKeywordAnalysesList(
   userId: string,
   keywordId: string
 ): Promise<
-  Array<{ id: string; region: Region; period: Period; search_type: SearchType }>
+  Array<{
+    id: string
+    keyword_id: string
+    region: Region
+    period: Period
+    search_type: SearchType
+    trends_data: TrendsDataPoint[]
+    ma13_data?: number
+    yoy_data?: number
+    display_order?: number
+    created_at?: string
+    updated_at?: string
+  }>
 > {
   if (!keywordId) {
     throw new AnalysisServiceError(
@@ -437,5 +449,57 @@ export async function deleteOwnedAnalysis(
   }
 
   await deleteKeywordAnalysis(analysisId, supabase)
+  return { success: true }
+}
+
+export async function reorderOwnedAnalyses(
+  supabase: SupabaseClient,
+  userId: string,
+  orderedIds: string[]
+) {
+  if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
+    throw new AnalysisServiceError(
+      'INVALID_ORDER',
+      '유효하지 않은 조건 순서입니다.',
+      400
+    )
+  }
+
+  const uniqueIds = Array.from(new Set(orderedIds))
+  if (uniqueIds.length !== orderedIds.length) {
+    throw new AnalysisServiceError(
+      'DUPLICATE_ANALYSIS_ID',
+      '중복된 조건 ID가 포함되어 있습니다.',
+      400
+    )
+  }
+
+  const { data: ownedAnalyses, error: ownedError } = await supabase
+    .from('keyword_analysis')
+    .select('id, keywords!inner(user_id)')
+    .in('id', orderedIds)
+    .eq('keywords.user_id', userId)
+
+  if (ownedError) throw ownedError
+  if ((ownedAnalyses ?? []).length !== orderedIds.length) {
+    throw new AnalysisServiceError(
+      'ANALYSIS_OWNERSHIP_MISMATCH',
+      '조건 순서를 변경할 권한이 없습니다.',
+      403
+    )
+  }
+
+  await Promise.all(
+    orderedIds.map((id, index) =>
+      supabase
+        .from('keyword_analysis')
+        .update({ display_order: index + 1 })
+        .eq('id', id)
+        .then(({ error }) => {
+          if (error) throw error
+        })
+    )
+  )
+
   return { success: true }
 }
