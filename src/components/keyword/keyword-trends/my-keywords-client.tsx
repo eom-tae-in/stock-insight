@@ -68,6 +68,7 @@ import { toast } from 'sonner'
 import { apiFetchJson, apiFetch } from '@/lib/fetch-client'
 import { CHART_SERIES_COLORS } from '@/lib/constants/chart-series'
 import type {
+  KeywordAnalysisOverlay,
   KeywordAnalysisSummary,
   KeywordRecord,
   Region,
@@ -81,7 +82,7 @@ interface MyKeywordsClientProps {
 type EditMode = 'none' | 'delete' | 'reorder'
 type KeywordFilter = 'all' | KeywordLanguage | 'stock'
 type KeywordSort = 'custom' | 'latest' | 'name'
-type SearchMode = 'keyword' | 'condition'
+type SearchMode = 'keyword' | 'condition' | 'ticker'
 
 type StockSuggestion = {
   ticker: string
@@ -92,8 +93,10 @@ type ConditionEntry = {
   id: string
   keyword: KeywordRecord
   analysis: KeywordAnalysisSummary
+  overlay?: KeywordAnalysisOverlay
   label: string
   conditionLabel: string
+  tickerLabel?: string
   updatedAt: string
 }
 
@@ -114,6 +117,7 @@ type ConditionChartPoint = {
   trendsValue: number | null
   ma13Value: number | null
   yoyValue: number | null
+  normalizedPrice?: number | null
 }
 
 const REGION_LABEL: Record<Region, string> = {
@@ -143,9 +147,10 @@ const SEARCH_TYPE_LABEL: Record<SearchType, string> = {
 }
 
 function buildConditionChartTooltipPayload(
-  point: ConditionChartPoint
+  point: ConditionChartPoint,
+  ticker?: string
 ): ConditionChartTooltipEntry[] {
-  return [
+  const payload: ConditionChartTooltipEntry[] = [
     {
       color: CHART_SERIES_COLORS.ma13,
       dataKey: 'ma13Value',
@@ -165,11 +170,23 @@ function buildConditionChartTooltipPayload(
       value: point.trendsValue,
     },
   ]
+
+  if (ticker && typeof point.normalizedPrice === 'number') {
+    payload.splice(2, 0, {
+      color: CHART_SERIES_COLORS.price,
+      dataKey: 'normalizedPrice',
+      name: `${ticker} 주가`,
+      value: point.normalizedPrice,
+    })
+  }
+
+  return payload
 }
 
 function formatConditionChartTooltipValue(entry: ConditionChartTooltipEntry) {
   if (typeof entry.value !== 'number') return entry.value ?? '-'
   if (entry.dataKey === 'yoyValue') return `${entry.value.toFixed(1)}%`
+  if (entry.dataKey === 'normalizedPrice') return entry.value.toFixed(2)
   return Number.isInteger(entry.value)
     ? entry.value.toString()
     : entry.value.toFixed(2)
@@ -360,6 +377,15 @@ function KeywordConditionCard({
   const [activeTooltip, setActiveTooltip] =
     useState<ConditionChartTooltipState | null>(null)
   const chartWrapperRef = useRef<HTMLDivElement>(null)
+  const overlayDataByDate = useMemo(() => {
+    const map = new Map<string, number | null>()
+
+    entry.overlay?.chart_data?.forEach(point => {
+      map.set(point.date, point.normalizedPrice)
+    })
+
+    return map
+  }, [entry.overlay])
   const chartData =
     entry.analysis.trends_data?.map(
       (point): ConditionChartPoint => ({
@@ -367,6 +393,9 @@ function KeywordConditionCard({
         trendsValue: point.value,
         ma13Value: point.ma13Value,
         yoyValue: point.yoyValue,
+        normalizedPrice: entry.overlay
+          ? (overlayDataByDate.get(point.date) ?? null)
+          : undefined,
       })
     ) ?? []
   const dateRange =
@@ -436,6 +465,11 @@ function KeywordConditionCard({
             <p className="text-primary truncate text-sm font-medium">
               {entry.conditionLabel}
             </p>
+            {entry.overlay && (
+              <p className="text-muted-foreground truncate text-xs font-medium">
+                {entry.overlay.ticker} · {entry.overlay.company_name}
+              </p>
+            )}
           </div>
 
           {chartData.length > 0 ? (
@@ -476,7 +510,10 @@ function KeywordConditionCard({
 
                     setActiveTooltip({
                       label: tooltipState.activeLabel ?? point.date,
-                      payload: buildConditionChartTooltipPayload(point),
+                      payload: buildConditionChartTooltipPayload(
+                        point,
+                        entry.overlay?.ticker
+                      ),
                     })
                   }}
                   onMouseLeave={() => setActiveTooltip(null)}
@@ -525,6 +562,16 @@ function KeywordConditionCard({
                     isAnimationActive={false}
                     dot={false}
                   />
+                  {entry.overlay && (
+                    <Line
+                      type="monotone"
+                      dataKey="normalizedPrice"
+                      stroke={CHART_SERIES_COLORS.price}
+                      strokeWidth={2}
+                      isAnimationActive={false}
+                      dot={false}
+                    />
+                  )}
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -547,7 +594,11 @@ function KeywordConditionCard({
 
   return (
     <Link
-      href={`/keywords/${entry.keyword.id}?region=${entry.analysis.region}&searchType=${entry.analysis.search_type}`}
+      href={
+        entry.overlay
+          ? `/keywords/${entry.keyword.id}/overlays/${entry.overlay.id}`
+          : `/keywords/${entry.keyword.id}?region=${entry.analysis.region}&searchType=${entry.analysis.search_type}`
+      }
     >
       {card}
     </Link>
@@ -877,6 +928,78 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
     )
   }, [baseFilteredKeywords, keywordSort, searchQuery])
 
+  const tickerEntries = useMemo<ConditionEntry[]>(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase()
+    const selectedTicker = selectedStockFilter?.ticker.toUpperCase()
+
+    const entries = baseFilteredKeywords.flatMap(keyword =>
+      (keyword.analyses ?? []).flatMap(analysis => {
+        const conditionLabel = `${
+          REGION_LABEL[analysis.region] ?? analysis.region
+        } / ${SEARCH_TYPE_LABEL[analysis.search_type] ?? analysis.search_type}`
+
+        return (analysis.overlays ?? [])
+          .filter(
+            overlay =>
+              !selectedTicker || overlay.ticker.toUpperCase() === selectedTicker
+          )
+          .map(overlay => {
+            const tickerLabel = `${overlay.ticker} · ${overlay.company_name}`
+
+            return {
+              id: `${analysis.id}:${overlay.id}`,
+              keyword,
+              analysis,
+              overlay,
+              label: `${keyword.keyword} - ${conditionLabel} - ${tickerLabel}`,
+              conditionLabel,
+              tickerLabel,
+              updatedAt:
+                analysis.updated_at ??
+                analysis.created_at ??
+                keyword.updated_at ??
+                keyword.created_at,
+            }
+          })
+      })
+    )
+
+    const queryFiltered = normalizedQuery
+      ? entries.filter(
+          entry =>
+            entry.keyword.keyword.toLowerCase().includes(normalizedQuery) ||
+            entry.conditionLabel.toLowerCase().includes(normalizedQuery) ||
+            entry.tickerLabel?.toLowerCase().includes(normalizedQuery) ||
+            entry.label.toLowerCase().includes(normalizedQuery)
+        )
+      : entries
+
+    if (keywordSort === 'latest') {
+      return [...queryFiltered].sort(
+        (a, b) =>
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      )
+    }
+
+    if (keywordSort === 'name') {
+      return [...queryFiltered].sort((a, b) =>
+        a.label.localeCompare(b.label, 'ko')
+      )
+    }
+
+    return [...queryFiltered].sort(
+      (a, b) =>
+        (a.analysis.display_order ?? 0) - (b.analysis.display_order ?? 0) ||
+        (a.overlay?.display_order ?? 0) - (b.overlay?.display_order ?? 0) ||
+        a.label.localeCompare(b.label, 'ko')
+    )
+  }, [
+    baseFilteredKeywords,
+    keywordSort,
+    searchQuery,
+    selectedStockFilter?.ticker,
+  ])
+
   const displayedKeywords = useMemo(() => {
     return sortedKeywords.slice(0, displayCount)
   }, [displayCount, sortedKeywords])
@@ -885,10 +1008,16 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
     return conditionEntries.slice(0, displayCount)
   }, [conditionEntries, displayCount])
 
+  const displayedTickerEntries = useMemo(() => {
+    return tickerEntries.slice(0, displayCount)
+  }, [displayCount, tickerEntries])
+
   const activeDisplayCount =
     searchMode === 'keyword'
       ? displayedKeywords.length
-      : displayedConditionEntries.length
+      : searchMode === 'ticker'
+        ? displayedTickerEntries.length
+        : displayedConditionEntries.length
 
   // 무한스크롤 감지
   useEffect(() => {
@@ -1277,8 +1406,9 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
         <div className="bg-card rounded-lg border p-4">
           <div className="mb-3 flex flex-wrap gap-2">
             {[
-              { value: 'keyword', label: '키워드' },
-              { value: 'condition', label: '조건' },
+              { value: 'keyword', label: '키워드만' },
+              { value: 'condition', label: '키워드 + 분석 조건' },
+              { value: 'ticker', label: '키워드 + 조건 + 티커 연동' },
             ].map(option => (
               <Button
                 key={option.value}
@@ -1369,7 +1499,9 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
                     placeholder={
                       searchMode === 'keyword'
                         ? '키워드 검색'
-                        : '키워드 또는 조건 검색'
+                        : searchMode === 'ticker'
+                          ? '키워드, 조건, 티커 검색'
+                          : '키워드 또는 조건 검색'
                     }
                     className="pl-9"
                   />
@@ -1432,7 +1564,7 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
                   variant="outline"
                   size="sm"
                   onClick={handleToggleEditMode}
-                  disabled={activeDisplayCount === 0}
+                  disabled={activeDisplayCount === 0 || searchMode === 'ticker'}
                   className="border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
                   <Pencil className="mr-2 h-4 w-4" />
@@ -1570,6 +1702,21 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
 
           {activeDisplayCount === 0 ? (
             <EmptyFilteredState />
+          ) : searchMode === 'ticker' ? (
+            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+              {displayedTickerEntries.map((entry, index) => {
+                const isLastElement =
+                  index === displayedTickerEntries.length - 1
+                return (
+                  <div
+                    key={entry.id}
+                    ref={isLastElement ? lastElementRef : null}
+                  >
+                    <KeywordConditionCard entry={entry} />
+                  </div>
+                )
+              })}
+            </div>
           ) : searchMode === 'condition' ? (
             editMode === 'reorder' ? (
               <DndContext
