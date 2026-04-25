@@ -116,6 +116,20 @@ export interface KeywordRecord {
   updated_at: string // ISO 8601 타임스탬프
   display_order?: number // 내 키워드 목록 정렬 순서
   last_viewed_at?: string | null // 내 키워드에서 마지막으로 본 시간 (미조회 배지 판별용)
+  overlays?: KeywordStockOverlay[] // 기본 분석에 연결된 종목 오버레이 목록
+  analyses?: KeywordAnalysisSummary[] // 이 키워드에 저장된 5년 분석 조건 목록
+}
+
+export interface KeywordAnalysisSummary {
+  id: string
+  keyword_id: string
+  region: Region
+  period: Period
+  search_type: SearchType
+  trends_data?: TrendsDataPoint[]
+  display_order?: number
+  created_at?: string
+  updated_at?: string
 }
 
 /**
@@ -235,6 +249,7 @@ export interface KeywordAnalysis {
   // 지표 (최신값)
   ma13_data?: number // 13주 이동평균 (0-100)
   yoy_data?: number // 13주 이동평균 기준 52주 YoY (%)
+  display_order?: number // 내 키워드 조건 목록 정렬 순서
 
   created_at: string // ISO 8601 타임스탬프
   updated_at?: string // ISO 8601 타임스탬프

@@ -1,5 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { KeywordRecord } from '@/types/database'
+import type {
+  KeywordAnalysisSummary,
+  KeywordRecord,
+  KeywordStockOverlay,
+  Period,
+  Region,
+  SearchType,
+  TrendsDataPoint,
+} from '@/types/database'
 import { normalizeKeywordSpacing } from '@/lib/utils/keyword-normalization'
 
 type KeywordRow = {
@@ -12,14 +20,98 @@ type KeywordRow = {
 }
 
 type KeywordAnalysisRefreshRow = {
+  id: string
   keyword_id: string
+  region: Region
+  period: Period
+  search_type: SearchType
+  trends_data: TrendsDataPoint[] | null
+  display_order: number | null
   updated_at: string | null
+  created_at: string
+}
+
+async function selectKeywordAnalyses(
+  supabase: SupabaseClient,
+  keywordIds: string[]
+): Promise<KeywordAnalysisRefreshRow[]> {
+  const selectWithOrder =
+    'id, keyword_id, region, period, search_type, trends_data, display_order, created_at, updated_at'
+  const selectWithoutOrder =
+    'id, keyword_id, region, period, search_type, trends_data, created_at, updated_at'
+
+  const { data, error } = await supabase
+    .from('keyword_analysis')
+    .select(selectWithOrder)
+    .in('keyword_id', keywordIds)
+
+  if (!error) return (data ?? []) as KeywordAnalysisRefreshRow[]
+  if (error.code !== '42703') throw error
+
+  const { data: fallbackData, error: fallbackError } = await supabase
+    .from('keyword_analysis')
+    .select(selectWithoutOrder)
+    .in('keyword_id', keywordIds)
+
+  if (fallbackError) throw fallbackError
+  return (
+    (fallbackData ?? []) as Omit<KeywordAnalysisRefreshRow, 'display_order'>[]
+  ).map(analysis => ({
+    ...analysis,
+    display_order: null,
+  }))
+}
+
+async function selectKeywordAnalysesByKeywordId(
+  supabase: SupabaseClient,
+  keywordId: string
+): Promise<KeywordAnalysisRefreshRow[]> {
+  const selectWithOrder =
+    'id, keyword_id, region, period, search_type, trends_data, display_order, created_at, updated_at'
+  const selectWithoutOrder =
+    'id, keyword_id, region, period, search_type, trends_data, created_at, updated_at'
+
+  const { data, error } = await supabase
+    .from('keyword_analysis')
+    .select(selectWithOrder)
+    .eq('keyword_id', keywordId)
+    .order('display_order', { ascending: true })
+    .order('updated_at', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false })
+
+  if (!error) return (data ?? []) as KeywordAnalysisRefreshRow[]
+  if (error.code !== '42703') throw error
+
+  const { data: fallbackData, error: fallbackError } = await supabase
+    .from('keyword_analysis')
+    .select(selectWithoutOrder)
+    .eq('keyword_id', keywordId)
+    .order('updated_at', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false })
+
+  if (fallbackError) throw fallbackError
+  return (
+    (fallbackData ?? []) as Omit<KeywordAnalysisRefreshRow, 'display_order'>[]
+  ).map(analysis => ({
+    ...analysis,
+    display_order: null,
+  }))
+}
+
+type KeywordOverlayRow = {
+  analysis_id: string
+  id: string
+  ticker: string
+  company_name: string
+  display_order: number
   created_at: string
 }
 
 function toKeywordRecord(
   row: KeywordRow,
-  refreshedAt?: string | null
+  refreshedAt?: string | null,
+  overlays: KeywordStockOverlay[] = [],
+  analyses: KeywordAnalysisSummary[] = []
 ): KeywordRecord {
   const displayDate = refreshedAt ?? row.created_at
 
@@ -36,7 +128,44 @@ function toKeywordRecord(
     updated_at: displayDate,
     display_order: row.display_order ?? 0,
     last_viewed_at: null,
+    overlays,
+    analyses,
   }
+}
+
+function getLatestAnalysisTimestamp(
+  analyses: KeywordAnalysisRefreshRow[]
+): string | null {
+  if (analyses.length === 0) return null
+
+  return analyses.reduce<string | null>((latest, analysis) => {
+    const current = analysis.updated_at ?? analysis.created_at
+    if (!latest) return current
+    return new Date(current).getTime() > new Date(latest).getTime()
+      ? current
+      : latest
+  }, null)
+}
+
+function dedupeOverlaysByTicker(
+  overlays: KeywordStockOverlay[]
+): KeywordStockOverlay[] {
+  const uniqueByTicker = new Map<string, KeywordStockOverlay>()
+
+  for (const overlay of overlays) {
+    const normalizedTicker = overlay.ticker.trim().toUpperCase()
+    if (!normalizedTicker || uniqueByTicker.has(normalizedTicker)) continue
+
+    uniqueByTicker.set(normalizedTicker, {
+      ...overlay,
+      ticker: normalizedTicker,
+    })
+  }
+
+  return Array.from(uniqueByTicker.values()).sort(
+    (a, b) =>
+      a.display_order - b.display_order || a.ticker.localeCompare(b.ticker)
+  )
 }
 
 export async function getKeywords(
@@ -57,25 +186,77 @@ export async function getKeywords(
 
   if (keywordIds.length === 0) return []
 
-  const { data: analyses, error: analysesError } = await supabase
-    .from('keyword_analysis')
-    .select('keyword_id, created_at, updated_at')
-    .in('keyword_id', keywordIds)
-    .eq('region', 'GLOBAL')
-    .eq('period', '5Y')
-    .eq('search_type', 'WEB')
+  const analyses = await selectKeywordAnalyses(supabase, keywordIds)
 
-  if (analysesError) throw analysesError
+  const analysesByKeywordId = new Map<string, KeywordAnalysisRefreshRow[]>()
+  for (const analysis of analyses) {
+    const current = analysesByKeywordId.get(analysis.keyword_id) ?? []
+    current.push(analysis)
+    analysesByKeywordId.set(analysis.keyword_id, current)
+  }
 
-  const refreshedAtByKeywordId = new Map(
-    ((analyses ?? []) as KeywordAnalysisRefreshRow[]).map(analysis => [
-      analysis.keyword_id,
-      analysis.updated_at ?? analysis.created_at,
-    ])
+  const analysisIds = Array.from(
+    new Set(analyses.map(analysis => analysis.id).filter(Boolean))
   )
 
+  const overlaysByKeywordId = new Map<string, KeywordStockOverlay[]>()
+
+  if (analysisIds.length > 0) {
+    const { data: overlays, error: overlaysError } = await supabase
+      .from('keyword_stock_overlays')
+      .select(
+        'analysis_id, id, ticker, company_name, display_order, created_at'
+      )
+      .in('analysis_id', analysisIds)
+      .order('display_order', { ascending: true })
+
+    if (overlaysError) throw overlaysError
+
+    const keywordIdByAnalysisId = new Map(
+      analyses.map(analysis => [analysis.id, analysis.keyword_id])
+    )
+
+    for (const overlay of (overlays ?? []) as KeywordOverlayRow[]) {
+      const keywordId = keywordIdByAnalysisId.get(overlay.analysis_id)
+      if (!keywordId) continue
+
+      const current = overlaysByKeywordId.get(keywordId) ?? []
+      current.push({
+        id: overlay.id,
+        ticker: overlay.ticker,
+        company_name: overlay.company_name,
+        display_order: overlay.display_order,
+        created_at: overlay.created_at,
+      })
+      overlaysByKeywordId.set(keywordId, current)
+    }
+  }
+
   return rows.map(row =>
-    toKeywordRecord(row, refreshedAtByKeywordId.get(row.id))
+    toKeywordRecord(
+      row,
+      getLatestAnalysisTimestamp(analysesByKeywordId.get(row.id) ?? []),
+      dedupeOverlaysByTicker(overlaysByKeywordId.get(row.id) ?? []),
+      (analysesByKeywordId.get(row.id) ?? [])
+        .filter(analysis => analysis.period === '5Y')
+        .sort(
+          (a, b) =>
+            (a.display_order ?? 0) - (b.display_order ?? 0) ||
+            new Date(b.updated_at ?? b.created_at).getTime() -
+              new Date(a.updated_at ?? a.created_at).getTime()
+        )
+        .map(analysis => ({
+          id: analysis.id,
+          keyword_id: analysis.keyword_id,
+          region: analysis.region,
+          period: analysis.period,
+          search_type: analysis.search_type,
+          trends_data: analysis.trends_data ?? [],
+          display_order: analysis.display_order ?? 0,
+          created_at: analysis.created_at,
+          updated_at: analysis.updated_at ?? undefined,
+        }))
+    )
   )
 }
 
@@ -94,20 +275,45 @@ export async function getKeyword(
   if (error?.code === 'PGRST116') return null
   if (error) throw error
 
-  const { data: analysis, error: analysisError } = await supabase
-    .from('keyword_analysis')
-    .select('created_at, updated_at')
-    .eq('keyword_id', keywordId)
-    .eq('region', 'GLOBAL')
-    .eq('period', '5Y')
-    .eq('search_type', 'WEB')
-    .maybeSingle()
+  const analyses = await selectKeywordAnalysesByKeywordId(supabase, keywordId)
+  const analysisIds = analyses.map(item => item.id)
+  const overlays: KeywordStockOverlay[] = []
 
-  if (analysisError) throw analysisError
+  if (analysisIds.length > 0) {
+    const { data: overlayRows, error: overlayError } = await supabase
+      .from('keyword_stock_overlays')
+      .select('id, ticker, company_name, display_order, created_at')
+      .in('analysis_id', analysisIds)
+      .order('display_order', { ascending: true })
+
+    if (overlayError) throw overlayError
+
+    overlays.push(...((overlayRows ?? []) as KeywordStockOverlay[]))
+  }
 
   return toKeywordRecord(
     data as KeywordRow,
-    analysis?.updated_at ?? analysis?.created_at
+    getLatestAnalysisTimestamp(analyses),
+    dedupeOverlaysByTicker(overlays),
+    analyses
+      .filter(analysis => analysis.period === '5Y')
+      .sort(
+        (a, b) =>
+          (a.display_order ?? 0) - (b.display_order ?? 0) ||
+          new Date(b.updated_at ?? b.created_at).getTime() -
+            new Date(a.updated_at ?? a.created_at).getTime()
+      )
+      .map(analysis => ({
+        id: analysis.id,
+        keyword_id: analysis.keyword_id,
+        region: analysis.region,
+        period: analysis.period,
+        search_type: analysis.search_type,
+        trends_data: analysis.trends_data ?? [],
+        display_order: analysis.display_order ?? 0,
+        created_at: analysis.created_at,
+        updated_at: analysis.updated_at ?? undefined,
+      }))
   )
 }
 

@@ -63,7 +63,7 @@ export default async function KeywordDetailPage({
   // 1. 키워드 정보 조회 (기존 데이터 - 호환성)
   const keyword = await getKeyword(supabase, user.id, keywordId)
   if (!keyword) {
-    redirect('/trends')
+    redirect('/keyword-analysis')
   }
 
   // 2. 차트 시계열 데이터는 클라이언트에서 API로 로드 (통일된 구조)

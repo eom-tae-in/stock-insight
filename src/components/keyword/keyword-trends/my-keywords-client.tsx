@@ -1,9 +1,27 @@
 'use client'
 
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { GripVertical, Pencil, Search, Trash2, X } from 'lucide-react'
+import {
+  Check,
+  ChevronsUpDown,
+  GripVertical,
+  Pencil,
+  Search,
+  Trash2,
+  X,
+} from 'lucide-react'
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
 import {
   DndContext,
   PointerSensor,
@@ -21,6 +39,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select,
   SelectContent,
@@ -44,17 +63,184 @@ import {
   filterKeywordsByLanguage,
   type KeywordLanguage,
 } from '@/lib/utils/keyword-classifier'
+import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { apiFetchJson, apiFetch } from '@/lib/fetch-client'
-import type { KeywordRecord } from '@/types/database'
+import { CHART_SERIES_COLORS } from '@/lib/constants/chart-series'
+import type {
+  KeywordAnalysisSummary,
+  KeywordRecord,
+  Region,
+  SearchType,
+} from '@/types/database'
 
 interface MyKeywordsClientProps {
   initialKeywords: KeywordRecord[]
 }
 
 type EditMode = 'none' | 'delete' | 'reorder'
-type KeywordFilter = 'all' | KeywordLanguage
+type KeywordFilter = 'all' | KeywordLanguage | 'stock'
 type KeywordSort = 'custom' | 'latest' | 'name'
+type SearchMode = 'keyword' | 'condition'
+
+type StockSuggestion = {
+  ticker: string
+  companyName: string
+}
+
+type ConditionEntry = {
+  id: string
+  keyword: KeywordRecord
+  analysis: KeywordAnalysisSummary
+  label: string
+  conditionLabel: string
+  updatedAt: string
+}
+
+type ConditionChartTooltipEntry = {
+  color?: string
+  dataKey?: string | number
+  name?: string
+  value?: number | string | null
+}
+
+type ConditionChartTooltipState = {
+  label?: string | number
+  payload: ConditionChartTooltipEntry[]
+}
+
+type ConditionChartPoint = {
+  date: string
+  trendsValue: number | null
+  ma13Value: number | null
+  yoyValue: number | null
+}
+
+const REGION_LABEL: Record<Region, string> = {
+  GLOBAL: '전체',
+  US: '미국',
+  KR: '한국',
+  JP: '일본',
+  GB: '영국',
+  DE: '독일',
+  FR: '프랑스',
+  CA: '캐나다',
+  AU: '호주',
+  IN: '인도',
+  BR: '브라질',
+  CN: '중국',
+  TW: '대만',
+  HK: '홍콩',
+  SG: '싱가포르',
+}
+
+const SEARCH_TYPE_LABEL: Record<SearchType, string> = {
+  WEB: '웹 검색',
+  IMAGES: '이미지',
+  NEWS: '뉴스',
+  YOUTUBE: '유튜브',
+  SHOPPING: '쇼핑',
+}
+
+function buildConditionChartTooltipPayload(
+  point: ConditionChartPoint
+): ConditionChartTooltipEntry[] {
+  return [
+    {
+      color: CHART_SERIES_COLORS.ma13,
+      dataKey: 'ma13Value',
+      name: '13주 이동평균(13주 MA)',
+      value: point.ma13Value,
+    },
+    {
+      color: CHART_SERIES_COLORS.yoy,
+      dataKey: 'yoyValue',
+      name: '13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)',
+      value: point.yoyValue,
+    },
+    {
+      color: CHART_SERIES_COLORS.googleTrends,
+      dataKey: 'trendsValue',
+      name: '검색량 기반',
+      value: point.trendsValue,
+    },
+  ]
+}
+
+function formatConditionChartTooltipValue(entry: ConditionChartTooltipEntry) {
+  if (typeof entry.value !== 'number') return entry.value ?? '-'
+  if (entry.dataKey === 'yoyValue') return `${entry.value.toFixed(1)}%`
+  return Number.isInteger(entry.value)
+    ? entry.value.toString()
+    : entry.value.toFixed(2)
+}
+
+function ConditionChartTooltipContent({
+  active,
+  label,
+  payload,
+}: {
+  active?: boolean
+  label?: string | number
+  payload?: ConditionChartTooltipEntry[]
+}) {
+  if (!active || !payload || payload.length === 0) return null
+
+  const visiblePayload = payload.filter(
+    entry => entry.value !== null && entry.value !== undefined
+  )
+
+  if (visiblePayload.length === 0) return null
+
+  return (
+    <div className="min-w-52 rounded-md border border-slate-300/80 bg-white/82 px-3 py-2 shadow-lg ring-1 ring-slate-200/60 backdrop-blur-md dark:border-slate-700/80 dark:bg-slate-950/78 dark:ring-slate-800/70">
+      <div className="text-[11px] font-semibold tracking-tight text-slate-700 dark:text-slate-200">
+        {label}
+      </div>
+      <div className="mt-2 grid gap-1.5">
+        {visiblePayload.map(entry => (
+          <div
+            key={`${String(entry.dataKey)}-${entry.name}`}
+            className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3"
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              <span
+                className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-black/10"
+                style={{ backgroundColor: entry.color ?? 'currentColor' }}
+              />
+              <span className="truncate text-[11px] font-medium text-slate-700 dark:text-slate-200">
+                {entry.name}
+              </span>
+            </div>
+            <span className="text-[11px] font-semibold text-slate-950 tabular-nums dark:text-slate-50">
+              {formatConditionChartTooltipValue(entry)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function getConditionChartTooltipStyle(rect: DOMRect): CSSProperties {
+  const tooltipWidth = 248
+  const gap = 12
+  const viewportWidth =
+    typeof window !== 'undefined'
+      ? window.innerWidth
+      : rect.right + tooltipWidth
+
+  const hasRightSpace = viewportWidth - rect.right >= tooltipWidth + gap
+  const left = hasRightSpace
+    ? rect.right + gap
+    : Math.max(12, rect.left - tooltipWidth - gap)
+
+  return {
+    top: Math.max(12, rect.top),
+    left,
+    width: tooltipWidth,
+  }
+}
 
 function SortableKeywordCard({
   keyword,
@@ -71,6 +257,39 @@ function SortableKeywordCard({
     transition,
     isDragging,
   } = useSortable({ id: keyword.id })
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.45 : 1,
+        zIndex: isDragging ? 10 : 'auto',
+      }}
+      {...attributes}
+      {...listeners}
+    >
+      {children}
+    </div>
+  )
+}
+
+function SortableConditionCard({
+  entry,
+  children,
+}: {
+  entry: ConditionEntry
+  children: ReactNode
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: entry.id })
 
   return (
     <div
@@ -122,14 +341,239 @@ function EmptyFilteredState() {
   )
 }
 
+function KeywordConditionCard({
+  entry,
+  mode = 'normal',
+  isSelected = false,
+  onToggleSelect,
+}: {
+  entry: ConditionEntry
+  mode?: 'normal' | 'delete' | 'reorder'
+  isSelected?: boolean
+  onToggleSelect?: (id: string) => void
+}) {
+  const formattedDate = new Date(entry.updatedAt).toLocaleDateString('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+  const [activeTooltip, setActiveTooltip] =
+    useState<ConditionChartTooltipState | null>(null)
+  const chartWrapperRef = useRef<HTMLDivElement>(null)
+  const chartData =
+    entry.analysis.trends_data?.map(
+      (point): ConditionChartPoint => ({
+        date: point.date,
+        trendsValue: point.value,
+        ma13Value: point.ma13Value,
+        yoyValue: point.yoyValue,
+      })
+    ) ?? []
+  const dateRange =
+    chartData.length > 0
+      ? `${chartData[0].date} ~ ${chartData[chartData.length - 1].date}`
+      : '데이터 없음'
+  const tooltipRect = chartWrapperRef.current?.getBoundingClientRect()
+
+  const card = (
+    <div className="group relative z-0 hover:z-30">
+      {activeTooltip &&
+        tooltipRect &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            className="pointer-events-none fixed z-[9999]"
+            style={getConditionChartTooltipStyle(tooltipRect)}
+          >
+            <ConditionChartTooltipContent
+              active
+              label={activeTooltip.label}
+              payload={activeTooltip.payload}
+            />
+          </div>,
+          document.body
+        )}
+      <div
+        className={cn(
+          'border-border/50 from-card to-card/80 relative overflow-hidden rounded-xl border bg-gradient-to-br p-4 transition-all duration-200',
+          mode === 'normal'
+            ? 'hover:border-primary/70 hover:shadow-primary/10 cursor-pointer backdrop-blur-sm hover:shadow-md'
+            : 'cursor-pointer',
+          mode === 'reorder' && 'cursor-grab active:cursor-grabbing',
+          mode === 'delete' &&
+            isSelected &&
+            'border-primary bg-primary/5 ring-primary/20 ring-2'
+        )}
+        onClick={
+          mode === 'delete' ? () => onToggleSelect?.(entry.id) : undefined
+        }
+      >
+        {mode === 'delete' && (
+          <div className="absolute top-3 left-3">
+            <Checkbox
+              checked={isSelected}
+              onCheckedChange={() => onToggleSelect?.(entry.id)}
+              onClick={event => event.stopPropagation()}
+              aria-label={`${entry.label} 선택`}
+            />
+          </div>
+        )}
+        {mode === 'reorder' && (
+          <div className="absolute top-3 left-3">
+            <GripVertical className="text-muted-foreground h-4 w-4" />
+          </div>
+        )}
+        <div
+          className={cn(
+            'flex h-full flex-col',
+            (mode === 'delete' || mode === 'reorder') && 'pl-8'
+          )}
+        >
+          <div className="space-y-1">
+            <h3 className="text-foreground truncate leading-tight font-semibold">
+              {entry.keyword.keyword}
+            </h3>
+            <p className="text-primary truncate text-sm font-medium">
+              {entry.conditionLabel}
+            </p>
+          </div>
+
+          {chartData.length > 0 ? (
+            <div
+              ref={chartWrapperRef}
+              className="mt-3 h-32 cursor-default"
+              onClick={event => {
+                event.preventDefault()
+                event.stopPropagation()
+              }}
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={chartData}
+                  margin={{ top: 4, right: 6, left: -22, bottom: 0 }}
+                  onMouseMove={state => {
+                    const tooltipState = state as {
+                      activeTooltipIndex?: number | string
+                      activeLabel?: string | number
+                      isTooltipActive?: boolean
+                    }
+                    const rawIndex = tooltipState.activeTooltipIndex
+                    const index =
+                      typeof rawIndex === 'number'
+                        ? rawIndex
+                        : typeof rawIndex === 'string'
+                          ? Number(rawIndex)
+                          : NaN
+                    const point =
+                      Number.isInteger(index) && index >= 0
+                        ? chartData[index]
+                        : undefined
+
+                    if (!tooltipState.isTooltipActive || !point) {
+                      setActiveTooltip(null)
+                      return
+                    }
+
+                    setActiveTooltip({
+                      label: tooltipState.activeLabel ?? point.date,
+                      payload: buildConditionChartTooltipPayload(point),
+                    })
+                  }}
+                  onMouseLeave={() => setActiveTooltip(null)}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="date"
+                    tick={false}
+                    axisLine={false}
+                    height={0}
+                  />
+                  <YAxis
+                    domain={[0, 100]}
+                    tick={false}
+                    axisLine={false}
+                    width={30}
+                  />
+                  <Tooltip
+                    content={() => null}
+                    cursor={{
+                      stroke: 'hsl(var(--border))',
+                      strokeDasharray: '3 3',
+                    }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="ma13Value"
+                    stroke={CHART_SERIES_COLORS.ma13}
+                    strokeWidth={2}
+                    isAnimationActive={false}
+                    dot={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="yoyValue"
+                    stroke={CHART_SERIES_COLORS.yoy}
+                    strokeWidth={2}
+                    isAnimationActive={false}
+                    dot={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="trendsValue"
+                    stroke={CHART_SERIES_COLORS.googleTrends}
+                    strokeWidth={2}
+                    isAnimationActive={false}
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="text-muted-foreground bg-muted mt-3 flex h-32 items-center justify-center rounded text-xs">
+              데이터 없음
+            </div>
+          )}
+
+          <div className="text-muted-foreground mt-2 flex items-center justify-between gap-2 border-t pt-1 text-[10px] leading-none">
+            <span>{formattedDate}</span>
+            <span className="truncate text-right">{dateRange}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+
+  if (mode === 'delete' || mode === 'reorder') return card
+
+  return (
+    <Link
+      href={`/keywords/${entry.keyword.id}?region=${entry.analysis.region}&searchType=${entry.analysis.search_type}`}
+    >
+      {card}
+    </Link>
+  )
+}
+
 export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
   const [keywords, setKeywords] = useState<KeywordRecord[]>(initialKeywords)
   const [isLoading, setIsLoading] = useState(false)
   const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set())
 
   const [searchQuery, setSearchQuery] = useState('')
+  const [searchMode, setSearchMode] = useState<SearchMode>('keyword')
   const [keywordFilter, setKeywordFilter] = useState<KeywordFilter>('all')
   const [keywordSort, setKeywordSort] = useState<KeywordSort>('custom')
+  const [stockSearchInput, setStockSearchInput] = useState('')
+  const [stockSuggestions, setStockSuggestions] = useState<StockSuggestion[]>(
+    []
+  )
+  const [showStockSuggestions, setShowStockSuggestions] = useState(false)
+  const [selectedStockIndex, setSelectedStockIndex] = useState(-1)
+  const [selectedStockFilter, setSelectedStockFilter] =
+    useState<StockSuggestion | null>(null)
+  const [isSearchingStocks, setIsSearchingStocks] = useState(false)
+  const stockSearchTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const stockSearchWrapperRef = useRef<HTMLDivElement>(null)
 
   // 무한스크롤
   const [displayCount, setDisplayCount] = useState(100)
@@ -141,7 +585,13 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<'selected' | null>(null)
+  const [conditionDeleteTarget, setConditionDeleteTarget] = useState<
+    'selected' | null
+  >(null)
   const [isSavingOrder, setIsSavingOrder] = useState(false)
+  const [selectedConditionIds, setSelectedConditionIds] = useState<Set<string>>(
+    new Set()
+  )
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -173,21 +623,187 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
     setIsEditMode(false)
     setEditMode('none')
     setSelectedIds(new Set())
-  }, [keywordFilter, keywordSort, searchQuery])
+    setSelectedConditionIds(new Set())
+  }, [keywordFilter, keywordSort, searchMode, searchQuery, selectedStockFilter])
 
-  const filteredKeywords = useMemo(() => {
+  useEffect(() => {
+    if (keywordFilter !== 'stock') {
+      setStockSearchInput('')
+      setStockSuggestions([])
+      setShowStockSuggestions(false)
+      setSelectedStockIndex(-1)
+      setSelectedStockFilter(null)
+    } else {
+      setSearchQuery('')
+    }
+  }, [keywordFilter])
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        stockSearchWrapperRef.current &&
+        !stockSearchWrapperRef.current.contains(event.target as Node)
+      ) {
+        setShowStockSuggestions(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (stockSearchTimerRef.current) {
+        clearTimeout(stockSearchTimerRef.current)
+      }
+    }
+  }, [])
+
+  const fetchStockSuggestions = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      setStockSuggestions([])
+      setShowStockSuggestions(false)
+      setSelectedStockIndex(-1)
+      setIsSearchingStocks(false)
+      return
+    }
+
+    try {
+      setIsSearchingStocks(true)
+      const response = await fetch(
+        `/api/stocks/search?q=${encodeURIComponent(query)}`
+      )
+
+      if (!response.ok) {
+        throw new Error('stock search failed')
+      }
+
+      const data = (await response.json()) as {
+        data?: Array<{
+          ticker?: string
+          symbol?: string
+          companyName?: string
+          longname?: string
+        }>
+      }
+
+      const suggestions = (data.data ?? [])
+        .map(item => ({
+          ticker: item.ticker ?? item.symbol ?? '',
+          companyName: item.companyName ?? item.longname ?? '',
+        }))
+        .filter(item => item.ticker)
+
+      setStockSuggestions(suggestions)
+      setShowStockSuggestions(suggestions.length > 0)
+      setSelectedStockIndex(-1)
+    } catch (error) {
+      console.error('Failed to fetch stock suggestions:', error)
+      setStockSuggestions([])
+      setShowStockSuggestions(false)
+      setSelectedStockIndex(-1)
+    } finally {
+      setIsSearchingStocks(false)
+    }
+  }, [])
+
+  const handleStockInputChange = (value: string) => {
+    const nextValue = value.toUpperCase()
+    setStockSearchInput(nextValue)
+    setSelectedStockFilter(null)
+
+    if (stockSearchTimerRef.current) {
+      clearTimeout(stockSearchTimerRef.current)
+    }
+
+    stockSearchTimerRef.current = setTimeout(() => {
+      void fetchStockSuggestions(nextValue)
+    }, 250)
+  }
+
+  const handleSelectStockSuggestion = (suggestion: StockSuggestion) => {
+    setStockSearchInput(suggestion.ticker)
+    setSelectedStockFilter(suggestion)
+    setStockSuggestions([])
+    setShowStockSuggestions(false)
+    setSelectedStockIndex(-1)
+  }
+
+  const handleStockInputKeyDown = (
+    event: React.KeyboardEvent<HTMLInputElement>
+  ) => {
+    if (!showStockSuggestions || stockSuggestions.length === 0) {
+      if (event.key === 'Escape') {
+        setShowStockSuggestions(false)
+      }
+      return
+    }
+
+    switch (event.key) {
+      case 'ArrowDown':
+        event.preventDefault()
+        setSelectedStockIndex(prev =>
+          prev < stockSuggestions.length - 1 ? prev + 1 : prev
+        )
+        break
+      case 'ArrowUp':
+        event.preventDefault()
+        setSelectedStockIndex(prev => (prev > 0 ? prev - 1 : 0))
+        break
+      case 'Enter':
+        event.preventDefault()
+        if (selectedStockIndex >= 0) {
+          handleSelectStockSuggestion(stockSuggestions[selectedStockIndex])
+        }
+        break
+      case 'Escape':
+        event.preventDefault()
+        setShowStockSuggestions(false)
+        break
+      default:
+        break
+    }
+  }
+
+  const clearSelectedStockFilter = () => {
+    setStockSearchInput('')
+    setSelectedStockFilter(null)
+    setStockSuggestions([])
+    setShowStockSuggestions(false)
+    setSelectedStockIndex(-1)
+  }
+
+  const baseFilteredKeywords = useMemo(() => {
+    if (keywordFilter === 'stock') {
+      if (stockSearchInput.trim() && !selectedStockFilter) return []
+      if (!selectedStockFilter) return keywords
+
+      return keywords.filter(keyword =>
+        (keyword.overlays ?? []).some(
+          overlay =>
+            overlay.ticker.toUpperCase() ===
+            selectedStockFilter.ticker.toUpperCase()
+        )
+      )
+    }
+
     const languageFiltered =
       keywordFilter === 'all'
         ? keywords
         : filterKeywordsByLanguage(keywords, keywordFilter)
 
-    const normalizedQuery = searchQuery.trim().toLowerCase()
-    if (!normalizedQuery) return languageFiltered
+    return languageFiltered
+  }, [keywordFilter, keywords, selectedStockFilter, stockSearchInput])
 
-    return languageFiltered.filter(keyword =>
+  const filteredKeywords = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase()
+    if (!normalizedQuery) return baseFilteredKeywords
+
+    return baseFilteredKeywords.filter(keyword =>
       keyword.keyword.toLowerCase().includes(normalizedQuery)
     )
-  }, [keywordFilter, keywords, searchQuery])
+  }, [baseFilteredKeywords, searchQuery])
 
   const sortedKeywords = useMemo(() => {
     const copied = [...filteredKeywords]
@@ -208,18 +824,77 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
     return copied
   }, [filteredKeywords, keywordSort])
 
+  const conditionEntries = useMemo<ConditionEntry[]>(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase()
+
+    const entries = baseFilteredKeywords.flatMap(keyword =>
+      (keyword.analyses ?? []).map(analysis => {
+        const conditionLabel = `${
+          REGION_LABEL[analysis.region] ?? analysis.region
+        } / ${SEARCH_TYPE_LABEL[analysis.search_type] ?? analysis.search_type}`
+
+        return {
+          id: analysis.id,
+          keyword,
+          analysis,
+          label: `${keyword.keyword} - ${conditionLabel}`,
+          conditionLabel,
+          updatedAt:
+            analysis.updated_at ??
+            analysis.created_at ??
+            keyword.updated_at ??
+            keyword.created_at,
+        }
+      })
+    )
+
+    const queryFiltered = normalizedQuery
+      ? entries.filter(
+          entry =>
+            entry.keyword.keyword.toLowerCase().includes(normalizedQuery) ||
+            entry.conditionLabel.toLowerCase().includes(normalizedQuery) ||
+            entry.label.toLowerCase().includes(normalizedQuery)
+        )
+      : entries
+
+    if (keywordSort === 'latest') {
+      return [...queryFiltered].sort(
+        (a, b) =>
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      )
+    }
+
+    if (keywordSort === 'name') {
+      return [...queryFiltered].sort((a, b) =>
+        a.label.localeCompare(b.label, 'ko')
+      )
+    }
+
+    return [...queryFiltered].sort(
+      (a, b) =>
+        (a.analysis.display_order ?? 0) - (b.analysis.display_order ?? 0) ||
+        a.label.localeCompare(b.label, 'ko')
+    )
+  }, [baseFilteredKeywords, keywordSort, searchQuery])
+
   const displayedKeywords = useMemo(() => {
     return sortedKeywords.slice(0, displayCount)
   }, [displayCount, sortedKeywords])
+
+  const displayedConditionEntries = useMemo(() => {
+    return conditionEntries.slice(0, displayCount)
+  }, [conditionEntries, displayCount])
+
+  const activeDisplayCount =
+    searchMode === 'keyword'
+      ? displayedKeywords.length
+      : displayedConditionEntries.length
 
   // 무한스크롤 감지
   useEffect(() => {
     const observer = new IntersectionObserver(
       entries => {
-        if (
-          entries[0].isIntersecting &&
-          displayedKeywords.length === displayCount
-        ) {
+        if (entries[0].isIntersecting && activeDisplayCount === displayCount) {
           setDisplayCount(prev => prev + 100)
         }
       },
@@ -231,12 +906,13 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
     }
 
     return () => observer.disconnect()
-  }, [displayCount, displayedKeywords.length])
+  }, [activeDisplayCount, displayCount])
 
   const closeEditMode = () => {
     setIsEditMode(false)
     setEditMode('none')
     setSelectedIds(new Set())
+    setSelectedConditionIds(new Set())
     setEditingId(null)
   }
 
@@ -255,6 +931,7 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
   const handleSelectDeleteMode = () => {
     setEditMode(prev => (prev === 'delete' ? 'none' : 'delete'))
     setSelectedIds(new Set())
+    setSelectedConditionIds(new Set())
     setEditingId(null)
   }
 
@@ -270,6 +947,7 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
 
     setEditMode(prev => (prev === 'reorder' ? 'none' : 'reorder'))
     setSelectedIds(new Set())
+    setSelectedConditionIds(new Set())
     setEditingId(null)
   }
 
@@ -286,9 +964,27 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
     })
   }
 
+  const handleToggleConditionSelect = (id: string) => {
+    setSelectedConditionIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
   // 전체 선택 (현재 탭의 키워드만)
   const handleSelectAll = () => {
     setSelectedIds(new Set(displayedKeywords.map(k => k.id)))
+  }
+
+  const handleSelectAllConditions = () => {
+    setSelectedConditionIds(
+      new Set(displayedConditionEntries.map(entry => entry.id))
+    )
   }
 
   // 키워드 삭제
@@ -332,6 +1028,42 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
     }
   }
 
+  const handleDeleteConditions = async () => {
+    try {
+      const idsToDelete = Array.from(selectedConditionIds)
+      if (idsToDelete.length === 0) return
+
+      await Promise.all(
+        idsToDelete.map(analysisId =>
+          apiFetch(`/api/analyses/${analysisId}`, {
+            method: 'DELETE',
+          })
+        )
+      )
+
+      setKeywords(prev =>
+        prev.map(keyword => ({
+          ...keyword,
+          analyses: (keyword.analyses ?? []).filter(
+            analysis => !idsToDelete.includes(analysis.id)
+          ),
+        }))
+      )
+      setSelectedConditionIds(new Set())
+      setConditionDeleteTarget(null)
+      if (editMode === 'delete') {
+        setEditMode('none')
+      }
+
+      toast.success(`${idsToDelete.length}개 조건이 삭제되었습니다.`)
+      await fetchKeywords()
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : '조건 삭제에 실패했습니다.'
+      toast.error(message)
+    }
+  }
+
   // 키워드 수정 저장
   const handleEditSave = async (id: string, newKeyword: string) => {
     try {
@@ -363,6 +1095,48 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
     const { active, over } = event
     if (editMode !== 'reorder' || !over || active.id === over.id) return
 
+    if (searchMode === 'condition') {
+      const oldIndex = displayedConditionEntries.findIndex(
+        entry => entry.id === active.id
+      )
+      const newIndex = displayedConditionEntries.findIndex(
+        entry => entry.id === over.id
+      )
+
+      if (oldIndex < 0 || newIndex < 0) return
+
+      const reorderedVisible = arrayMove(
+        displayedConditionEntries,
+        oldIndex,
+        newIndex
+      )
+      const displayedIdSet = new Set(
+        displayedConditionEntries.map(entry => entry.id)
+      )
+      const reorderedQueue = [...reorderedVisible]
+      const reorderedEntries = conditionEntries.map(entry => {
+        if (!displayedIdSet.has(entry.id)) return entry
+
+        return reorderedQueue.shift() ?? entry
+      })
+      const orderByAnalysisId = new Map(
+        reorderedEntries.map((entry, index) => [entry.id, index + 1])
+      )
+
+      setKeywords(prev =>
+        prev.map(keyword => ({
+          ...keyword,
+          analyses: (keyword.analyses ?? []).map(analysis => {
+            const nextOrder = orderByAnalysisId.get(analysis.id)
+            return nextOrder === undefined
+              ? analysis
+              : { ...analysis, display_order: nextOrder }
+          }),
+        }))
+      )
+      return
+    }
+
     const oldIndex = displayedKeywords.findIndex(
       keyword => keyword.id === active.id
     )
@@ -389,6 +1163,20 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
   const handleConfirmReorder = async () => {
     setIsSavingOrder(true)
     try {
+      if (searchMode === 'condition') {
+        const orderedIds = conditionEntries.map(entry => entry.id)
+        await apiFetchJson('/api/analyses/reorder', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderedIds }),
+        })
+
+        toast.success('조건 위치가 저장되었습니다.')
+        closeEditMode()
+        await fetchKeywords()
+        return
+      }
+
       const orderedIds = keywords.map(keyword => keyword.id)
       await apiFetchJson('/api/keywords/reorder', {
         method: 'PATCH',
@@ -487,15 +1275,106 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
 
       <div className="space-y-4">
         <div className="bg-card rounded-lg border p-4">
+          <div className="mb-3 flex flex-wrap gap-2">
+            {[
+              { value: 'keyword', label: '키워드' },
+              { value: 'condition', label: '조건' },
+            ].map(option => (
+              <Button
+                key={option.value}
+                type="button"
+                variant={searchMode === option.value ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  setSearchMode(option.value as SearchMode)
+                  closeEditMode()
+                }}
+              >
+                {option.label}
+              </Button>
+            ))}
+          </div>
+
           <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto] lg:items-center">
             <div className="relative">
-              <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-              <Input
-                value={searchQuery}
-                onChange={event => setSearchQuery(event.target.value)}
-                placeholder="키워드 검색"
-                className="pl-9"
-              />
+              {keywordFilter === 'stock' ? (
+                <div ref={stockSearchWrapperRef} className="relative">
+                  <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+                  <Input
+                    value={stockSearchInput}
+                    onChange={event =>
+                      handleStockInputChange(event.target.value)
+                    }
+                    onKeyDown={handleStockInputKeyDown}
+                    placeholder="티커 또는 기업명으로 종목 검색"
+                    className="pr-24 pl-9"
+                    autoComplete="off"
+                  />
+                  <div className="absolute top-1/2 right-3 flex -translate-y-1/2 items-center gap-2">
+                    {isSearchingStocks && (
+                      <ChevronsUpDown className="text-muted-foreground h-4 w-4 animate-pulse" />
+                    )}
+                    {selectedStockFilter && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={clearSelectedStockFilter}
+                        className="h-7 px-2 text-xs"
+                      >
+                        초기화
+                      </Button>
+                    )}
+                  </div>
+
+                  {showStockSuggestions && stockSuggestions.length > 0 && (
+                    <div className="bg-popover absolute top-full z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-md border shadow-md">
+                      {stockSuggestions.map((suggestion, index) => (
+                        <button
+                          key={`${suggestion.ticker}-${suggestion.companyName}`}
+                          type="button"
+                          onClick={() =>
+                            handleSelectStockSuggestion(suggestion)
+                          }
+                          className="hover:bg-accent flex w-full items-center justify-between px-3 py-2 text-left transition-colors"
+                        >
+                          <div className="min-w-0">
+                            <div
+                              className={cn(
+                                'font-semibold',
+                                index === selectedStockIndex && 'text-primary'
+                              )}
+                            >
+                              {suggestion.ticker}
+                            </div>
+                            <div className="text-muted-foreground truncate text-xs">
+                              {suggestion.companyName}
+                            </div>
+                          </div>
+                          {selectedStockFilter?.ticker ===
+                            suggestion.ticker && (
+                            <Check className="h-4 w-4 shrink-0" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+                  <Input
+                    value={searchQuery}
+                    onChange={event => setSearchQuery(event.target.value)}
+                    placeholder={
+                      searchMode === 'keyword'
+                        ? '키워드 검색'
+                        : '키워드 또는 조건 검색'
+                    }
+                    className="pl-9"
+                  />
+                </>
+              )}
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -504,6 +1383,7 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
                 { value: 'ko', label: '한글' },
                 { value: 'en', label: '영어' },
                 { value: 'symbol', label: '기타' },
+                { value: 'stock', label: '종목' },
               ].map(option => (
                 <Button
                   key={option.value}
@@ -541,7 +1421,10 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
           {keywords.length > 0 && (
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-muted-foreground text-sm">
-                {displayedKeywords.length}개 표시 중
+                {activeDisplayCount}개 표시 중
+                {keywordFilter === 'stock' && selectedStockFilter
+                  ? ` · ${selectedStockFilter.ticker} 연결 키워드`
+                  : ''}
               </div>
 
               {!isEditMode ? (
@@ -549,7 +1432,7 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
                   variant="outline"
                   size="sm"
                   onClick={handleToggleEditMode}
-                  disabled={displayedKeywords.length === 0}
+                  disabled={activeDisplayCount === 0}
                   className="border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
                   <Pencil className="mr-2 h-4 w-4" />
@@ -601,49 +1484,145 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
             </div>
           )}
 
-          {editMode === 'delete' && displayedKeywords.length > 0 && (
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSelectAll}
-                  className="border-slate-300 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:bg-slate-800"
-                >
-                  전체 선택
-                </Button>
+          {searchMode === 'keyword' &&
+            editMode === 'delete' &&
+            displayedKeywords.length > 0 && (
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSelectAll}
+                    className="border-slate-300 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    전체 선택
+                  </Button>
+                  {selectedIds.size > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedIds(new Set())}
+                      className="border-slate-300 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:bg-slate-800"
+                    >
+                      선택 해제
+                    </Button>
+                  )}
+                  <span className="text-muted-foreground text-sm">
+                    {selectedIds.size}개 선택됨
+                  </span>
+                </div>
                 {selectedIds.size > 0 && (
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setSelectedIds(new Set())}
-                    className="border-slate-300 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:bg-slate-800"
+                    onClick={() => {
+                      setDeleteTarget('selected')
+                    }}
+                    className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300 dark:hover:bg-red-950/40"
                   >
-                    선택 해제
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    삭제
                   </Button>
                 )}
-                <span className="text-muted-foreground text-sm">
-                  {selectedIds.size}개 선택됨
-                </span>
               </div>
-              {selectedIds.size > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setDeleteTarget('selected')
-                  }}
-                  className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300 dark:hover:bg-red-950/40"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  삭제
-                </Button>
-              )}
-            </div>
-          )}
+            )}
 
-          {displayedKeywords.length === 0 ? (
+          {searchMode === 'condition' &&
+            editMode === 'delete' &&
+            displayedConditionEntries.length > 0 && (
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSelectAllConditions}
+                    className="border-slate-300 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    전체 선택
+                  </Button>
+                  {selectedConditionIds.size > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedConditionIds(new Set())}
+                      className="border-slate-300 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:bg-slate-800"
+                    >
+                      선택 해제
+                    </Button>
+                  )}
+                  <span className="text-muted-foreground text-sm">
+                    {selectedConditionIds.size}개 선택됨
+                  </span>
+                </div>
+                {selectedConditionIds.size > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setConditionDeleteTarget('selected')}
+                    className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300 dark:hover:bg-red-950/40"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    삭제
+                  </Button>
+                )}
+              </div>
+            )}
+
+          {activeDisplayCount === 0 ? (
             <EmptyFilteredState />
+          ) : searchMode === 'condition' ? (
+            editMode === 'reorder' ? (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={displayedConditionEntries.map(entry => entry.id)}
+                  strategy={rectSortingStrategy}
+                >
+                  <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                    {displayedConditionEntries.map((entry, index) => {
+                      const isLastElement =
+                        index === displayedConditionEntries.length - 1
+                      return (
+                        <div
+                          key={entry.id}
+                          ref={isLastElement ? lastElementRef : null}
+                        >
+                          <SortableConditionCard entry={entry}>
+                            <KeywordConditionCard
+                              entry={entry}
+                              mode="reorder"
+                            />
+                          </SortableConditionCard>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                {displayedConditionEntries.map((entry, index) => {
+                  const isLastElement =
+                    index === displayedConditionEntries.length - 1
+                  return (
+                    <div
+                      key={entry.id}
+                      ref={isLastElement ? lastElementRef : null}
+                    >
+                      <KeywordConditionCard
+                        entry={entry}
+                        mode={editMode === 'delete' ? 'delete' : 'normal'}
+                        isSelected={selectedConditionIds.has(entry.id)}
+                        onToggleSelect={handleToggleConditionSelect}
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+            )
           ) : (
             <>
               {editMode === 'reorder' ? (
@@ -733,6 +1712,34 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
             <AlertDialogCancel>취소</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => handleDeleteKeyword()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={conditionDeleteTarget !== null}
+        onOpenChange={open => {
+          if (!open) {
+            setConditionDeleteTarget(null)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>선택한 조건을 삭제하시겠어요?</AlertDialogTitle>
+            <AlertDialogDescription>
+              이 작업은 되돌릴 수 없습니다. 선택한 저장 분석 조건과 연결된
+              데이터가 삭제됩니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => handleDeleteConditions()}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               삭제

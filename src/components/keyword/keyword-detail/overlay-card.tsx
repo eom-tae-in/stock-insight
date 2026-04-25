@@ -14,7 +14,7 @@ interface OverlayCardProps {
 export function OverlayCard({ overlay, keywordId }: OverlayCardProps) {
   return (
     <Link
-      href={`/trends/search?keywordId=${keywordId}&overlayId=${overlay.id}`}
+      href={`/keywords/${keywordId}/overlays/${overlay.id}`}
       className="block"
     >
       <div
