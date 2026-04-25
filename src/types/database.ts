@@ -127,6 +127,7 @@ export interface KeywordAnalysisSummary {
   period: Period
   search_type: SearchType
   trends_data?: TrendsDataPoint[]
+  overlays?: KeywordAnalysisOverlay[]
   display_order?: number
   created_at?: string
   updated_at?: string
@@ -137,10 +138,16 @@ export interface KeywordAnalysisSummary {
  */
 export interface KeywordStockOverlay {
   id: string // UUID
+  analysis_id?: string // keyword_analysis.id 참조
   ticker: string // 종목 심볼 (예: AAPL)
   company_name: string // 회사명 (예: Apple Inc.)
   display_order: number // 그래프에서 표시할 순서
   created_at: string // ISO 8601 타임스탐프
+  chart_data?: Array<{
+    date: string
+    normalizedPrice: number | null
+    rawPrice: number | null
+  }>
 }
 
 /**

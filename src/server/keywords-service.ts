@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   KeywordAnalysisSummary,
+  KeywordAnalysisOverlay,
   KeywordRecord,
   KeywordStockOverlay,
   Period,
@@ -105,6 +106,31 @@ type KeywordOverlayRow = {
   company_name: string
   display_order: number
   created_at: string
+  overlay_chart_timeseries?: Array<{
+    date: string
+    normalized_price: number | null
+    raw_price: number | null
+  }>
+}
+
+function toKeywordAnalysisOverlay(
+  overlay: KeywordOverlayRow
+): KeywordAnalysisOverlay {
+  return {
+    id: overlay.id,
+    analysis_id: overlay.analysis_id,
+    ticker: overlay.ticker,
+    company_name: overlay.company_name,
+    display_order: overlay.display_order,
+    created_at: overlay.created_at,
+    chart_data: (overlay.overlay_chart_timeseries ?? [])
+      .map(point => ({
+        date: point.date,
+        normalizedPrice: point.normalized_price,
+        rawPrice: point.raw_price,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date)),
+  }
 }
 
 function toKeywordRecord(
@@ -200,12 +226,13 @@ export async function getKeywords(
   )
 
   const overlaysByKeywordId = new Map<string, KeywordStockOverlay[]>()
+  const overlaysByAnalysisId = new Map<string, KeywordAnalysisOverlay[]>()
 
   if (analysisIds.length > 0) {
     const { data: overlays, error: overlaysError } = await supabase
       .from('keyword_stock_overlays')
       .select(
-        'analysis_id, id, ticker, company_name, display_order, created_at'
+        'analysis_id, id, ticker, company_name, display_order, created_at, overlay_chart_timeseries(date, normalized_price, raw_price)'
       )
       .in('analysis_id', analysisIds)
       .order('display_order', { ascending: true })
@@ -217,16 +244,24 @@ export async function getKeywords(
     )
 
     for (const overlay of (overlays ?? []) as KeywordOverlayRow[]) {
+      const analysisOverlay = toKeywordAnalysisOverlay(overlay)
+      const analysisOverlays =
+        overlaysByAnalysisId.get(overlay.analysis_id) ?? []
+      analysisOverlays.push(analysisOverlay)
+      overlaysByAnalysisId.set(overlay.analysis_id, analysisOverlays)
+
       const keywordId = keywordIdByAnalysisId.get(overlay.analysis_id)
       if (!keywordId) continue
 
       const current = overlaysByKeywordId.get(keywordId) ?? []
       current.push({
         id: overlay.id,
+        analysis_id: overlay.analysis_id,
         ticker: overlay.ticker,
         company_name: overlay.company_name,
         display_order: overlay.display_order,
         created_at: overlay.created_at,
+        chart_data: analysisOverlay.chart_data,
       })
       overlaysByKeywordId.set(keywordId, current)
     }
@@ -252,6 +287,7 @@ export async function getKeywords(
           period: analysis.period,
           search_type: analysis.search_type,
           trends_data: analysis.trends_data ?? [],
+          overlays: overlaysByAnalysisId.get(analysis.id) ?? [],
           display_order: analysis.display_order ?? 0,
           created_at: analysis.created_at,
           updated_at: analysis.updated_at ?? undefined,
@@ -282,13 +318,28 @@ export async function getKeyword(
   if (analysisIds.length > 0) {
     const { data: overlayRows, error: overlayError } = await supabase
       .from('keyword_stock_overlays')
-      .select('id, ticker, company_name, display_order, created_at')
+      .select(
+        'analysis_id, id, ticker, company_name, display_order, created_at, overlay_chart_timeseries(date, normalized_price, raw_price)'
+      )
       .in('analysis_id', analysisIds)
       .order('display_order', { ascending: true })
 
     if (overlayError) throw overlayError
 
-    overlays.push(...((overlayRows ?? []) as KeywordStockOverlay[]))
+    overlays.push(
+      ...((overlayRows ?? []) as KeywordOverlayRow[]).map(
+        toKeywordAnalysisOverlay
+      )
+    )
+  }
+
+  const overlaysByAnalysisId = new Map<string, KeywordAnalysisOverlay[]>()
+  for (const overlay of overlays) {
+    if (!overlay.analysis_id) continue
+
+    const current = overlaysByAnalysisId.get(overlay.analysis_id) ?? []
+    current.push(overlay as KeywordAnalysisOverlay)
+    overlaysByAnalysisId.set(overlay.analysis_id, current)
   }
 
   return toKeywordRecord(
@@ -310,6 +361,7 @@ export async function getKeyword(
         period: analysis.period,
         search_type: analysis.search_type,
         trends_data: analysis.trends_data ?? [],
+        overlays: overlaysByAnalysisId.get(analysis.id) ?? [],
         display_order: analysis.display_order ?? 0,
         created_at: analysis.created_at,
         updated_at: analysis.updated_at ?? undefined,
