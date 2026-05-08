@@ -391,7 +391,7 @@ function DragOverlayComponent({
                       padding: '6px 8px',
                     }}
                   />
-                  {/* 라인1: 13주 이동평균(13주 MA) (주황색) */}
+                  {/* 라인1: 13주 이동평균(13주 MA) (빨간색) */}
                   <Line
                     type="monotone"
                     dataKey="ma13Value"
@@ -401,7 +401,7 @@ function DragOverlayComponent({
                     dot={false}
                     name="13주 이동평균(13주 MA)"
                   />
-                  {/* 라인2: 13주 이동평균 기준 전년동기 대비 증감률(52주 YoY) (분홍색) */}
+                  {/* 라인2: 13주 이동평균 기준 전년동기 대비 증감률(52주 YoY) (노란색) */}
                   <Line
                     type="monotone"
                     dataKey="yoyValue"
@@ -411,7 +411,7 @@ function DragOverlayComponent({
                     dot={false}
                     name="13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)"
                   />
-                  {/* 라인3: 종목 주가 (초록색) - ticker 포함 */}
+                  {/* 라인3: 종목 주가 (검은색) - ticker 포함 */}
                   <Line
                     type="monotone"
                     dataKey="normalizedPrice"
@@ -2572,14 +2572,17 @@ export function KeywordDetailClient({
                   <li className="flex items-start gap-2">
                     <span className="mt-0.5 font-bold text-green-500">✓</span>
                     <span>
-                      상단 차트는 키워드의 트렌드 데이터만 표시합니다 (5년 전체)
+                      상단 차트는 현재 선택한 분석 조건의 5년 키워드 트렌드
+                      지표를 표시하고, 종목을 선택하면 임시 주가 비교선도 함께
+                      표시합니다
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="mt-0.5 font-bold text-green-500">✓</span>
                     <span>
-                      하단 카드는 키워드 + 종목 조합의 정확한 시계열
-                      데이터입니다 (1년치 = 52주)
+                      하단 카드는 현재 분석 조건에 저장된 티커 연동 차트입니다.
+                      저장된 5년 키워드 트렌드와 티커 주가 데이터를 날짜
+                      기준으로 맞춰 비교합니다
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
@@ -2589,21 +2592,31 @@ export function KeywordDetailClient({
                       <span className="font-medium">
                         13주 이동평균(13주 MA)
                       </span>
-                      (주황색),{' '}
+                      (빨간색),{' '}
                       <span className="font-medium">
                         13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)
                       </span>
-                      (분홍색),{' '}
+                      (노란색),{' '}
                       <span className="font-medium">
                         AAPL/TSLA 등 종목 주가
                       </span>
-                      (초록색), <span className="font-medium">검색량 기반</span>
+                      (검은색), <span className="font-medium">검색량 기반</span>
                       (파란색)
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="mt-0.5 font-bold text-green-500">✓</span>
-                    <span>드래그로 카드 순서를 변경할 수 있습니다</span>
+                    <span>
+                      종목 주가 데이터는 각 카드의 최신화 버튼이나 티커 상세
+                      페이지의 티커 최신화 버튼으로 갱신할 수 있습니다
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="mt-0.5 font-bold text-green-500">✓</span>
+                    <span>
+                      편집 모드에서 카드를 삭제하거나 드래그로 표시 순서를
+                      변경할 수 있습니다
+                    </span>
                   </li>
                 </ul>
               </div>

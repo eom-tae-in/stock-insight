@@ -4,11 +4,13 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   Check,
   ChevronsUpDown,
   GripVertical,
   Pencil,
+  RefreshCw,
   Search,
   Trash2,
   X,
@@ -363,12 +365,17 @@ function KeywordConditionCard({
   mode = 'normal',
   isSelected = false,
   onToggleSelect,
+  onRefresh,
+  isRefreshing = false,
 }: {
   entry: ConditionEntry
   mode?: 'normal' | 'delete' | 'reorder'
   isSelected?: boolean
   onToggleSelect?: (id: string) => void
+  onRefresh?: (entry: ConditionEntry) => Promise<void>
+  isRefreshing?: boolean
 }) {
+  const router = useRouter()
   const formattedDate = new Date(entry.updatedAt).toLocaleDateString('ko-KR', {
     year: 'numeric',
     month: '2-digit',
@@ -403,6 +410,16 @@ function KeywordConditionCard({
       ? `${chartData[0].date} ~ ${chartData[chartData.length - 1].date}`
       : '데이터 없음'
   const tooltipRect = chartWrapperRef.current?.getBoundingClientRect()
+  const refreshLabel = entry.overlay ? '티커 최신화' : '분석 최신화'
+  const href = entry.overlay
+    ? `/keywords/${entry.keyword.id}/overlays/${entry.overlay.id}`
+    : `/keywords/${entry.keyword.id}?region=${entry.analysis.region}&searchType=${entry.analysis.search_type}`
+
+  const handleRefresh = async (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    await onRefresh?.(entry)
+  }
 
   const card = (
     <div className="group relative z-0 hover:z-30">
@@ -433,9 +450,25 @@ function KeywordConditionCard({
             isSelected &&
             'border-primary bg-primary/5 ring-primary/20 ring-2'
         )}
-        onClick={
-          mode === 'delete' ? () => onToggleSelect?.(entry.id) : undefined
-        }
+        role={mode === 'normal' ? 'link' : undefined}
+        tabIndex={mode === 'normal' ? 0 : undefined}
+        onClick={() => {
+          if (mode === 'delete') {
+            onToggleSelect?.(entry.id)
+            return
+          }
+
+          if (mode === 'normal') {
+            router.push(href)
+          }
+        }}
+        onKeyDown={event => {
+          if (mode !== 'normal') return
+          if (event.key !== 'Enter' && event.key !== ' ') return
+
+          event.preventDefault()
+          router.push(href)
+        }}
       >
         {mode === 'delete' && (
           <div className="absolute top-3 left-3">
@@ -458,17 +491,39 @@ function KeywordConditionCard({
             (mode === 'delete' || mode === 'reorder') && 'pl-8'
           )}
         >
-          <div className="space-y-1">
-            <h3 className="text-foreground truncate leading-tight font-semibold">
-              {entry.keyword.keyword}
-            </h3>
-            <p className="text-primary truncate text-sm font-medium">
-              {entry.conditionLabel}
-            </p>
-            {entry.overlay && (
-              <p className="text-muted-foreground truncate text-xs font-medium">
-                {entry.overlay.ticker} · {entry.overlay.company_name}
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+            <div className="min-w-0 space-y-1">
+              <h3 className="text-foreground truncate leading-tight font-semibold">
+                {entry.keyword.keyword}
+              </h3>
+              <p className="text-primary truncate text-sm font-medium">
+                {entry.conditionLabel}
               </p>
+              {entry.overlay && (
+                <p className="text-muted-foreground truncate text-xs font-medium">
+                  {entry.overlay.ticker} · {entry.overlay.company_name}
+                </p>
+              )}
+            </div>
+
+            {mode === 'normal' && onRefresh && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                aria-label={refreshLabel}
+                className="h-10 shrink-0 rounded-full border-cyan-300 bg-white/90 px-3 text-xs font-semibold text-cyan-700 shadow-sm transition-all hover:border-cyan-400 hover:bg-cyan-50 hover:text-cyan-800 dark:border-cyan-800 dark:bg-slate-950/80 dark:text-cyan-200 dark:hover:bg-cyan-950"
+              >
+                <RefreshCw
+                  className={cn(
+                    'mr-1.5 h-4 w-4',
+                    isRefreshing && 'animate-spin'
+                  )}
+                />
+                <span>{isRefreshing ? '최신화 중' : refreshLabel}</span>
+              </Button>
             )}
           </div>
 
@@ -590,25 +645,18 @@ function KeywordConditionCard({
     </div>
   )
 
-  if (mode === 'delete' || mode === 'reorder') return card
-
-  return (
-    <Link
-      href={
-        entry.overlay
-          ? `/keywords/${entry.keyword.id}/overlays/${entry.overlay.id}`
-          : `/keywords/${entry.keyword.id}?region=${entry.analysis.region}&searchType=${entry.analysis.search_type}`
-      }
-    >
-      {card}
-    </Link>
-  )
+  return card
 }
 
 export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
   const [keywords, setKeywords] = useState<KeywordRecord[]>(initialKeywords)
   const [isLoading, setIsLoading] = useState(false)
-  const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set())
+  const [refreshingAnalysisIds, setRefreshingAnalysisIds] = useState<
+    Set<string>
+  >(new Set())
+  const [refreshingOverlayIds, setRefreshingOverlayIds] = useState<Set<string>>(
+    new Set()
+  )
 
   const [searchQuery, setSearchQuery] = useState('')
   const [searchMode, setSearchMode] = useState<SearchMode>('keyword')
@@ -1334,23 +1382,57 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
     closeEditMode()
   }
 
-  const handleRefreshKeyword = async (id: string) => {
-    setRefreshingIds(prev => new Set(prev).add(id))
+  const handleRefreshAnalysis = async (entry: ConditionEntry) => {
+    const analysisId = entry.analysis.id
+    setRefreshingAnalysisIds(prev => new Set(prev).add(analysisId))
 
     try {
-      await apiFetchJson(`/api/keywords/${id}/refreshes`, {
+      await apiFetchJson(`/api/analyses/${analysisId}/refreshes`, {
         method: 'POST',
       })
       await fetchKeywords()
-      toast.success('키워드를 최신화했습니다.')
+      toast.success('분석 조건을 최신화했습니다.')
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : '키워드 최신화에 실패했습니다.'
+        error instanceof Error
+          ? error.message
+          : '분석 조건 최신화에 실패했습니다.'
       toast.error(message)
     } finally {
-      setRefreshingIds(prev => {
+      setRefreshingAnalysisIds(prev => {
         const next = new Set(prev)
-        next.delete(id)
+        next.delete(analysisId)
+        return next
+      })
+    }
+  }
+
+  const handleRefreshOverlay = async (entry: ConditionEntry) => {
+    if (!entry.overlay) return
+
+    const analysisId = entry.analysis.id
+    const overlayId = entry.overlay.id
+    setRefreshingOverlayIds(prev => new Set(prev).add(overlayId))
+
+    try {
+      await apiFetchJson(
+        `/api/analyses/${analysisId}/overlays/${overlayId}/refreshes`,
+        {
+          method: 'POST',
+        }
+      )
+      await fetchKeywords()
+      toast.success('티커 연동 차트를 최신화했습니다.')
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : '티커 연동 차트 최신화에 실패했습니다.'
+      toast.error(message)
+    } finally {
+      setRefreshingOverlayIds(prev => {
+        const next = new Set(prev)
+        next.delete(overlayId)
         return next
       })
     }
@@ -1712,7 +1794,15 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
                     key={entry.id}
                     ref={isLastElement ? lastElementRef : null}
                   >
-                    <KeywordConditionCard entry={entry} />
+                    <KeywordConditionCard
+                      entry={entry}
+                      onRefresh={handleRefreshOverlay}
+                      isRefreshing={
+                        entry.overlay
+                          ? refreshingOverlayIds.has(entry.overlay.id)
+                          : false
+                      }
+                    />
                   </div>
                 )
               })}
@@ -1764,6 +1854,14 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
                         mode={editMode === 'delete' ? 'delete' : 'normal'}
                         isSelected={selectedConditionIds.has(entry.id)}
                         onToggleSelect={handleToggleConditionSelect}
+                        onRefresh={
+                          editMode === 'delete'
+                            ? undefined
+                            : handleRefreshAnalysis
+                        }
+                        isRefreshing={refreshingAnalysisIds.has(
+                          entry.analysis.id
+                        )}
                       />
                     </div>
                   )
@@ -1825,8 +1923,6 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
                           onEditStart={() => setEditingId(keyword.id)}
                           onEditSave={handleEditSave}
                           onEditCancel={() => setEditingId(null)}
-                          onRefresh={handleRefreshKeyword}
-                          isRefreshing={refreshingIds.has(keyword.id)}
                         />
                       </div>
                     )

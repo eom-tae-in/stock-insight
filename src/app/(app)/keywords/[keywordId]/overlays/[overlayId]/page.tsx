@@ -100,6 +100,7 @@ export default async function OverlayDetailPage({
     <OverlayDetailClient
       keyword={keyword}
       analysisContext={{
+        analysisId: analysis.id,
         region: analysis.region as Region,
         searchType: analysis.search_type as SearchType,
       }}
