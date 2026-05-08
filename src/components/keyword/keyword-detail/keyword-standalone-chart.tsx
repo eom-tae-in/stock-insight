@@ -384,7 +384,7 @@ export function KeywordStandaloneChart({
               />
             )}
 
-            {/* 13주 이동평균 (주황색) */}
+            {/* 13주 이동평균 (빨간색) */}
             {visibleLines.ma13Value && (
               <Line
                 type="monotone"
@@ -398,7 +398,7 @@ export function KeywordStandaloneChart({
               />
             )}
 
-            {/* 13주 이동평균 기준 52주 YoY (분홍색) */}
+            {/* 13주 이동평균 기준 52주 YoY (노란색) */}
             {visibleLines.yoyValue && (
               <Line
                 type="monotone"
@@ -412,7 +412,7 @@ export function KeywordStandaloneChart({
               />
             )}
 
-            {/* 선택된 종목 주가 (보라색) */}
+            {/* 선택된 종목 주가 (검은색) */}
             {overlayStock && visibleLines.stockPrice && (
               <Line
                 type="monotone"

@@ -2,14 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import {
-  GripVertical,
-  X,
-  Pencil,
-  Check,
-  Loader2,
-  RefreshCw,
-} from 'lucide-react'
+import { GripVertical, X, Pencil, Check, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -26,8 +19,6 @@ interface KeywordCardProps {
   onEditStart?: (id: string) => void
   onEditSave?: (id: string, newKeyword: string) => Promise<void>
   onEditCancel?: () => void
-  onRefresh?: (id: string) => Promise<void>
-  isRefreshing?: boolean
 }
 
 export function KeywordCard({
@@ -40,12 +31,9 @@ export function KeywordCard({
   onEditStart,
   onEditSave,
   onEditCancel,
-  onRefresh,
-  isRefreshing = false,
 }: KeywordCardProps) {
   const [editValue, setEditValue] = useState(keyword.keyword)
   const [isSaving, setIsSaving] = useState(false)
-  const [showOverlay, setShowOverlay] = useState(false)
 
   // isEditing이 true로 바뀔 때 editValue 초기화
   useEffect(() => {
@@ -89,12 +77,6 @@ export function KeywordCard({
     }
   }
 
-  const handleRefresh = async (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    await onRefresh?.(keyword.id)
-  }
-
   const searchDate = new Date(keyword.searched_at)
   const formattedDate = searchDate.toLocaleDateString('ko-KR', {
     year: 'numeric',
@@ -115,21 +97,9 @@ export function KeywordCard({
           className={cn(
             'group border-border/50 from-card to-card/80 relative overflow-hidden rounded-xl border bg-gradient-to-br p-4 transition-all duration-200',
             'hover:border-primary/70 hover:shadow-primary/10 hover:shadow-md',
-            'cursor-pointer backdrop-blur-sm',
-            isRefreshing &&
-              'border-cyan-400 bg-cyan-50/50 shadow-md ring-2 ring-cyan-400/30 dark:bg-cyan-950/20'
+            'cursor-pointer backdrop-blur-sm'
           )}
-          onMouseEnter={() => setShowOverlay(true)}
-          onMouseLeave={() => setShowOverlay(false)}
-          onClick={() => setShowOverlay(prev => !prev)}
         >
-          {isRefreshing && (
-            <div className="absolute top-3 right-3 z-20 inline-flex items-center gap-1 rounded-full border border-cyan-300 bg-cyan-50 px-2 py-1 text-xs font-medium text-cyan-700 shadow-sm dark:border-cyan-800 dark:bg-cyan-950 dark:text-cyan-200">
-              <RefreshCw className="h-3 w-3 animate-spin" />
-              최신화 중
-            </div>
-          )}
-
           <div className="space-y-3">
             {/* 키워드 이름 */}
             <h3 className="text-foreground truncate leading-tight font-semibold">
@@ -139,24 +109,6 @@ export function KeywordCard({
             {/* 기준 날짜 */}
             <p className="text-muted-foreground text-xs">{formattedDate}</p>
           </div>
-
-          {(showOverlay || isRefreshing) && (
-            <div className="bg-background/70 absolute inset-0 flex items-center justify-center backdrop-blur-sm transition-opacity">
-              <Button
-                type="button"
-                size="lg"
-                variant="outline"
-                className="bg-background/95 h-12 w-12 rounded-full border-cyan-300 text-cyan-700 shadow-md transition-all hover:border-cyan-400 hover:bg-cyan-50 hover:text-cyan-800 hover:shadow-lg dark:border-cyan-800 dark:text-cyan-200 dark:hover:bg-cyan-950"
-                onClick={handleRefresh}
-                disabled={isRefreshing}
-                aria-label="키워드 최신화"
-              >
-                <RefreshCw
-                  className={cn('h-5 w-5', isRefreshing && 'animate-spin')}
-                />
-              </Button>
-            </div>
-          )}
         </div>
       </Link>
     )

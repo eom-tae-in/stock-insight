@@ -1,8 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo } from 'react'
-import { ChevronLeft } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { ChevronLeft, RefreshCw } from 'lucide-react'
+import { toast } from 'sonner'
 import {
   LineChart,
   Line,
@@ -17,6 +19,7 @@ import type { KeywordRecord } from '@/types/database'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CHART_SERIES_COLORS } from '@/lib/constants/chart-series'
+import { apiFetchJson } from '@/lib/fetch-client'
 
 const REGION_LABEL: Record<string, string> = {
   GLOBAL: '전체',
@@ -47,6 +50,7 @@ const SEARCH_TYPE_LABEL: Record<string, string> = {
 interface OverlayDetailClientProps {
   keyword: KeywordRecord
   analysisContext: {
+    analysisId: string
     region: string
     searchType: string
   }
@@ -76,6 +80,9 @@ export function OverlayDetailClient({
   chartData,
   overlayChartData,
 }: OverlayDetailClientProps) {
+  const router = useRouter()
+  const [isRefreshingOverlay, setIsRefreshingOverlay] = useState(false)
+
   // 차트 데이터 병합
   const mergedChartData = useMemo(() => {
     const keywordMap = new Map(chartData.map(d => [d.date, d]))
@@ -115,11 +122,31 @@ export function OverlayDetailClient({
     SEARCH_TYPE_LABEL[analysisContext.searchType] ?? analysisContext.searchType
   } · 5Y`
 
+  const handleRefreshOverlay = async () => {
+    setIsRefreshingOverlay(true)
+    try {
+      await apiFetchJson(
+        `/api/analyses/${analysisContext.analysisId}/overlays/${overlay.id}/refreshes`,
+        { method: 'POST' }
+      )
+      toast.success('티커 연동 차트를 최신화했습니다.')
+      router.refresh()
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : '티커 연동 차트 최신화에 실패했습니다.'
+      )
+    } finally {
+      setIsRefreshingOverlay(false)
+    }
+  }
+
   return (
     <div className="bg-background min-h-screen p-6">
       <div className="mx-auto max-w-6xl">
         {/* 헤더 */}
-        <div className="mb-6">
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Button
             asChild
             variant="outline"
@@ -131,6 +158,19 @@ export function OverlayDetailClient({
               <ChevronLeft className="h-4 w-4" />
               키워드 분석으로 이동
             </Link>
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleRefreshOverlay}
+            disabled={isRefreshingOverlay}
+            className="h-10 border-cyan-300 bg-white/90 px-4 font-semibold text-cyan-700 shadow-sm hover:border-cyan-400 hover:bg-cyan-50 hover:text-cyan-800 dark:border-cyan-800 dark:bg-slate-950/80 dark:text-cyan-200 dark:hover:bg-cyan-950"
+          >
+            <RefreshCw
+              className={`mr-2 h-4 w-4 ${isRefreshingOverlay ? 'animate-spin' : ''}`}
+            />
+            {isRefreshingOverlay ? '최신화 중' : '티커 최신화'}
           </Button>
         </div>
 
@@ -214,7 +254,7 @@ export function OverlayDetailClient({
                       }}
                     />
                     <Legend />
-                    {/* 라인1: 13주 이동평균 (주황색) */}
+                    {/* 라인1: 13주 이동평균 (빨간색) */}
                     <Line
                       type="monotone"
                       dataKey="ma13Value"
@@ -224,7 +264,7 @@ export function OverlayDetailClient({
                       dot={false}
                       name="13주 이동평균"
                     />
-                    {/* 라인2: 13주 이동평균 기준 52주 YoY (분홍색) */}
+                    {/* 라인2: 13주 이동평균 기준 52주 YoY (노란색) */}
                     <Line
                       type="monotone"
                       dataKey="yoyValue"
@@ -234,7 +274,7 @@ export function OverlayDetailClient({
                       dot={false}
                       name="13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)"
                     />
-                    {/* 라인3: 종목 주가 (초록색) */}
+                    {/* 라인3: 종목 주가 (검은색) */}
                     <Line
                       type="monotone"
                       dataKey="normalizedPrice"

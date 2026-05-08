@@ -483,9 +483,7 @@ export default function KeywordTrendsClient() {
       })
 
       toast.success(`"${trimmedKeyword}" 키워드가 저장되었습니다`)
-
-      // 저장된 키워드 목록 새로고침
-      await fetchSavedKeywords()
+      router.push('/keyword-analysis')
     } catch (error) {
       console.error('[handleSaveKeyword] 에러:', error)
       toast.error(
