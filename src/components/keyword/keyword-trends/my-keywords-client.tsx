@@ -393,18 +393,42 @@ function KeywordConditionCard({
 
     return map
   }, [entry.overlay])
-  const chartData =
-    entry.analysis.trends_data?.map(
-      (point): ConditionChartPoint => ({
-        date: point.date,
-        trendsValue: point.value,
-        ma13Value: point.ma13Value,
-        yoyValue: point.yoyValue,
-        normalizedPrice: entry.overlay
-          ? (overlayDataByDate.get(point.date) ?? null)
-          : undefined,
-      })
-    ) ?? []
+  const chartData = useMemo(() => {
+    const trendsData = entry.analysis.trends_data ?? []
+
+    if (!entry.overlay) {
+      return trendsData.map(
+        (point): ConditionChartPoint => ({
+          date: point.date,
+          trendsValue: point.value,
+          ma13Value: point.ma13Value,
+          yoyValue: point.yoyValue,
+        })
+      )
+    }
+
+    const trendsDataByDate = new Map(
+      trendsData.map(point => [point.date, point])
+    )
+    const dates = Array.from(
+      new Set([
+        ...trendsData.map(point => point.date),
+        ...(entry.overlay.chart_data ?? []).map(point => point.date),
+      ])
+    ).sort((a, b) => a.localeCompare(b))
+
+    return dates.map((date): ConditionChartPoint => {
+      const trendsPoint = trendsDataByDate.get(date)
+
+      return {
+        date,
+        trendsValue: trendsPoint?.value ?? null,
+        ma13Value: trendsPoint?.ma13Value ?? null,
+        yoyValue: trendsPoint?.yoyValue ?? null,
+        normalizedPrice: overlayDataByDate.get(date) ?? null,
+      }
+    })
+  }, [entry.analysis.trends_data, entry.overlay, overlayDataByDate])
   const dateRange =
     chartData.length > 0
       ? `${chartData[0].date} ~ ${chartData[chartData.length - 1].date}`
@@ -1003,6 +1027,9 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
               conditionLabel,
               tickerLabel,
               updatedAt:
+                overlay.last_refreshed_at ??
+                overlay.lastRefreshedAt ??
+                overlay.created_at ??
                 analysis.updated_at ??
                 analysis.created_at ??
                 keyword.updated_at ??
