@@ -106,6 +106,7 @@ type KeywordOverlayRow = {
   company_name: string
   display_order: number
   created_at: string
+  last_refreshed_at: string | null
   overlay_chart_timeseries?: Array<{
     date: string
     normalized_price: number | null
@@ -123,6 +124,8 @@ function toKeywordAnalysisOverlay(
     company_name: overlay.company_name,
     display_order: overlay.display_order,
     created_at: overlay.created_at,
+    last_refreshed_at: overlay.last_refreshed_at,
+    lastRefreshedAt: overlay.last_refreshed_at,
     chart_data: (overlay.overlay_chart_timeseries ?? [])
       .map(point => ({
         date: point.date,
@@ -232,7 +235,7 @@ export async function getKeywords(
     const { data: overlays, error: overlaysError } = await supabase
       .from('keyword_stock_overlays')
       .select(
-        'analysis_id, id, ticker, company_name, display_order, created_at, overlay_chart_timeseries(date, normalized_price, raw_price)'
+        'analysis_id, id, ticker, company_name, display_order, created_at, last_refreshed_at, overlay_chart_timeseries(date, normalized_price, raw_price)'
       )
       .in('analysis_id', analysisIds)
       .order('display_order', { ascending: true })
@@ -261,6 +264,8 @@ export async function getKeywords(
         company_name: overlay.company_name,
         display_order: overlay.display_order,
         created_at: overlay.created_at,
+        last_refreshed_at: overlay.last_refreshed_at,
+        lastRefreshedAt: overlay.last_refreshed_at,
         chart_data: analysisOverlay.chart_data,
       })
       overlaysByKeywordId.set(keywordId, current)
@@ -319,7 +324,7 @@ export async function getKeyword(
     const { data: overlayRows, error: overlayError } = await supabase
       .from('keyword_stock_overlays')
       .select(
-        'analysis_id, id, ticker, company_name, display_order, created_at, overlay_chart_timeseries(date, normalized_price, raw_price)'
+        'analysis_id, id, ticker, company_name, display_order, created_at, last_refreshed_at, overlay_chart_timeseries(date, normalized_price, raw_price)'
       )
       .in('analysis_id', analysisIds)
       .order('display_order', { ascending: true })
