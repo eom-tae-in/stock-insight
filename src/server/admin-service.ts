@@ -97,6 +97,18 @@ type AnalysisRow = {
   keywords?: KeywordJoin | KeywordJoin[] | null
 }
 
+type AdminRecentAnalysisRow = {
+  id: string
+  keyword_name: string | null
+  region: string | null
+  period: string | null
+  search_type: string | null
+  trends_data: TrendsPoint[] | null
+  created_at: string | null
+  updated_at: string | null
+  recent_at: string | null
+}
+
 type OverlayRow = {
   id: string
   ticker: string | null
@@ -107,7 +119,22 @@ type OverlayRow = {
   keyword_analysis?: AnalysisJoin | AnalysisJoin[] | null
 }
 
+type AdminRecentOverlayRow = {
+  id: string
+  ticker: string | null
+  company_name: string | null
+  last_refreshed_at: string | null
+  created_at: string | null
+  recent_at: string | null
+  region: string | null
+  period: string | null
+  search_type: string | null
+  keyword_name: string | null
+  overlay_chart_timeseries?: TimeseriesPoint[] | null
+}
+
 const MIN_TREND_POINTS = 52
+const RECENT_DISPLAY_LIMIT = 20
 
 const yf = new YahooFinance()
 const ADMIN_KEY_PLACEHOLDERS = new Set([
@@ -333,58 +360,55 @@ async function getUserCount(
 
 async function getRecentAnalyses(supabase: SupabaseClient) {
   const { data, error } = await supabase
-    .from('keyword_analysis')
+    .from('admin_recent_keyword_analysis')
     .select(
-      'id, region, period, search_type, trends_data, created_at, updated_at, keywords(name, user_id)'
+      'id, keyword_name, region, period, search_type, trends_data, created_at, updated_at, recent_at'
     )
-    .order('updated_at', { ascending: false, nullsFirst: false })
-    .order('created_at', { ascending: false })
-    .limit(20)
+    .order('recent_at', { ascending: false })
+    .limit(RECENT_DISPLAY_LIMIT)
 
   if (error) throw error
 
-  return ((data ?? []) as AnalysisRow[]).map(row => {
+  return ((data ?? []) as AdminRecentAnalysisRow[]).map(row => {
     const dates = getTrendDates(row.trends_data)
     return {
       id: row.id,
-      keyword: getJoinedKeyword(row.keywords),
+      keyword: row.keyword_name ?? '-',
       region: row.region ?? '-',
       searchType: row.search_type ?? '-',
       period: row.period ?? '-',
       pointCount: dates.pointCount,
       firstDate: dates.firstDate,
       lastDate: dates.lastDate,
-      refreshedAt: row.updated_at ?? row.created_at,
+      refreshedAt: row.recent_at ?? row.updated_at ?? row.created_at,
     }
   })
 }
 
 async function getRecentOverlays(supabase: SupabaseClient) {
   const { data, error } = await supabase
-    .from('keyword_stock_overlays')
+    .from('admin_recent_keyword_stock_overlays')
     .select(
-      'id, ticker, company_name, last_refreshed_at, created_at, overlay_chart_timeseries(date), keyword_analysis(region, search_type, keywords(name, user_id))'
+      'id, ticker, company_name, last_refreshed_at, created_at, recent_at, region, period, search_type, keyword_name, overlay_chart_timeseries'
     )
-    .order('last_refreshed_at', { ascending: false, nullsFirst: false })
-    .order('created_at', { ascending: false })
-    .limit(20)
+    .order('recent_at', { ascending: false })
+    .limit(RECENT_DISPLAY_LIMIT)
 
   if (error) throw error
 
-  return ((data ?? []) as OverlayRow[]).map(row => {
-    const analysis = getJoinedAnalysis(row.keyword_analysis)
+  return ((data ?? []) as AdminRecentOverlayRow[]).map(row => {
     const dates = getTimeseriesDates(row.overlay_chart_timeseries)
 
     return {
       id: row.id,
-      keyword: getJoinedKeyword(analysis?.keywords),
-      conditionLabel: `${analysis?.region ?? '-'} / ${analysis?.search_type ?? '-'}`,
+      keyword: row.keyword_name ?? '-',
+      conditionLabel: `${row.region ?? '-'} / ${row.search_type ?? '-'}`,
       ticker: row.ticker ?? '-',
       companyName: row.company_name ?? '-',
       pointCount: dates.pointCount,
       firstDate: dates.firstDate,
       lastDate: dates.lastDate,
-      refreshedAt: row.last_refreshed_at ?? row.created_at,
+      refreshedAt: row.recent_at ?? row.last_refreshed_at ?? row.created_at,
     }
   })
 }
