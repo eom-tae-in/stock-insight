@@ -40,10 +40,9 @@ pip install -r requirements.txt
 
 ```env
 SUPABASE_URL=https://your-project-id.supabase.co
-SUPABASE_KEY=your_supabase_anon_key_here
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
-PYTRENDS_INTERNAL_SECRET=replace_with_a_long_random_secret
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=추가해야함
+PYTRENDS_INTERNAL_SECRET=추가해야함
 ```
 
 선택 값:
@@ -54,6 +53,8 @@ UPSTASH_REDIS_REST_TOKEN=your_upstash_redis_rest_token
 STOCK_DATA_CACHE_TTL_SECONDS=86400
 TRENDS_CACHE_TTL_SECONDS=86400
 PREVIEW_CACHE_TTL_SECONDS=86400
+SUPABASE_SECRET_KEY=추가해야함
+ADMIN_EMAILS=추가해야함
 ```
 
 예시는 [`.env.example`](./.env.example) 를 참고하세요.

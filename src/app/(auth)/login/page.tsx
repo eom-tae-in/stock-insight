@@ -20,12 +20,13 @@ function getSafeNextPath(input?: string): string {
   return input
 }
 
-export default function LoginPage({
+export default async function LoginPage({
   searchParams,
 }: {
-  searchParams?: { next?: string }
+  searchParams?: Promise<{ next?: string }>
 }) {
-  const nextPath = getSafeNextPath(searchParams?.next)
+  const params = await searchParams
+  const nextPath = getSafeNextPath(params?.next)
 
   return (
     <div className="from-background via-background to-primary/5 flex min-h-screen flex-col bg-gradient-to-br">

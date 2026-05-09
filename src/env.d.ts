@@ -15,14 +15,23 @@ declare namespace NodeJS {
     /** Supabase 프로젝트 URL (필수) */
     SUPABASE_URL: string
 
-    /** Supabase 공개 API 키 (anon key, 필수) */
-    SUPABASE_KEY: string
+    /** Legacy Supabase anon key. 새 키 전환 후 제거 예정 */
+    SUPABASE_KEY?: string
+
+    /** Supabase secret key. 서버/관리자 전용 */
+    SUPABASE_SECRET_KEY?: string
+
+    /** Legacy service_role key. 새 키 전환 후 제거 예정 */
+    SUPABASE_SERVICE_ROLE_KEY?: string
 
     /** 클라이언트에서 접근하는 Supabase URL (필수) */
     NEXT_PUBLIC_SUPABASE_URL: string
 
-    /** 클라이언트에서 접근하는 Supabase anon key (필수) */
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: string
+    /** Supabase publishable key. 클라이언트에서 접근 */
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?: string
+
+    /** Legacy Supabase anon key. 새 키 전환 후 제거 예정 */
+    NEXT_PUBLIC_SUPABASE_ANON_KEY?: string
 
     /** Upstash Redis REST URL (선택, 주가/트렌드 데이터 캐시용) */
     UPSTASH_REDIS_REST_URL?: string
@@ -42,10 +51,16 @@ declare namespace NodeJS {
     /** Vercel /api/pytrends 내부 서버 호출 인증 secret */
     PYTRENDS_INTERNAL_SECRET?: string
 
+    /** 관리자 접근 허용 이메일 목록. 쉼표로 구분 */
+    ADMIN_EMAILS?: string
+
     /** Vercel 런타임 표시 (Vercel 환경에서 자동 주입) */
     VERCEL?: string
 
     /** 현재 deployment hostname (Vercel 환경에서 자동 주입, scheme 없음) */
     VERCEL_URL?: string
+
+    /** Vercel 환경 이름 (production, preview, development) */
+    VERCEL_ENV?: string
   }
 }
