@@ -21,6 +21,7 @@ import {
   TIMEFRAME_LABELS,
   TIMEFRAME_MAX_WEEKS,
   TIMEFRAME_VALUE_MAX_WEEKS,
+  TIMEFRAME_OPTIONS,
   DEFAULT_TIMEFRAME,
   GEO_OPTIONS,
   GPROP_OPTIONS,
@@ -34,6 +35,7 @@ import {
 } from '@/lib/constants/trends'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -94,6 +96,13 @@ function overlayToSearchRecord(overlay: KeywordOverlayResponse): SearchRecord {
   }
 }
 
+function getOptionLabel<T extends readonly { label: string; value: string }[]>(
+  options: T,
+  value: string
+) {
+  return options.find(option => option.value === value)?.label ?? value
+}
+
 export default function KeywordTrendsClient() {
   // F027: 각 timeframe별 ref 저장
   const chartRefs = useRef<Record<string, HTMLDivElement | null>>({})
@@ -130,6 +139,14 @@ export default function KeywordTrendsClient() {
   const availableTimeframes = useMemo(
     () => TIMEFRAMES.filter(tf => TIMEFRAME_MAX_WEEKS[tf] <= maxCustomWeeks),
     [maxCustomWeeks]
+  )
+  const searchConditionLabels = useMemo(
+    () => ({
+      geo: getOptionLabel(GEO_OPTIONS, state.geo),
+      timeframe: getOptionLabel(TIMEFRAME_OPTIONS, searchTimeframeValue),
+      gprop: getOptionLabel(GPROP_OPTIONS, state.gprop),
+    }),
+    [state.geo, state.gprop, searchTimeframeValue]
   )
 
   // 페이지 진입 시: URL 파라미터 읽기 + REST API로 데이터 조회
@@ -573,13 +590,29 @@ export default function KeywordTrendsClient() {
           <div>
             <h1 className="text-3xl font-bold">키워드 트렌드 분석</h1>
             {state.keyword && (
-              <div className="mt-4 flex items-baseline gap-2">
-                <span className="text-muted-foreground text-sm font-medium">
-                  검색 키워드:
-                </span>
-                <span className="text-foreground text-2xl font-bold">
-                  {state.keyword}
-                </span>
+              <div className="mt-4 space-y-3">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-muted-foreground text-sm font-medium">
+                    검색 키워드:
+                  </span>
+                  <span className="text-foreground text-2xl font-bold">
+                    {state.keyword}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-muted-foreground text-sm font-medium">
+                    분석 조건:
+                  </span>
+                  <Badge variant="secondary" className="h-7 px-3">
+                    지역 {searchConditionLabels.geo}
+                  </Badge>
+                  <Badge variant="secondary" className="h-7 px-3">
+                    기간 {searchConditionLabels.timeframe}
+                  </Badge>
+                  <Badge variant="secondary" className="h-7 px-3">
+                    검색범위 {searchConditionLabels.gprop}
+                  </Badge>
+                </div>
               </div>
             )}
           </div>
