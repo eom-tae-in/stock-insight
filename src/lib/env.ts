@@ -3,7 +3,7 @@ import { z } from 'zod'
 /**
  * 환경 변수 검증 스키마
  * Phase 6: Supabase 단일 기반 (SQLite 제거 완료)
- * SUPABASE_URL과 SUPABASE_KEY는 필수 환경 변수입니다.
+ * Supabase URL과 publishable key는 필수 환경 변수입니다.
  */
 const envSchema = z.object({
   NODE_ENV: z
@@ -13,18 +13,27 @@ const envSchema = z.object({
     .string()
     .url()
     .describe('Supabase 프로젝트 URL (https://YOUR_PROJECT_ID.supabase.co)'),
-  SUPABASE_KEY: z
+  SUPABASE_KEY: z.string().optional().describe('Legacy Supabase anon key'),
+  SUPABASE_SECRET_KEY: z
     .string()
-    .describe(
-      'Supabase 공개 API 키 (anon key) - Supabase Dashboard Settings → API에서 확인'
-    ),
+    .optional()
+    .describe('Supabase secret key - 서버/관리자 전용'),
+  SUPABASE_SERVICE_ROLE_KEY: z
+    .string()
+    .optional()
+    .describe('Legacy Supabase service_role key'),
   NEXT_PUBLIC_SUPABASE_URL: z
     .string()
     .url()
     .describe('Supabase 프로젝트 URL - 클라이언트에서 접근'),
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z
+    .string()
+    .optional()
+    .describe('Supabase publishable key - 클라이언트에서 접근'),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z
     .string()
-    .describe('Supabase anon 키 - 클라이언트에서 접근 (OAuth용)'),
+    .optional()
+    .describe('Legacy Supabase anon key - 클라이언트 fallback'),
   UPSTASH_REDIS_REST_URL: z
     .string()
     .url()
@@ -50,7 +59,13 @@ const envSchema = z.object({
     .string()
     .optional()
     .describe('Vercel /api/pytrends 내부 서버 호출 인증 secret'),
+  ADMIN_EMAILS: z.string().optional().describe('관리자 접근 허용 이메일 목록'),
 })
+
+function hasConfiguredEnv(value: string | undefined) {
+  const trimmed = value?.trim()
+  return Boolean(trimmed && trimmed !== '추가해야함' && trimmed !== '제거예정')
+}
 
 /**
  * 환경 변수 검증 및 파싱
@@ -61,7 +76,11 @@ function validateEnv() {
       NODE_ENV: process.env.NODE_ENV,
       SUPABASE_URL: process.env.SUPABASE_URL,
       SUPABASE_KEY: process.env.SUPABASE_KEY,
+      SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY,
+      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
       NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
       NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
       UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
@@ -69,7 +88,18 @@ function validateEnv() {
       TRENDS_CACHE_TTL_SECONDS: process.env.TRENDS_CACHE_TTL_SECONDS,
       PREVIEW_CACHE_TTL_SECONDS: process.env.PREVIEW_CACHE_TTL_SECONDS,
       PYTRENDS_INTERNAL_SECRET: process.env.PYTRENDS_INTERNAL_SECRET,
+      ADMIN_EMAILS: process.env.ADMIN_EMAILS,
     })
+
+    if (
+      !hasConfiguredEnv(parsed.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) &&
+      !hasConfiguredEnv(parsed.NEXT_PUBLIC_SUPABASE_ANON_KEY) &&
+      !hasConfiguredEnv(parsed.SUPABASE_KEY)
+    ) {
+      throw new Error(
+        'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY is required. Legacy anon keys are only fallback.'
+      )
+    }
 
     if (parsed.NODE_ENV === 'production' && !parsed.PYTRENDS_INTERNAL_SECRET) {
       throw new Error('PYTRENDS_INTERNAL_SECRET is required in production.')
