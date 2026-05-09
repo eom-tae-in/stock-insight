@@ -1,9 +1,7 @@
 const PLACEHOLDER_VALUES = new Set([
   '추가해야함',
-  '제거예정',
+  '.....',
   'your_supabase_publishable_key_here',
-  'your_supabase_anon_key_here',
-  'your_legacy_supabase_anon_key_here',
   'sb_publishable_your_key_here',
 ])
 
@@ -14,9 +12,7 @@ function readConfiguredValue(value: string | undefined) {
 }
 
 export function getSupabaseUrl() {
-  const url =
-    readConfiguredValue(process.env.NEXT_PUBLIC_SUPABASE_URL) ??
-    readConfiguredValue(process.env.SUPABASE_URL)
+  const url = readConfiguredValue(process.env.NEXT_PUBLIC_SUPABASE_URL)
 
   if (!url) {
     throw new Error('Supabase URL is not configured.')
@@ -26,10 +22,9 @@ export function getSupabaseUrl() {
 }
 
 export function getSupabasePublishableKey() {
-  const key =
-    readConfiguredValue(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) ??
-    readConfiguredValue(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) ??
-    readConfiguredValue(process.env.SUPABASE_KEY)
+  const key = readConfiguredValue(
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  )
 
   if (!key) {
     throw new Error(
