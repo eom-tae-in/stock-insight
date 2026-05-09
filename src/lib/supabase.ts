@@ -2,7 +2,7 @@
  * Supabase Client Initialization
  *
  * Creates and exports a Supabase client for database operations.
- * SUPABASE_URL과 publishable key는 필수 환경 변수입니다.
+ * NEXT_PUBLIC_SUPABASE_URL과 publishable key는 필수 환경 변수입니다.
  *
  * Usage:
  *   import { getSupabaseClient } from '@/lib/supabase'

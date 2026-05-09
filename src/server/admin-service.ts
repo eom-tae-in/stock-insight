@@ -112,6 +112,7 @@ const MIN_TREND_POINTS = 52
 const yf = new YahooFinance()
 const ADMIN_KEY_PLACEHOLDERS = new Set([
   '추가해야함',
+  '.....',
   'sb_secret_your_key_here',
   'your_supabase_service_role_key_here',
   'your_legacy_supabase_service_role_key_here',
@@ -127,10 +128,8 @@ function readAdminKey(value: string | undefined) {
 }
 
 function getAdminDataClient(fallbackClient: SupabaseClient) {
-  const adminKey =
-    readAdminKey(process.env.SUPABASE_SECRET_KEY) ??
-    readAdminKey(process.env.SUPABASE_SERVICE_ROLE_KEY)
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL
+  const adminKey = readAdminKey(process.env.SUPABASE_SECRET_KEY)
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
 
   if (!adminKey || !url) {
     return {

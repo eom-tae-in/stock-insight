@@ -39,7 +39,6 @@ pip install -r requirements.txt
 필수 값:
 
 ```env
-SUPABASE_URL=https://your-project-id.supabase.co
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=추가해야함
 PYTRENDS_INTERNAL_SECRET=추가해야함

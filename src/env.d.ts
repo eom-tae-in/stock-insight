@@ -9,29 +9,14 @@ declare namespace NodeJS {
     /** 실행 환경 (development, production, test) */
     NODE_ENV?: 'development' | 'production' | 'test'
 
-    /** Finnhub API 키 (선택 사항, Yahoo Finance 폴백 가능) */
-    FINNHUB_API_KEY?: string
-
-    /** Supabase 프로젝트 URL (필수) */
-    SUPABASE_URL: string
-
-    /** Legacy Supabase anon key. 새 키 전환 후 제거 예정 */
-    SUPABASE_KEY?: string
-
     /** Supabase secret key. 서버/관리자 전용 */
     SUPABASE_SECRET_KEY?: string
-
-    /** Legacy service_role key. 새 키 전환 후 제거 예정 */
-    SUPABASE_SERVICE_ROLE_KEY?: string
 
     /** 클라이언트에서 접근하는 Supabase URL (필수) */
     NEXT_PUBLIC_SUPABASE_URL: string
 
     /** Supabase publishable key. 클라이언트에서 접근 */
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?: string
-
-    /** Legacy Supabase anon key. 새 키 전환 후 제거 예정 */
-    NEXT_PUBLIC_SUPABASE_ANON_KEY?: string
 
     /** Upstash Redis REST URL (선택, 주가/트렌드 데이터 캐시용) */
     UPSTASH_REDIS_REST_URL?: string

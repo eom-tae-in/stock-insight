@@ -9,19 +9,10 @@ const envSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'production', 'test'])
     .default('development'),
-  SUPABASE_URL: z
-    .string()
-    .url()
-    .describe('Supabase 프로젝트 URL (https://YOUR_PROJECT_ID.supabase.co)'),
-  SUPABASE_KEY: z.string().optional().describe('Legacy Supabase anon key'),
   SUPABASE_SECRET_KEY: z
     .string()
     .optional()
     .describe('Supabase secret key - 서버/관리자 전용'),
-  SUPABASE_SERVICE_ROLE_KEY: z
-    .string()
-    .optional()
-    .describe('Legacy Supabase service_role key'),
   NEXT_PUBLIC_SUPABASE_URL: z
     .string()
     .url()
@@ -30,10 +21,6 @@ const envSchema = z.object({
     .string()
     .optional()
     .describe('Supabase publishable key - 클라이언트에서 접근'),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z
-    .string()
-    .optional()
-    .describe('Legacy Supabase anon key - 클라이언트 fallback'),
   UPSTASH_REDIS_REST_URL: z
     .string()
     .url()
@@ -64,7 +51,7 @@ const envSchema = z.object({
 
 function hasConfiguredEnv(value: string | undefined) {
   const trimmed = value?.trim()
-  return Boolean(trimmed && trimmed !== '추가해야함' && trimmed !== '제거예정')
+  return Boolean(trimmed && trimmed !== '추가해야함' && trimmed !== '.....')
 }
 
 /**
@@ -74,14 +61,10 @@ function validateEnv() {
   try {
     const parsed = envSchema.parse({
       NODE_ENV: process.env.NODE_ENV,
-      SUPABASE_URL: process.env.SUPABASE_URL,
-      SUPABASE_KEY: process.env.SUPABASE_KEY,
       SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY,
-      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
       NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
         process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
       UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
       STOCK_DATA_CACHE_TTL_SECONDS: process.env.STOCK_DATA_CACHE_TTL_SECONDS,
@@ -91,14 +74,8 @@ function validateEnv() {
       ADMIN_EMAILS: process.env.ADMIN_EMAILS,
     })
 
-    if (
-      !hasConfiguredEnv(parsed.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) &&
-      !hasConfiguredEnv(parsed.NEXT_PUBLIC_SUPABASE_ANON_KEY) &&
-      !hasConfiguredEnv(parsed.SUPABASE_KEY)
-    ) {
-      throw new Error(
-        'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY is required. Legacy anon keys are only fallback.'
-      )
+    if (!hasConfiguredEnv(parsed.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)) {
+      throw new Error('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY is required.')
     }
 
     if (parsed.NODE_ENV === 'production' && !parsed.PYTRENDS_INTERNAL_SECRET) {
