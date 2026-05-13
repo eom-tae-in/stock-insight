@@ -225,9 +225,153 @@ vercel dev
 
 관리자 대시보드는 위 view와 주요 테이블 count를 조합해 읽기 전용 요약을 만든다.
 
-## 8. API 구조
+## 8. 설계 결정 배경
 
-### 8.1 응답 원칙
+이 섹션은 현재 구조를 바꾸거나 디버깅할 때 자주 생기는 "왜 이렇게 했는가?"를 정리한다. 평소에는 접힌 제목만 훑고, 특정 결정의 배경이 필요할 때만 펼쳐서 확인한다.
+
+### 8.1 데이터 모델과 저장 단위
+
+<details>
+<summary>왜 키워드와 분석을 분리하는가?</summary>
+
+`keywords`는 사용자가 저장한 키워드 이름 컨테이너이고, `keyword_analysis`는 조건 조합별 분석 결과다. 같은 키워드라도 region, period, search_type이 달라지면 Google Trends의 기준 모집단과 검색 속성이 달라진다. 따라서 "같은 keyword의 다른 상태"가 아니라 "같은 keyword 아래의 독립 분석"으로 모델링한다.
+
+분석 단위는 `(keyword_id, region, period, search_type)` 조합이다. 이 조합을 유일한 분석 기준으로 두면 저장, 복원, 최신화, 삭제, 정렬, 오버레이 연결이 모두 같은 단위를 기준으로 동작한다.
+
+</details>
+
+<details>
+<summary>왜 keyword normalization을 하는가?</summary>
+
+사용자는 같은 키워드를 조금씩 다르게 입력할 수 있다. 예를 들어 `tesla`, `tesla  `, `tesla   stock`처럼 앞뒤 공백이나 중간 공백이 달라져도 사용자가 의도한 키워드는 같은 경우가 많다.
+
+keyword normalization은 이런 입력 차이를 저장 기준에서 정리하는 과정이다. 공백을 정리한 `normalized_name`을 함께 저장하면 같은 사용자의 키워드 목록에 사실상 같은 키워드가 여러 개 생기는 일을 막을 수 있다. 또한 저장된 키워드를 다시 찾거나 중복 여부를 확인할 때 화면 입력 모양이 조금 달라도 같은 키워드로 판단할 수 있다.
+
+즉 normalization은 검색어 의미를 바꾸는 처리가 아니라, 사용자가 실수로 넣은 공백 차이 때문에 저장 데이터와 목록 UX가 지저분해지는 것을 막기 위한 최소한의 정리다.
+
+</details>
+
+<details>
+<summary>왜 오버레이를 analysis_id 기준으로 저장하는가?</summary>
+
+오버레이는 `keyword_id`가 아니라 `analysis_id` 기준으로 저장한다. 같은 키워드라도 `GLOBAL / WEB` 분석과 `US / YOUTUBE` 분석은 비교 맥락이 다르며, 연결된 종목도 달라질 수 있다. 오버레이를 keyword에 직접 붙이면 조건 변경 시 이전 조건의 종목이 섞여 보일 위험이 있다.
+
+오버레이 저장 시 filter mismatch를 검증하는 이유도 같다. 클라이언트 화면에서 사용자가 조건을 바꾸는 중이거나 오래된 요청이 뒤늦게 도착하면, 다른 analysis에 종목이 저장될 수 있다. 서버는 클라이언트가 보낸 region, period, search_type이 실제 analysis와 같은지 확인해 이 상태를 409로 막는다.
+
+</details>
+
+<details>
+<summary>왜 5Y 원본 저장과 view filter 방식을 쓰는가?</summary>
+
+현재 키워드 분석 원본 데이터는 5Y 기준으로 저장한다. 기간 변경마다 Trends를 재조회하면 rate limit, 응답 지연, 외부 API 변동으로 인해 같은 분석 화면 안에서도 데이터 기준이 달라질 수 있다.
+
+그래서 화면의 기간 변경은 저장된 5Y 데이터를 잘라 보는 view filter로 처리한다. 이 방식은 빠르고, 같은 원본 데이터에서 파생된 화면을 보여주며, 다운로드와 차트가 같은 기준을 공유하게 만든다.
+
+</details>
+
+<details>
+<summary>왜 주간 축으로 정규화하는가?</summary>
+
+종목 가격과 Google Trends는 함께 비교되어야 하므로 모두 주간 축에 맞춘다. Yahoo Finance 주간 데이터 날짜는 거래소/응답 형태에 따라 기준 요일이 다를 수 있어 ISO week start로 정규화한다. 이렇게 해야 주가, Trends, MA13, YoY, 오버레이가 같은 주차 기준으로 정렬된다.
+
+</details>
+
+<details>
+<summary>왜 raw price와 normalized price를 둘 다 저장하는가?</summary>
+
+여기서 오버레이는 특정 키워드 분석 차트 위에 겹쳐 보는 종목 오버레이를 뜻한다. 예를 들어 `tesla / GLOBAL / 5Y / WEB` 분석에 `AAPL`을 추가하면, `keyword_stock_overlays`에는 `AAPL` 오버레이 자체의 메타데이터가 저장되고, `overlay_chart_timeseries`에는 그 `AAPL` 오버레이를 차트에 그리기 위한 주간 가격 포인트가 저장된다.
+
+`keyword_stock_overlays`에는 analysis_id, ticker, company_name, display_order 같은 연결 정보만 둔다. 날짜별 raw price와 normalized price는 `overlay_chart_timeseries`에 `overlay_id` 기준으로 저장한다. raw price는 실제 가격 확인과 다운로드에 필요하고, normalized price는 서로 다른 가격 단위의 종목을 0-100 범위에서 같은 차트에 비교하기 위해 필요하다.
+
+이렇게 분리하면 `AAPL` 오버레이를 삭제할 때 해당 `overlay_id`의 시계열을 함께 제거하기 쉽고, `AAPL`만 최신화할 때도 그 오버레이의 주간 포인트만 교체하면 된다. 또한 오버레이 생성 중 시계열 저장이 실패하면 방금 만든 overlay row를 롤백해 차트 데이터 없는 오버레이가 남는 것을 막을 수 있다. 운영 관점에서도 "오버레이는 있는데 차트 포인트가 0개인 상태" 같은 이상 데이터를 점검하기 쉽다.
+
+</details>
+
+### 8.2 검색, preview, 캐시
+
+<details>
+<summary>왜 종목 preview 단계를 두는가?</summary>
+
+종목 검색은 저장보다 자주 일어난다. 사용자는 여러 티커를 검색해 보고, 회사명이나 가격 흐름을 확인한 뒤 저장하지 않을 수 있다. 이때 검색할 때마다 바로 DB에 영구 저장하면 저장하지 않은 후보 데이터가 사용자 데이터 모델에 섞이고, 나중에 정리해야 할 임시 데이터가 늘어난다.
+
+그래서 종목은 먼저 preview로 만든다. preview는 Yahoo Finance에서 가져온 회사명, 통화, 5년 주간 가격 데이터를 사용자가 저장 전에 확인하는 임시 상태다. 사용자가 실제로 저장을 누를 때만 `searches`와 `stock_price_data`에 영구 저장한다.
+
+preview를 Redis에 두는 이유는 검색만 계속하고 저장하지 않는 흐름을 DB 영구 데이터와 분리하기 위해서다. Redis TTL이 지나면 저장하지 않은 preview는 자연스럽게 사라진다. 다만 이 구조 때문에 종목 preview 저장 흐름은 Redis 의존성이 강하다.
+
+</details>
+
+<details>
+<summary>왜 캐시 키에 마지막 완료 주를 넣고 TTL을 24시간으로 두는가?</summary>
+
+주가와 Trends cache key에는 마지막 완료 주를 포함한다. 주간 분석 제품에서 같은 키워드/티커라도 새 주가 완료되면 데이터 기준이 바뀌므로, 완료 주가 바뀔 때 자연스럽게 새 데이터를 조회하게 하기 위한 선택이다.
+
+기본 TTL은 24시간이다. 주간 데이터 제품에서는 분 단위 최신성이 핵심이 아니고, Google Trends와 Yahoo Finance 호출 비용 및 rate limit 위험이 더 크다. 24시간 TTL은 반복 조회 체감을 개선하면서도 다음 운영일에 새 데이터를 다시 확인할 수 있는 보수적인 기준이다.
+
+Redis cache miss 시 외부 API를 재조회하는 구조는 캐시를 원천 데이터 저장소가 아니라 성능/안정성 보조 계층으로 보기 때문이다. Redis가 없거나 miss가 발생해도 가능한 경로는 외부 API를 통해 결과를 만들고, 성공한 결과만 다시 캐시에 저장한다.
+
+</details>
+
+<details>
+<summary>왜 Trends 결과를 캐시하고 일부 실패만 재시도하는가?</summary>
+
+Trends 결과는 Redis에 저장한다. Google Trends는 응답이 느리고 rate limit 가능성이 있으며, 같은 키워드/조건을 반복 조회하는 사용 흐름이 많기 때문이다.
+
+조회에는 retry 정책을 둔다. 429, 408, 5xx는 일시 실패일 가능성이 있어 재시도하고, 입력 오류나 데이터 없음 계열은 재시도해도 성공 가능성이 낮으므로 즉시 실패로 처리한다. 실패를 빈 성공 응답으로 숨기지 않는 이유는 사용자가 "데이터가 0인 상태"와 "조회가 실패한 상태"를 다르게 판단해야 하기 때문이다.
+
+</details>
+
+### 8.3 런타임과 보안
+
+<details>
+<summary>왜 Python Function self-fetch 구조를 유지하는가?</summary>
+
+Next 서버는 Python을 직접 실행하지 않고 `/api/pytrends`를 self-fetch한다. 배포 기준이 Vercel이고, pytrends는 Python 런타임 의존성을 가진다. Python Function으로 분리하면 Node/Next 런타임과 Python 의존성을 분리할 수 있고, 로컬도 `vercel dev` 기준으로 배포와 같은 호출 경로를 검증할 수 있다.
+
+self-fetch 구조는 성능과 단순성 면에서 단점이 있다. HTTP 경계를 한 번 더 지나기 때문에 지연, 직렬화 비용, 실패 지점이 늘어난다. 그럼에도 현재는 Vercel 단일 프로젝트 안에서 Node/Next 런타임과 pytrends Python 런타임을 분리해 배포하기 위한 현실적인 선택으로 유지한다. 이 비용은 기술 부채로 보고, cache hit 비율 개선이나 별도 Python 서비스 분리를 장기 개선 후보로 둔다.
+
+`/api/pytrends`는 미들웨어 auth를 우회하므로 자체 internal secret 검증이 필요하다. 이 엔드포인트는 브라우저 사용자가 직접 호출할 공개 API가 아니라 Next 서버가 호출하는 내부 런타임 경계다.
+
+</details>
+
+<details>
+<summary>왜 RLS와 API auth를 함께 유지하는가?</summary>
+
+사용자별 격리는 Supabase RLS를 중심으로 둔다. DB 레벨에서 소유권을 강제해야 API 구현 실수나 클라이언트 조작에도 데이터 경계가 유지된다.
+
+동시에 API auth 검증도 유지한다. RLS는 데이터 접근의 최종 방어선이고, API auth는 빠른 실패 응답, 명확한 오류 형식, 불필요한 서비스 로직 실행 방지를 담당한다. 둘 중 하나만으로는 사용자 경험과 방어 깊이가 부족하다.
+
+</details>
+
+<details>
+<summary>왜 관리자 권한과 운영 범위를 이렇게 제한하는가?</summary>
+
+관리자 접근은 `ADMIN_EMAILS` 기반이다. 현재 제품의 관리자 요구사항은 소수 운영자의 읽기 전용 점검이므로 별도 role 테이블보다 환경 변수 기반 허용 목록이 단순하고 배포 환경에서 관리하기 쉽다.
+
+관리자 권한 실패는 403 대신 not found처럼 처리한다. 운영 화면의 존재 자체를 일반 사용자에게 드러낼 필요가 없기 때문이다. 이 방식은 보안의 핵심 장치는 아니지만 내부 운영 경로의 노출 신호를 줄인다.
+
+`SUPABASE_SECRET_KEY`가 있으면 service role client로 전체 운영 데이터를 조회한다. 없으면 현재 관리자 세션에서 RLS가 허용하는 범위만 보여주는 session scope로 fallback한다. secret 누락 때문에 관리자 화면 전체가 깨지는 것을 피하고, 로컬/제한 환경에서도 최소한의 상태 확인을 가능하게 하기 위한 선택이다.
+
+</details>
+
+### 8.4 사용자 제어와 문서 기준
+
+<details>
+<summary>왜 키워드, 분석, 오버레이에 각각 display_order를 두는가?</summary>
+
+키워드, 분석, 오버레이에는 각각 `display_order`를 둔다. 세 목록은 사용자가 반복적으로 보는 작업 단위가 다르며, 사용자가 중요하게 보는 순서도 다르다. 서버 저장 순서를 명시적으로 두면 목록 복원과 드래그 정렬이 안정적으로 동작한다.
+
+</details>
+
+<details>
+<summary>왜 문서는 현재 runtime 구조를 우선하는가?</summary>
+
+이 문서는 미래 희망사항보다 현재 runtime 구조를 우선 기록한다. 이 프로젝트는 Next, Supabase, Redis, Python Function, 외부 API가 함께 움직이므로 문서가 실제 코드와 어긋나면 장애 원인 파악과 기능 수정이 어려워진다.
+
+</details>
+
+## 9. API 구조
+
+### 9.1 응답 원칙
 
 - API 응답은 `createSuccessResponse`, `createErrorResponse` 형식을 사용한다.
 - 보호 API는 `validateApiAuth()` 또는 동일한 인증 검증을 거친다.
@@ -235,7 +379,7 @@ vercel dev
 - 내부 오류는 프로덕션 응답에 직접 노출하지 않는다.
 - 외부 API 실패를 빈 배열 성공으로 숨기지 않는다.
 
-### 8.2 주요 API
+### 9.2 주요 API
 
 종목:
 
@@ -274,7 +418,7 @@ vercel dev
 - `GET /api/admin/summary`
 - `POST /api/pytrends`
 
-## 9. 환경 변수
+## 10. 환경 변수
 
 필수:
 
@@ -297,7 +441,7 @@ vercel dev
 - `SUPABASE_SECRET_KEY`가 없으면 관리자 대시보드는 현재 관리자 세션에서 조회 가능한 범위만 표시한다.
 - Redis가 없으면 일반 주가/Trends 캐시는 우회되지만, 종목 미리보기 저장 흐름은 preview cache unavailable 오류가 날 수 있다.
 
-## 10. 배포 기준
+## 11. 배포 기준
 
 - 배포는 Vercel 기준이다.
 - 빌드 명령은 `npm run build`다.
@@ -315,7 +459,7 @@ vercel dev
 6. `/api/trends` -> `/api/pytrends` 내부 호출 정상 여부
 7. `/admin`의 운영 상태 표시 정상 여부
 
-## 11. 현재 기술 부채
+## 12. 현재 기술 부채
 
 - Trends 경로는 안정화됐지만 self-fetch hop 비용이 있다.
 - 키워드 결과 페이지는 Trends 조회 외에 저장 키워드/분석 관련 부가 API를 호출한다.
