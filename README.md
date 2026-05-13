@@ -19,7 +19,7 @@ StockInsight는 로그인한 개인 사용자를 기준으로 세 가지 흐름�
 - Yahoo Finance 기반 5년 주간 주가 수집
 - Google Trends 기반 5년 검색 관심도 수집
 - 13주 이동평균, 52주 YoY, 주간 OHLC 지표 계산
-- Redis 기반 주가/Trends/종목 미리보기 캐시
+- Redis 기반 주가/Trends 조회 캐시
 - 키워드 사전형 목록, 분석 조건 목록, 드래그 정렬
 - 종목 차트, 커스텀 차트, 테이블 뷰
 - 키워드 상세 차트와 normalized price 오버레이
@@ -66,7 +66,6 @@ UPSTASH_REDIS_REST_URL=https://your-redis.upstash.io
 UPSTASH_REDIS_REST_TOKEN=your_upstash_redis_rest_token
 STOCK_DATA_CACHE_TTL_SECONDS=86400
 TRENDS_CACHE_TTL_SECONDS=86400
-PREVIEW_CACHE_TTL_SECONDS=86400
 ```
 
 예시는 [`.env.example`](./.env.example)를 참고하세요.
@@ -76,7 +75,7 @@ PREVIEW_CACHE_TTL_SECONDS=86400
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`는 클라이언트 공개 키입니다.
 - `SUPABASE_SECRET_KEY`는 관리자/서버 전용입니다. `NEXT_PUBLIC_` 접두사를 붙이면 안 됩니다.
 - 프로덕션에서는 `PYTRENDS_INTERNAL_SECRET`가 필요합니다.
-- Redis 환경 변수가 없으면 주가/Trends 캐시는 비활성화되며, 종목 미리보기 저장 흐름은 Redis 미리보기 캐시에 의존합니다.
+- Redis 환경 변수가 없으면 주가/Trends 조회 캐시는 비활성화되며, 조회 시 외부 API를 직접 호출합니다.
 
 ## 실행
 

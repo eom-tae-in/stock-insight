@@ -7,7 +7,7 @@ import { SearchForm } from '@/components/stock/search-form'
 import { LoadingSkeleton } from '@/components/shared/loading-skeleton'
 import { ProgressIndicator } from '@/components/shared/progress-indicator'
 import { Button } from '@/components/ui/button'
-import type { ProgressState, ApiResponse } from '@/types'
+import type { ProgressState } from '@/types'
 
 interface TickerCandidate {
   symbol: string
@@ -51,14 +51,12 @@ export default function SearchPage() {
       }, 4000)
       timerRefsRef.current.push(progressTimer2)
 
-      // POST /api/stock-previews로 저장 전 미리보기 생성
-      const response = await fetch('/api/stock-previews', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ ticker }),
+      const params = new URLSearchParams({
+        ticker,
+        period: '5Y',
+        interval: '1wk',
       })
+      const response = await fetch(`/api/stock-data?${params.toString()}`)
 
       // 진행 상황 타이머 정리
       timerRefsRef.current.forEach(clearTimeout)
@@ -71,18 +69,17 @@ export default function SearchPage() {
         throw new Error(message)
       }
 
-      const data: ApiResponse<{ id: string; ticker: string }> =
-        await response.json()
+      await response.json()
 
       setProgress({
         stage: 'complete',
         message: `${ticker} 조회가 완료되었습니다.`,
       })
 
-      // 1초 후 미리보기 페이지로 리다이렉트
+      // 1초 후 분석 페이지로 리다이렉트
       const redirectTimer = setTimeout(() => {
         router.push(
-          `/stock-analysis/preview/${data.data.id}?ticker=${data.data.ticker}`
+          `/stock-analysis/search?ticker=${encodeURIComponent(ticker)}&period=5Y&interval=1wk`
         )
       }, 1000)
       timerRefsRef.current.push(redirectTimer)

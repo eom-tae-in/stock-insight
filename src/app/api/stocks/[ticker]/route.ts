@@ -1,5 +1,5 @@
 /**
- * 종목 데이터 미리보기 API (DB 저장 안 함)
+ * 키워드 오버레이용 종목 가격 API (DB 저장 안 함)
  * GET /api/stocks/[ticker]
  */
 
