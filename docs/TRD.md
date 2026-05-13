@@ -42,7 +42,7 @@ src/components
 src/server
   admin-service.ts
   cached-stock-service.ts
-  stock-preview-service.ts
+  stock-analysis-service.ts
   trends-internal-service.ts
   keywords-service.ts
   keyword-analyses-service.ts
@@ -73,8 +73,8 @@ migrations/
 - `/stock-analysis`
 - `/stock-analysis/[id]`
 - `/stock-analysis/[id]/table`
-- `/stock-analysis/preview/[id]`
-- `/stock-analysis/preview/[id]/table`
+- `/stock-analysis/search`
+- `/stock-analysis/search/table`
 - `/keyword-analysis`
 - `/keyword-analysis/new`
 - `/keyword-analysis/search`
@@ -102,22 +102,23 @@ migrations/
 
 ## 5. 데이터 흐름
 
-### 5.1 종목 검색/미리보기/저장 흐름
+### 5.1 종목 검색/조회/저장 흐름
 
 1. 사용자가 `/search`에서 티커 또는 회사명을 입력한다.
 2. `/api/stocks/search`가 Yahoo Finance search 결과를 반환한다.
-3. 사용자가 종목을 선택하면 `/api/stock-previews`가 실행된다.
-4. `stock-preview-service`가 `fetchCachedStockData()`를 호출한다.
+3. 사용자가 종목을 선택하면 `/api/stock-data?ticker={ticker}&period=5Y&interval=1wk`가 실행된다.
+4. `stock-analysis-service`가 `fetchCachedStockData()`를 호출한다.
 5. Redis stock cache miss 시 Yahoo Finance에서 5년 주간 데이터를 수집한다.
-6. preview payload를 Redis에 `preview:{id}`로 저장한다.
-7. 사용자는 `/stock-analysis/preview/[id]`에서 미리보기를 확인한다.
-8. 저장 시 preview를 `searches`, `stock_price_data`에 저장한다.
+6. 결과는 `stock-data:v1:{ticker}:5y:1wk:{completedWeek}` 캐시에 저장된다.
+7. 사용자는 `/stock-analysis/search?ticker={ticker}&period=5Y&interval=1wk`에서 캐시 기반 조회 결과를 확인한다.
+8. 저장 시 화면에 표시된 companyName, currency, priceData를 `POST /api/searches`로 보내 `searches`, `stock_price_data`에 영구 저장한다.
 9. 저장된 종목은 `/stock-analysis`, `/stock-analysis/[id]`에서 재사용한다.
 
 중요:
 
 - 종목 데이터 캐시 키는 마지막 완료 주를 포함한다.
-- 종목 미리보기 캐시는 Redis가 필요하다.
+- Redis가 없어도 종목 조회는 외부 API 직접 조회로 fallback한다.
+- 저장은 Redis 재조회가 아니라 화면에 표시된 데이터 payload를 검증해 영구 저장한다.
 - `.KS` 티커는 현재 주가 수집 서비스에서 명시적으로 거부한다.
 
 ### 5.2 저장 종목 최신화 흐름
@@ -287,16 +288,16 @@ keyword normalization은 이런 입력 차이를 저장 기준에서 정리하�
 
 </details>
 
-### 8.2 검색, preview, 캐시
+### 8.2 검색, 조회, 캐시
 
 <details>
-<summary>왜 종목 preview 단계를 두는가?</summary>
+<summary>왜 종목 조회는 preview cache가 아니라 조건 기반 lookup cache를 쓰는가?</summary>
 
 종목 검색은 저장보다 자주 일어난다. 사용자는 여러 티커를 검색해 보고, 회사명이나 가격 흐름을 확인한 뒤 저장하지 않을 수 있다. 이때 검색할 때마다 바로 DB에 영구 저장하면 저장하지 않은 후보 데이터가 사용자 데이터 모델에 섞이고, 나중에 정리해야 할 임시 데이터가 늘어난다.
 
-그래서 종목은 먼저 preview로 만든다. preview는 Yahoo Finance에서 가져온 회사명, 통화, 5년 주간 가격 데이터를 사용자가 저장 전에 확인하는 임시 상태다. 사용자가 실제로 저장을 누를 때만 `searches`와 `stock_price_data`에 영구 저장한다.
+그래서 종목 조회 화면은 DB 저장 없이 Yahoo Finance 조회 결과를 보여준다. 이 결과는 `stock-data:v1:{ticker}:5y:1wk:{completedWeek}` Redis 캐시에 저장되며, 같은 완료 주에 같은 ticker, period, interval 조건을 다시 조회하는 사용자는 외부 API를 다시 호출하지 않고 캐시를 재사용한다.
 
-preview를 Redis에 두는 이유는 검색만 계속하고 저장하지 않는 흐름을 DB 영구 데이터와 분리하기 위해서다. Redis TTL이 지나면 저장하지 않은 preview는 자연스럽게 사라진다. 다만 이 구조 때문에 종목 preview 저장 흐름은 Redis 의존성이 강하다.
+저장 버튼을 누르면 별도 `preview:{id}` 객체를 읽는 것이 아니라 현재 화면에 표시된 companyName, currency, priceData를 `searches`와 `stock_price_data`에 영구 저장한다. 즉 Redis의 역할은 저장 전 후보 스냅샷 보관이 아니라, 조건 기반 반복 조회 최적화다.
 
 </details>
 
@@ -385,7 +386,7 @@ self-fetch 구조는 성능과 단순성 면에서 단점이 있다. HTTP 경계
 
 - `GET /api/stocks/search`
 - `GET /api/stocks/[ticker]`
-- `POST /api/stock-previews`
+- `GET /api/stock-data`
 - `GET|POST /api/searches`
 - `GET|DELETE /api/searches/[id]`
 - `POST /api/searches/[id]/refreshes`
@@ -434,12 +435,11 @@ self-fetch 구조는 성능과 단순성 면에서 단점이 있다. HTTP 경계
 - `UPSTASH_REDIS_REST_TOKEN`
 - `STOCK_DATA_CACHE_TTL_SECONDS`
 - `TRENDS_CACHE_TTL_SECONDS`
-- `PREVIEW_CACHE_TTL_SECONDS`
 
 주의:
 
 - `SUPABASE_SECRET_KEY`가 없으면 관리자 대시보드는 현재 관리자 세션에서 조회 가능한 범위만 표시한다.
-- Redis가 없으면 일반 주가/Trends 캐시는 우회되지만, 종목 미리보기 저장 흐름은 preview cache unavailable 오류가 날 수 있다.
+- Redis가 없으면 주가/Trends 조회 캐시는 우회되고 외부 API를 직접 조회한다.
 
 ## 11. 배포 기준
 

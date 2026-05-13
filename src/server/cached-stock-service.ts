@@ -24,8 +24,18 @@ function getRedisConfig() {
   }
 }
 
-function buildStockDataCacheKey(ticker: string) {
-  return `stock-data:v1:${ticker.toUpperCase()}:5y:1wk:${getLastCompletedWeekKey()}`
+export const STOCK_DATA_PERIOD = '5Y'
+export const STOCK_DATA_INTERVAL = '1wk'
+
+export type StockDataPeriod = typeof STOCK_DATA_PERIOD
+export type StockDataInterval = typeof STOCK_DATA_INTERVAL
+
+export function buildStockDataCacheKey(
+  ticker: string,
+  period: StockDataPeriod = STOCK_DATA_PERIOD,
+  interval: StockDataInterval = STOCK_DATA_INTERVAL
+) {
+  return `stock-data:v1:${ticker.toUpperCase()}:${period.toLowerCase()}:${interval}:${getLastCompletedWeekKey()}`
 }
 
 async function redisGet<T>(key: string): Promise<T | null> {
@@ -100,10 +110,12 @@ function isStockDataResult(value: unknown): value is StockDataResult {
 }
 
 export async function fetchCachedStockData(
-  ticker: string
+  ticker: string,
+  period: StockDataPeriod = STOCK_DATA_PERIOD,
+  interval: StockDataInterval = STOCK_DATA_INTERVAL
 ): Promise<StockDataResult> {
   const normalizedTicker = ticker.trim().toUpperCase()
-  const cacheKey = buildStockDataCacheKey(normalizedTicker)
+  const cacheKey = buildStockDataCacheKey(normalizedTicker, period, interval)
   const cached = await redisGet<unknown>(cacheKey)
 
   if (isStockDataResult(cached)) {

@@ -5,7 +5,7 @@
  * Response: ApiResponse<SearchRecord[]>
  *
  * POST /api/searches
- * Body: { previewId: string; ticker?: string }
+ * Body: { ticker: string; companyName: string; currency?: string; priceData: PriceDataPoint[] }
  * Response: ApiResponse<{ id: string; ticker: string }>
  */
 
@@ -18,11 +18,20 @@ import {
   validateApiAuth,
 } from '@/lib/api-helpers'
 import {
-  saveStockPreviewAsSearch,
-  StockPreviewServiceError,
-} from '@/server/stock-preview-service'
+  saveStockAnalysisAsSearch,
+  StockAnalysisServiceError,
+} from '@/server/stock-analysis-service'
+import { PriceDataPointSchema, TickerInputSchema } from '@/lib/validation'
+import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
+
+const SaveStockSearchBodySchema = z.object({
+  ticker: TickerInputSchema,
+  companyName: z.string().trim().min(1),
+  currency: z.string().trim().min(1).optional(),
+  priceData: z.array(PriceDataPointSchema).min(1),
+})
 
 export async function GET() {
   try {
@@ -57,28 +66,24 @@ export async function POST(request: NextRequest) {
       return authResult
     }
 
-    const body = (await request.json()) as {
-      previewId?: unknown
-      ticker?: unknown
-    }
-    if (typeof body.previewId !== 'string' || !body.previewId.trim()) {
+    const result = SaveStockSearchBodySchema.safeParse(await request.json())
+    if (!result.success) {
       return createErrorResponse(
-        'INVALID_INPUT',
-        'previewId가 필요합니다.',
+        'INVALID_STOCK_DATA',
+        '저장할 종목 데이터가 올바르지 않습니다.',
         400
       )
     }
 
-    const savedSearch = await saveStockPreviewAsSearch(
+    const savedSearch = await saveStockAnalysisAsSearch(
       supabase,
       authResult.userId,
-      body.previewId,
-      typeof body.ticker === 'string' ? body.ticker : undefined
+      result.data
     )
 
     return createSuccessResponse(savedSearch, 201)
   } catch (error) {
-    if (error instanceof StockPreviewServiceError) {
+    if (error instanceof StockAnalysisServiceError) {
       return createErrorResponse(error.code, error.message, error.status)
     }
 

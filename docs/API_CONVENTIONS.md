@@ -77,7 +77,7 @@
 
 - `GET /api/stocks/search`
 - `GET /api/stocks/[ticker]`
-- `POST /api/stock-previews`
+- `GET /api/stock-data`
 - `GET /api/searches`
 - `POST /api/searches`
 - `GET /api/searches/[id]`

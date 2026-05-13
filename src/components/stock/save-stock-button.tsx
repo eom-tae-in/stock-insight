@@ -5,17 +5,21 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { CheckCircle } from 'lucide-react'
 import { toast } from 'sonner'
-import type { ApiResponse } from '@/types'
+import type { ApiResponse, PriceDataPoint } from '@/types'
 
-interface SavePreviewButtonProps {
-  searchId: string
+interface SaveStockButtonProps {
   ticker: string
+  companyName: string
+  currency?: string
+  priceData: PriceDataPoint[]
 }
 
-export function SavePreviewButton({
-  searchId,
+export function SaveStockButton({
   ticker,
-}: SavePreviewButtonProps) {
+  companyName,
+  currency,
+  priceData,
+}: SaveStockButtonProps) {
   const router = useRouter()
   const [isSaving, setIsSaving] = useState(false)
 
@@ -28,8 +32,10 @@ export function SavePreviewButton({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          previewId: searchId,
           ticker,
+          companyName,
+          currency,
+          priceData,
         }),
       })
 
