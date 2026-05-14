@@ -1,6 +1,10 @@
 /**
- * 키워드 오버레이용 종목 가격 API (DB 저장 안 함)
+ * 오버레이 차트용 종목 가격 시계열 API (DB 저장 안 함)
  * GET /api/stocks/[ticker]
+ *
+ * 저장 전 종목 분석 화면은 /api/stock-data를 사용한다.
+ * 이 route는 키워드 상세 화면에서 비교 차트에 올릴 { date, price } 형태의
+ * 단순 시계열을 반환한다.
  */
 
 import { NextRequest, NextResponse } from 'next/server'

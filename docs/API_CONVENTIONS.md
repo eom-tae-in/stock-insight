@@ -46,17 +46,22 @@
 
 ## 3. 주요 오류 코드
 
-| HTTP | code                      | 의미                            |
-| ---- | ------------------------- | ------------------------------- |
-| 400  | `INVALID_INPUT`           | 입력 검증 실패                  |
-| 401  | `UNAUTHORIZED`            | 로그인 필요 또는 내부 인증 실패 |
-| 404  | `NOT_FOUND`               | 리소스 없음                     |
-| 409  | `CONFLICT`                | 중복 또는 충돌                  |
-| 500  | `DB_ERROR`                | DB 처리 오류                    |
-| 500  | `SERVER_ERROR`            | 내부 서버 오류                  |
-| 502  | `TRENDS_FETCH_FAILED`     | Trends 상위 수집 실패           |
-| 502  | `PYTRENDS_REQUEST_FAILED` | pytrends 요청 실패              |
-| 429  | `PYTRENDS_RATE_LIMIT`     | Google Trends rate limit        |
+| HTTP | code                           | 의미                            |
+| ---- | ------------------------------ | ------------------------------- |
+| 400  | `INVALID_INPUT`                | 입력 검증 실패                  |
+| 400  | `INVALID_STOCK_DATA`           | 저장할 종목 payload 검증 실패   |
+| 400  | `UNSUPPORTED_STOCK_DATA_RANGE` | 지원하지 않는 종목 조회 범위    |
+| 401  | `UNAUTHORIZED`                 | 로그인 필요 또는 내부 인증 실패 |
+| 404  | `NOT_FOUND`                    | 리소스 없음                     |
+| 404  | `TICKER_NOT_FOUND`             | Yahoo Finance 종목 데이터 없음  |
+| 409  | `CONFLICT`                     | 중복 또는 충돌                  |
+| 409  | `ALREADY_SAVED`                | 동일 사용자 기준 이미 저장됨    |
+| 500  | `DB_ERROR`                     | DB 처리 오류                    |
+| 500  | `SERVER_ERROR`                 | 내부 서버 오류                  |
+| 502  | `STOCK_DATA_FETCH_FAILED`      | Yahoo Finance 주가 수집 실패    |
+| 502  | `TRENDS_FETCH_FAILED`          | Trends 상위 수집 실패           |
+| 502  | `PYTRENDS_REQUEST_FAILED`      | pytrends 요청 실패              |
+| 429  | `PYTRENDS_RATE_LIMIT`          | Google Trends rate limit        |
 
 ## 4. 인증 규칙
 
@@ -75,14 +80,53 @@
 
 ### 종목
 
-- `GET /api/stocks/search`
+- `GET /api/stocks/search?q={query}`
 - `GET /api/stocks/[ticker]`
-- `GET /api/stock-data`
+- `GET /api/stock-data?ticker={ticker}&period=5Y&interval=1wk`
 - `GET /api/searches`
 - `POST /api/searches`
 - `GET /api/searches/[id]`
 - `DELETE /api/searches/[id]`
 - `POST /api/searches/[id]/refreshes`
+
+종목 API는 세 가지 조회 성격을 분리한다.
+
+| API                                                          | 용도                                                                            | 저장 여부  | 주요 응답                                                              |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------- |
+| `GET /api/stocks/search?q={query}`                           | 티커/회사명 자동완성 후보 검색                                                  | 저장 안 함 | `ticker`, `symbol`, `companyName`, `longname`                          |
+| `GET /api/stock-data?ticker={ticker}&period=5Y&interval=1wk` | 저장 전 종목 분석 화면의 5년 주간 데이터 조회                                   | 저장 안 함 | `ticker`, `companyName`, `currency`, `period`, `interval`, `priceData` |
+| `GET /api/stocks/[ticker]`                                   | 키워드 상세 화면에서 종목을 비교 차트에 올리기 위한 오버레이용 가격 시계열 조회 | 저장 안 함 | `ticker`, `companyName`, `priceData[{ date, price }]`                  |
+| `GET /api/searches`                                          | 사용자가 저장한 내 종목 목록 조회                                               | DB 조회    | `SearchRecord[]`                                                       |
+| `POST /api/searches`                                         | 화면에 표시된 종목 데이터를 내 종목으로 영구 저장                               | DB 저장    | `{ id, ticker }`                                                       |
+| `GET /api/searches/[id]`                                     | 저장된 내 종목 상세 조회                                                        | DB 조회    | `SearchRecord`                                                         |
+| `DELETE /api/searches/[id]`                                  | 저장된 내 종목 삭제                                                             | DB 삭제    | 삭제 결과                                                              |
+| `POST /api/searches/[id]/refreshes`                          | 저장된 내 종목의 5년 주간 데이터를 최신화                                       | DB 갱신    | `{ id, ticker }`                                                       |
+
+현재 `/api/stock-data`는 `period=5Y`, `interval=1wk`만 지원한다. 지원하지 않는 범위는 400 `UNSUPPORTED_STOCK_DATA_RANGE`로 실패해야 한다.
+
+`/api/stock-data`와 `/api/stocks/[ticker]`는 둘 다 Yahoo Finance 기반 데이터를 사용하지만 목적과 응답 모양이 다르다. 저장 전 종목 분석 화면은 전체 분석 데이터가 필요하므로 `/api/stock-data`를 사용한다. 키워드 상세 화면의 오버레이 입력은 차트에 겹쳐 그릴 날짜별 가격만 필요하므로 `/api/stocks/[ticker]`의 `{ date, price }` 형태를 사용한다.
+
+`POST /api/searches` 요청 body:
+
+```json
+{
+  "ticker": "AAPL",
+  "companyName": "Apple Inc.",
+  "currency": "USD",
+  "priceData": [
+    {
+      "date": "2026-05-04",
+      "open": 200.1,
+      "high": 205.2,
+      "low": 198.7,
+      "close": 204.5,
+      "volume": 123456789
+    }
+  ]
+}
+```
+
+서버는 이 payload를 검증한 뒤 `searches`와 `stock_price_data`에 저장한다. 캐시 키나 임시 식별자를 저장 요청의 기준으로 삼지 않는다.
 
 ### 키워드
 
@@ -104,9 +148,17 @@
 
 - `GET|PATCH|DELETE /api/analyses/[analysisId]`
 - `POST /api/analyses/[analysisId]/refreshes`
+- `PATCH /api/analyses/reorder`
 - `GET|POST|PATCH /api/analyses/[analysisId]/overlays`
 - `DELETE /api/analyses/[analysisId]/overlays/[overlayId]`
 - `POST /api/analyses/[analysisId]/overlays/[overlayId]/refreshes`
+
+### 운영/내부
+
+- `GET /api/admin/summary`
+- `POST /api/pytrends`
+
+`/api/pytrends`는 Vercel Python Function이다. 브라우저용 공개 API가 아니며, Next 서버가 `x-internal-api-secret` 헤더를 붙여 내부 호출한다.
 
 ## 6. 구현 규칙
 

@@ -22,6 +22,8 @@
 
 - Supabase Auth/RLS 기반 사용자별 데이터 격리
 - 종목 검색, 조건 기반 조회, 저장, 상세, 테이블, 최신화, 삭제
+- 종목 조회 API를 `/api/stock-data?ticker={ticker}&period=5Y&interval=1wk` 기준으로 정리
+- 저장 전 종목 조회 화면과 저장 후 종목 상세 화면 분리
 - Yahoo Finance 기반 5년 주간 OHLCV 수집
 - 키워드 저장, 사전형 목록, 조건별 분석 구조
 - Google Trends Python Function 경로
@@ -64,7 +66,7 @@
 - 키워드 결과 페이지의 부가 API 호출 필요성 재검토
 - Redis hit/miss 기준 로그와 체감 지연 구간 정리
 - Trends 조회 경로의 단계별 시간 계측 추가 검토
-- cache TTL, prewarm, 경량 DTO 적용 가능성 검토
+- cache TTL, prewarm, 응답 DTO 단순화 가능성 검토
 - 종목/키워드 조건 기반 조회 캐시의 hit 비율과 UX 영향 점검
 
 수락 기준:
@@ -81,6 +83,7 @@
 
 - API route의 공통 순서 점검: 인증, 입력 검증, 서비스 호출, 표준 응답
 - route 안에 남아 있는 직접 조합 로직을 service로 이동할지 검토
+- 종목 조회/저장 흐름에서 정리한 route/service 패턴을 다른 API에 적용할 수 있는지 검토
 - `keywords` 계열 API와 `analyses` 계열 API의 역할 경계 재점검
 - 인증/응답 형식 공통 처리 일관성 점검
 - API_CONVENTIONS와 실제 route method 목록 동기화

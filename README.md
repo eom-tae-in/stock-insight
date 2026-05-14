@@ -6,7 +6,7 @@ Yahoo Finance 주가 데이터와 Google Trends 검색 관심도를 같은 주�
 
 StockInsight는 로그인한 개인 사용자를 기준으로 세 가지 흐름을 제공합니다.
 
-- 종목 분석: 종목 검색, 저장, 5년 주간 OHLC/지표/차트/테이블 조회
+- 종목 분석: 티커/회사명 검색, 조건 기반 5년 주간 데이터 조회, 저장, OHLC/지표/차트/테이블 조회
 - 키워드 분석: Google Trends 조회, 키워드 저장, 조건별 5년 분석 복원
 - 키워드-종목 비교: 저장된 키워드 분석에 종목 오버레이를 추가하고 정렬/삭제/최신화
 
@@ -19,7 +19,7 @@ StockInsight는 로그인한 개인 사용자를 기준으로 세 가지 흐름�
 - Yahoo Finance 기반 5년 주간 주가 수집
 - Google Trends 기반 5년 검색 관심도 수집
 - 13주 이동평균, 52주 YoY, 주간 OHLC 지표 계산
-- Redis 기반 주가/Trends 조회 캐시
+- Redis 기반 조건별 주가/Trends 조회 캐시
 - 키워드 사전형 목록, 분석 조건 목록, 드래그 정렬
 - 종목 차트, 커스텀 차트, 테이블 뷰
 - 키워드 상세 차트와 normalized price 오버레이
@@ -76,6 +76,18 @@ TRENDS_CACHE_TTL_SECONDS=86400
 - `SUPABASE_SECRET_KEY`는 관리자/서버 전용입니다. `NEXT_PUBLIC_` 접두사를 붙이면 안 됩니다.
 - 프로덕션에서는 `PYTRENDS_INTERNAL_SECRET`가 필요합니다.
 - Redis 환경 변수가 없으면 주가/Trends 조회 캐시는 비활성화되며, 조회 시 외부 API를 직접 호출합니다.
+
+## 현재 조회/저장 흐름
+
+종목은 저장 전 조회와 저장 후 상세를 분리합니다.
+
+- 조회: `/api/stock-data?ticker=AAPL&period=5Y&interval=1wk`
+- 조회 화면: `/stock-analysis/search?ticker=AAPL&period=5Y&interval=1wk`
+- 캐시 키: `stock-data:v1:{ticker}:5y:1wk:{completedWeek}`
+- 저장: 화면에 표시된 회사명, 통화, 5년 주간 가격 데이터를 `POST /api/searches`로 저장
+- 저장 후: `/stock-analysis/{searchId}` 상세 화면으로 이동
+
+키워드는 조회 조건별 Trends 결과를 캐시하고, 사용자가 저장할 때 화면의 5년 Trends 데이터를 `keywords`와 `keyword_analysis`에 저장합니다.
 
 ## 실행
 
