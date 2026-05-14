@@ -347,7 +347,7 @@ function DragOverlayComponent({
 
   return (
     <DragOverlay>
-      <Card className="flex h-[18rem] w-[18rem] flex-col bg-blue-100 shadow-2xl transition-all duration-300 ease-in-out dark:bg-blue-900/30">
+      <Card className="flex h-72 w-[18rem] flex-col bg-blue-100 shadow-2xl transition-all duration-300 ease-in-out dark:bg-blue-900/30">
         <CardHeader className="pt-3 pr-3 pb-1.5 pl-5">
           <CardTitle className="flex items-center justify-between">
             <div>
@@ -485,7 +485,7 @@ function AnalysisConditionChartCard({
         typeof document !== 'undefined' &&
         createPortal(
           <div
-            className="pointer-events-none fixed z-[9999]"
+            className="pointer-events-none fixed z-9999"
             style={getMiniChartTooltipStyle(tooltipRect)}
           >
             <MiniChartTooltipContent
@@ -689,7 +689,7 @@ function SortableOverlayCard({
         typeof document !== 'undefined' &&
         createPortal(
           <div
-            className="pointer-events-none fixed z-[9999]"
+            className="pointer-events-none fixed z-9999"
             style={getMiniChartTooltipStyle(tooltipRect)}
           >
             <MiniChartTooltipContent
@@ -2564,7 +2564,7 @@ export function KeywordDetailClient({
               )}
 
               {/* 데이터 정보 */}
-              <div className="mt-12 rounded-lg border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-6 dark:border-amber-800 dark:from-amber-950/20 dark:to-orange-950/20">
+              <div className="mt-12 rounded-lg border border-amber-200 bg-linear-to-r from-amber-50 to-orange-50 p-6 dark:border-amber-800 dark:from-amber-950/20 dark:to-orange-950/20">
                 <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-amber-900 dark:text-amber-100">
                   <span className="text-lg">📊</span>이 페이지의 데이터
                 </h3>
