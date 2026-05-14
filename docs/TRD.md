@@ -116,7 +116,8 @@ migrations/
 
 중요:
 
-- 종목 데이터 캐시 키는 마지막 완료 주를 포함한다.
+- 종목 데이터 캐시 키는 ticker, period, interval, 마지막 완료 주를 포함한다.
+- 현재 종목 조회 API는 `period=5Y`, `interval=1wk`만 지원한다.
 - Redis가 없어도 종목 조회는 외부 API 직접 조회로 fallback한다.
 - 저장은 Redis 재조회가 아니라 화면에 표시된 데이터 payload를 검증해 영구 저장한다.
 - `.KS` 티커는 현재 주가 수집 서비스에서 명시적으로 거부한다.
@@ -157,6 +158,8 @@ migrations/
 4. `keyword_stock_overlays`에 오버레이를 저장한다.
 5. `overlay_chart_timeseries`에 raw price와 0-100 normalized price를 저장한다.
 6. 오버레이 목록은 analysis_id 기준으로 조회/정렬/삭제/최신화한다.
+
+키워드 상세 화면에서 사용자가 종목을 입력해 비교 차트에 올릴 때는 `/api/stocks/search?q={query}`로 후보를 찾고, `/api/stocks/[ticker]`로 오버레이 차트에 필요한 `{ date, price }` 시계열을 가져온다. 이 조회는 저장 전 화면 표시용이며, 실제 저장은 오버레이 API가 `keyword_stock_overlays`와 `overlay_chart_timeseries`에 기록하는 단계에서 일어난다.
 
 ## 6. Trends 런타임 상세
 
@@ -291,13 +294,24 @@ keyword normalization은 이런 입력 차이를 저장 기준에서 정리하�
 ### 8.2 검색, 조회, 캐시
 
 <details>
-<summary>왜 종목 조회는 preview cache가 아니라 조건 기반 lookup cache를 쓰는가?</summary>
+<summary>왜 종목 조회는 조건 기반 lookup cache를 쓰는가?</summary>
 
 종목 검색은 저장보다 자주 일어난다. 사용자는 여러 티커를 검색해 보고, 회사명이나 가격 흐름을 확인한 뒤 저장하지 않을 수 있다. 이때 검색할 때마다 바로 DB에 영구 저장하면 저장하지 않은 후보 데이터가 사용자 데이터 모델에 섞이고, 나중에 정리해야 할 임시 데이터가 늘어난다.
 
 그래서 종목 조회 화면은 DB 저장 없이 Yahoo Finance 조회 결과를 보여준다. 이 결과는 `stock-data:v1:{ticker}:5y:1wk:{completedWeek}` Redis 캐시에 저장되며, 같은 완료 주에 같은 ticker, period, interval 조건을 다시 조회하는 사용자는 외부 API를 다시 호출하지 않고 캐시를 재사용한다.
 
-저장 버튼을 누르면 별도 `preview:{id}` 객체를 읽는 것이 아니라 현재 화면에 표시된 companyName, currency, priceData를 `searches`와 `stock_price_data`에 영구 저장한다. 즉 Redis의 역할은 저장 전 후보 스냅샷 보관이 아니라, 조건 기반 반복 조회 최적화다.
+저장 버튼을 누르면 Redis에 저장된 후보 객체를 다시 찾는 방식이 아니라 현재 화면에 표시된 companyName, currency, priceData를 `searches`와 `stock_price_data`에 영구 저장한다. 즉 Redis의 역할은 저장 전 후보 스냅샷 보관이 아니라, 조건 기반 반복 조회 최적화다.
+
+</details>
+
+<details>
+<summary>왜 저장 전 조회 URL과 저장 후 상세 URL을 분리하는가?</summary>
+
+`/stock-analysis/search?ticker=AAPL&period=5Y&interval=1wk`는 저장 전 조회 결과 화면이다. 이 화면은 사용자 DB에 저장된 리소스를 식별하지 않고, ticker/period/interval 조건으로 Yahoo Finance 또는 Redis cache에서 데이터를 가져와 보여준다.
+
+`/stock-analysis/{searchId}`는 사용자가 저장한 내 종목 상세 화면이다. 저장 후에는 사용자 소유 DB row가 생기므로, 이후 최신화, 삭제, 테이블, 다운로드 같은 관리 동작은 `searchId` 기준 상세 화면에서 이어지는 것이 자연스럽다.
+
+따라서 조회 전후의 canonical URL을 분리한다. 저장 전에는 조회 조건이 URL의 기준이고, 저장 후에는 DB에 저장된 종목 id가 URL의 기준이다.
 
 </details>
 
@@ -384,12 +398,21 @@ self-fetch 구조는 성능과 단순성 면에서 단점이 있다. HTTP 경계
 
 종목:
 
-- `GET /api/stocks/search`
+- `GET /api/stocks/search?q={query}`
 - `GET /api/stocks/[ticker]`
-- `GET /api/stock-data`
+- `GET /api/stock-data?ticker={ticker}&period=5Y&interval=1wk`
 - `GET|POST /api/searches`
 - `GET|DELETE /api/searches/[id]`
 - `POST /api/searches/[id]/refreshes`
+
+종목 API 역할:
+
+- `/api/stocks/search`: 티커/회사명 자동완성 후보 검색
+- `/api/stock-data`: 저장 전 종목 분석 화면의 5년 주간 데이터 조회
+- `/api/stocks/[ticker]`: 키워드 상세 화면에서 오버레이 차트에 올릴 날짜별 가격 시계열 조회
+- `/api/searches`: 사용자가 저장한 내 종목 목록 조회와 저장
+- `/api/searches/[id]`: 저장된 내 종목 상세 조회와 삭제
+- `/api/searches/[id]/refreshes`: 저장된 내 종목 데이터 최신화
 
 키워드/Trends:
 

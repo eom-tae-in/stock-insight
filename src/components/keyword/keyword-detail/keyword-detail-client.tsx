@@ -1675,7 +1675,7 @@ export function KeywordDetailClient({
     setAutocompleteResults([])
     setSelectedAutocompleteIndex(-1)
 
-    // 즉시 종목 데이터 가져오기 (임시 조회, DB 저장 안 함)
+    // 오버레이 차트에 올릴 종목 가격 시계열 조회 (DB 저장 안 함)
     try {
       setIsAddingStock(true)
       const res = await fetch(`/api/stocks/${ticker}`)
@@ -1772,7 +1772,7 @@ export function KeywordDetailClient({
 
     try {
       setIsAddingStock(true)
-      // API에서 종목 데이터 조회 (임시 조회, DB 저장 안 함)
+      // 오버레이 차트에 올릴 종목 가격 시계열 조회 (DB 저장 안 함)
       const res = await fetch(`/api/stocks/${stockSearchInput}`)
 
       if (!res.ok) {
