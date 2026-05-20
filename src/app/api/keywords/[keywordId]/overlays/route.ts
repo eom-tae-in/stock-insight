@@ -47,7 +47,7 @@ export async function GET(
     const analysisId = request.nextUrl.searchParams.get('analysisId')
     const overlays = analysisId
       ? await listAnalysisOverlays(supabase, authResult.userId, analysisId)
-      : await listKeywordOverlays(supabase, keywordId)
+      : await listKeywordOverlays(supabase, authResult.userId, keywordId)
     return createSuccessResponse(overlays, 200)
   } catch (error) {
     return handleOverlayError(error, '오버레이 목록을 불러오지 못했습니다.')
@@ -68,6 +68,7 @@ export async function POST(
     const { keywordId } = await params
     const overlay = await createKeywordOverlay(
       supabase,
+      authResult.userId,
       keywordId,
       await request.json()
     )
@@ -93,6 +94,7 @@ export async function PATCH(
     const { orderedIds } = (await request.json()) as { orderedIds: string[] }
     const overlays = await updateKeywordOverlayOrder(
       supabase,
+      authResult.userId,
       keywordId,
       orderedIds
     )

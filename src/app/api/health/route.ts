@@ -1,14 +1,10 @@
 import { getSupabaseClient } from '@/lib/supabase'
+import { checkDatabaseHealth } from '@/server/health-service'
 
 export async function GET() {
   try {
-    // Supabase 연결 확인
     const supabase = getSupabaseClient()
-    const { error } = await supabase.from('searches').select('id').limit(1)
-
-    if (error) {
-      throw error
-    }
+    await checkDatabaseHealth(supabase)
 
     return Response.json(
       {

@@ -70,6 +70,8 @@ __pycache__/
 # Playwright test artifacts
 /.playwright-mcp/
 .playwright-mcp/
+/test-results/
+/playwright-report/
 
 # Python
 __pycache__/

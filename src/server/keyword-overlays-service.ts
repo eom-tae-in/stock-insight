@@ -1,13 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import {
-  addStockOverlay,
-  getKeywordStockOverlays,
-  getOverlayChartTimeseries,
-  insertOverlayChartTimeseries,
-  removeStockOverlay,
-  updateStockOverlayOrder,
-} from '@/lib/db/queries'
 import { fetchCachedStockData } from '@/server/cached-stock-service'
+import type { AnalysisRepository } from './repositories/analysis-repository'
+import type { OverlayRepository } from './repositories/overlay-repository'
+import { SupabaseAnalysisRepository } from './repositories/supabase-analysis-repository'
+import { SupabaseOverlayRepository } from './repositories/supabase-overlay-repository'
 
 export class ApiServiceError extends Error {
   constructor(
@@ -50,16 +46,19 @@ function normalizeOverlayData(priceData: PricePoint[]) {
   }))
 }
 
-async function formatOverlay(
-  supabase: SupabaseClient,
-  overlay: {
-    id: string
-    ticker: string
-    company_name: string
-    display_order: number
-    created_at?: string
-  }
-) {
+function formatOverlay(overlay: {
+  id: string
+  ticker: string
+  company_name: string
+  display_order: number
+  displayOrder?: number
+  created_at?: string
+  chart_data?: Array<{
+    date: string
+    normalizedPrice: number | null
+    rawPrice: number | null
+  }>
+}) {
   return {
     id: overlay.id,
     ticker: overlay.ticker,
@@ -68,138 +67,259 @@ async function formatOverlay(
     display_order: overlay.display_order,
     displayOrder: overlay.display_order,
     created_at: overlay.created_at,
-    chartData: await getOverlayChartTimeseries(overlay.id, supabase),
+    chartData: overlay.chart_data ?? [],
   }
 }
 
-export async function listKeywordOverlays(
-  supabase: SupabaseClient,
+async function getDefaultAnalysisId(
+  analysisRepository: AnalysisRepository,
+  userId: string,
   keywordId: string
 ) {
-  assertKeywordId(keywordId)
+  const keyword = await analysisRepository.getOwnedKeywordName(
+    userId,
+    keywordId
+  )
+  if (!keyword) {
+    throw new ApiServiceError('NOT_FOUND', '키워드를 찾을 수 없습니다.', 404)
+  }
 
-  const overlays = await getKeywordStockOverlays(keywordId, supabase)
-  return Promise.all(overlays.map(overlay => formatOverlay(supabase, overlay)))
+  const existingAnalysis = await analysisRepository.findByFilters(
+    userId,
+    keywordId,
+    'GLOBAL',
+    '5Y',
+    'WEB'
+  )
+  if (existingAnalysis) return existingAnalysis.id
+
+  return analysisRepository.create({
+    keyword_id: keywordId,
+    region: 'GLOBAL',
+    period: '5Y',
+    search_type: 'WEB',
+    trends_data: [],
+  })
 }
 
-export async function createKeywordOverlay(
-  supabase: SupabaseClient,
-  keywordId: string,
-  body: OverlayBody
+export function createKeywordOverlayService(
+  analysisRepository: AnalysisRepository,
+  overlayRepository: OverlayRepository
 ) {
-  assertKeywordId(keywordId)
+  const listKeywordOverlays = async (userId: string, keywordId: string) => {
+    assertKeywordId(keywordId)
 
-  if (!body.ticker) {
-    throw new ApiServiceError('INVALID_BODY', 'ticker는 필수입니다.', 400)
-  }
-
-  const ticker = body.ticker.trim().toUpperCase()
-  const companyName = body.companyName ?? body.company_name ?? ticker
-  const overlayId = await addStockOverlay(
-    keywordId,
-    ticker,
-    companyName,
-    0,
-    supabase
-  )
-
-  let priceData = body.priceData
-  if (!priceData || priceData.length === 0) {
-    const stockData = await fetchCachedStockData(ticker)
-    priceData = stockData.priceData.map(point => ({
-      date: point.date,
-      price: point.close,
-    }))
-  }
-
-  if (priceData.length > 0) {
-    await insertOverlayChartTimeseries(
-      overlayId,
-      normalizeOverlayData(priceData),
-      supabase
+    const analysisId = await getDefaultAnalysisId(
+      analysisRepository,
+      userId,
+      keywordId
     )
+    const overlays = await overlayRepository.findManyByAnalysisId(
+      userId,
+      analysisId
+    )
+
+    return overlays.map(formatOverlay)
   }
 
   return {
-    id: overlayId,
-    ticker,
-    companyName,
-    displayOrder: 0,
-    chartData: await getOverlayChartTimeseries(overlayId, supabase),
+    listKeywordOverlays,
+
+    async createKeywordOverlay(
+      userId: string,
+      keywordId: string,
+      body: OverlayBody
+    ) {
+      assertKeywordId(keywordId)
+
+      if (!body.ticker) {
+        throw new ApiServiceError('INVALID_BODY', 'ticker는 필수입니다.', 400)
+      }
+
+      const ticker = body.ticker.trim().toUpperCase()
+      const companyName = body.companyName ?? body.company_name ?? ticker
+      const analysisId = await getDefaultAnalysisId(
+        analysisRepository,
+        userId,
+        keywordId
+      )
+      const overlayId = await overlayRepository.create({
+        analysisId,
+        ticker,
+        companyName,
+        displayOrder: 0,
+      })
+
+      let priceData = body.priceData
+      if (!priceData || priceData.length === 0) {
+        const stockData = await fetchCachedStockData(ticker)
+        priceData = stockData.priceData.map(point => ({
+          date: point.date,
+          price: point.close,
+        }))
+      }
+
+      if (priceData.length > 0) {
+        await overlayRepository.insertTimeseries(
+          normalizeOverlayData(priceData).map(point => ({
+            overlay_id: overlayId,
+            date: point.date,
+            normalized_price: point.normalizedPrice,
+            raw_price: point.rawPrice,
+          }))
+        )
+      }
+
+      const savedOverlay = (
+        await overlayRepository.findManyByAnalysisId(userId, analysisId)
+      ).find(overlay => overlay.id === overlayId)
+
+      return {
+        id: overlayId,
+        ticker,
+        companyName,
+        displayOrder: 0,
+        chartData: savedOverlay?.chart_data ?? [],
+      }
+    },
+
+    async updateKeywordOverlayOrder(
+      userId: string,
+      keywordId: string,
+      orderedIds: string[]
+    ) {
+      assertKeywordId(keywordId)
+
+      if (!Array.isArray(orderedIds)) {
+        throw new ApiServiceError(
+          'INVALID_BODY',
+          'orderedIds는 배열이어야 합니다.',
+          400
+        )
+      }
+
+      const analysisId = await getDefaultAnalysisId(
+        analysisRepository,
+        userId,
+        keywordId
+      )
+      const overlays = await overlayRepository.findManyByAnalysisId(
+        userId,
+        analysisId
+      )
+      const ownedOverlayIds = new Set(overlays.map(overlay => overlay.id))
+
+      if (orderedIds.some(id => !ownedOverlayIds.has(id))) {
+        throw new ApiServiceError(
+          'NOT_FOUND',
+          '수정할 수 없는 오버레이가 포함되어 있습니다.',
+          404
+        )
+      }
+
+      await overlayRepository.updateOrder(
+        analysisId,
+        orderedIds.map((id, index) => ({ id, display_order: index }))
+      )
+
+      return listKeywordOverlays(userId, keywordId)
+    },
+
+    async deleteKeywordOverlay(
+      userId: string,
+      keywordId: string,
+      overlayId: string
+    ) {
+      assertKeywordId(keywordId)
+
+      if (!overlayId) {
+        throw new ApiServiceError('INVALID_ID', '유효하지 않은 ID입니다.', 400)
+      }
+
+      const analysisId = await getDefaultAnalysisId(
+        analysisRepository,
+        userId,
+        keywordId
+      )
+      const overlays = await overlayRepository.findManyByAnalysisId(
+        userId,
+        analysisId
+      )
+      const targetOverlay = overlays.find(overlay => overlay.id === overlayId)
+
+      if (!targetOverlay) {
+        throw new ApiServiceError(
+          'NOT_FOUND',
+          '오버레이를 찾을 수 없습니다.',
+          404
+        )
+      }
+
+      const deleted = await overlayRepository.deleteById(analysisId, overlayId)
+      if (!deleted) {
+        throw new ApiServiceError(
+          'DELETE_FAILED',
+          '오버레이를 삭제하지 못했습니다.',
+          500
+        )
+      }
+
+      return { success: true }
+    },
   }
 }
 
-export async function updateKeywordOverlayOrder(
+function createSupabaseKeywordOverlayService(supabase: SupabaseClient) {
+  return createKeywordOverlayService(
+    new SupabaseAnalysisRepository(supabase),
+    new SupabaseOverlayRepository(supabase)
+  )
+}
+
+export function listKeywordOverlays(
   supabase: SupabaseClient,
+  userId: string,
+  keywordId: string
+) {
+  return createSupabaseKeywordOverlayService(supabase).listKeywordOverlays(
+    userId,
+    keywordId
+  )
+}
+
+export function createKeywordOverlay(
+  supabase: SupabaseClient,
+  userId: string,
+  keywordId: string,
+  body: OverlayBody
+) {
+  return createSupabaseKeywordOverlayService(supabase).createKeywordOverlay(
+    userId,
+    keywordId,
+    body
+  )
+}
+
+export function updateKeywordOverlayOrder(
+  supabase: SupabaseClient,
+  userId: string,
   keywordId: string,
   orderedIds: string[]
 ) {
-  assertKeywordId(keywordId)
-
-  if (!Array.isArray(orderedIds)) {
-    throw new ApiServiceError(
-      'INVALID_BODY',
-      'orderedIds는 배열이어야 합니다.',
-      400
-    )
-  }
-
-  const overlays = await getKeywordStockOverlays(keywordId, supabase)
-  const ownedOverlayIds = new Set(overlays.map(overlay => overlay.id))
-
-  if (orderedIds.some(id => !ownedOverlayIds.has(id))) {
-    throw new ApiServiceError(
-      'NOT_FOUND',
-      '수정할 수 없는 오버레이가 포함되어 있습니다.',
-      404
-    )
-  }
-
-  for (let index = 0; index < orderedIds.length; index++) {
-    const updated = await updateStockOverlayOrder(
-      orderedIds[index],
-      index,
-      supabase
-    )
-
-    if (!updated) {
-      throw new ApiServiceError(
-        'DB_ERROR',
-        '순서 업데이트에 실패했습니다.',
-        500
-      )
-    }
-  }
-
-  return listKeywordOverlays(supabase, keywordId)
+  return createSupabaseKeywordOverlayService(
+    supabase
+  ).updateKeywordOverlayOrder(userId, keywordId, orderedIds)
 }
 
-export async function deleteKeywordOverlay(
+export function deleteKeywordOverlay(
   supabase: SupabaseClient,
+  userId: string,
   keywordId: string,
   overlayId: string
 ) {
-  assertKeywordId(keywordId)
-
-  if (!overlayId) {
-    throw new ApiServiceError('INVALID_ID', '유효하지 않은 ID입니다.', 400)
-  }
-
-  const overlays = await getKeywordStockOverlays(keywordId, supabase)
-  const targetOverlay = overlays.find(overlay => overlay.id === overlayId)
-
-  if (!targetOverlay) {
-    throw new ApiServiceError('NOT_FOUND', '오버레이를 찾을 수 없습니다.', 404)
-  }
-
-  const deleted = await removeStockOverlay(overlayId, supabase)
-  if (!deleted) {
-    throw new ApiServiceError(
-      'DELETE_FAILED',
-      '오버레이를 삭제하지 못했습니다.',
-      500
-    )
-  }
-
-  return { success: true }
+  return createSupabaseKeywordOverlayService(supabase).deleteKeywordOverlay(
+    userId,
+    keywordId,
+    overlayId
+  )
 }

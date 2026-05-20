@@ -5,17 +5,9 @@ import {
   createSuccessResponse,
   validateApiAuth,
 } from '@/lib/api-helpers'
-import {
-  getKeywords,
-  upsertKeyword,
-  updateKeyword,
-} from '@/server/keywords-service'
-import {
-  addStockOverlay,
-  createKeywordAnalysis,
-  insertOverlayChartTimeseries,
-} from '@/lib/db/queries'
-import type { Period, Region, SearchType } from '@/types/database'
+import { getKeywords, updateKeyword } from '@/server/keywords-service'
+import { createKeywordWithAnalysis } from '@/server/keyword-creation-service'
+import type { Region, SearchType } from '@/types/database'
 
 export const dynamic = 'force-dynamic'
 
@@ -68,55 +60,11 @@ export async function POST(request: NextRequest) {
       }>
     } = await request.json()
 
-    const keyword = await upsertKeyword(
+    const keyword = await createKeywordWithAnalysis(
       supabase,
       authResult.userId,
-      body.keyword ?? ''
+      body
     )
-    const region: Region = body.region ?? 'GLOBAL'
-    const searchType: SearchType = body.search_type ?? 'WEB'
-    const period: Period = '5Y'
-
-    if (body.chartData && body.chartData.length > 0) {
-      await createKeywordAnalysis(
-        {
-          keyword_id: keyword.id,
-          region,
-          period,
-          search_type: searchType,
-          trends_data: body.chartData.map(point => ({
-            date: point.date,
-            value: point.trendsValue,
-            ma13Value: point.ma13Value,
-            yoyValue: point.yoyValue,
-          })),
-          ma13_data: body.chartData.at(-1)?.ma13Value ?? undefined,
-          yoy_data: body.chartData.at(-1)?.yoyValue ?? undefined,
-        },
-        supabase
-      )
-    }
-
-    if (body.overlays && body.overlays.length > 0) {
-      for (let i = 0; i < body.overlays.length; i++) {
-        const overlay = body.overlays[i]
-        const overlayId = await addStockOverlay(
-          keyword.id,
-          overlay.ticker,
-          overlay.companyName,
-          i,
-          supabase
-        )
-
-        if (overlay.overlayData.length > 0) {
-          await insertOverlayChartTimeseries(
-            overlayId,
-            overlay.overlayData,
-            supabase
-          )
-        }
-      }
-    }
 
     return createSuccessResponse(
       {

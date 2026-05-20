@@ -15,6 +15,7 @@ import {
   validateApiAuth,
   createSuccessResponse,
 } from '@/lib/api-helpers'
+import { findSavedStockSuggestions } from '@/server/stock-search-service'
 
 export const dynamic = 'force-dynamic'
 
@@ -64,19 +65,14 @@ export async function GET(request: NextRequest) {
         }))
 
       // 로컬 저장 데이터도 함께 검색 (우선순위: Yahoo Finance 먼저)
-      const { data: savedSearches } = await supabase
-        .from('searches')
-        .select('ticker, company_name')
-        .or(`ticker.ilike.${q}%,company_name.ilike.%${q}%`)
-        .order('ticker', { ascending: true })
-        .limit(5)
+      const savedSearches = await findSavedStockSuggestions(supabase, q, 5)
 
       // 로컬 데이터를 티커 기준으로 변환
-      const savedResults = (savedSearches || []).map(s => ({
+      const savedResults = savedSearches.map(s => ({
         ticker: s.ticker,
         symbol: s.ticker,
-        companyName: s.company_name,
-        longname: s.company_name,
+        companyName: s.companyName,
+        longname: s.companyName,
       }))
 
       // 중복 제거: 로컬 데이터가 이미 있으면 제외
@@ -91,20 +87,13 @@ export async function GET(request: NextRequest) {
       console.error('Yahoo Finance search error:', yahooError)
 
       // Yahoo Finance 실패 시 로컬 저장 데이터만 반환
-      const { data: searches, error } = await supabase
-        .from('searches')
-        .select('ticker, company_name')
-        .or(`ticker.ilike.${q}%,company_name.ilike.%${q}%`)
-        .order('ticker', { ascending: true })
-        .limit(10)
-
-      if (error) throw error
+      const searches = await findSavedStockSuggestions(supabase, q, 10)
 
       const results = searches.map(s => ({
         ticker: s.ticker,
         symbol: s.ticker,
-        companyName: s.company_name,
-        longname: s.company_name,
+        companyName: s.companyName,
+        longname: s.companyName,
       }))
 
       return createSuccessResponse(results, 200)

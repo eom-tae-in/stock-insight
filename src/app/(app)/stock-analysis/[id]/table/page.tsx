@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
 import { TableHeader } from '@/components/shared/table-header'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getSearchById } from '@/lib/db/queries'
+import { getSavedSearch } from '@/server/stock-search-service'
 import { calculateMA13, calculateWeeklyYoY } from '@/lib/calculations'
 import { ArrowLeft } from 'lucide-react'
 
@@ -31,8 +31,7 @@ export default async function TablePage({ params }: TablePageProps) {
     notFound()
   }
 
-  // userId를 전달하여 RLS 검증 (필수)
-  const record = await getSearchById(id, user.id, supabase)
+  const record = await getSavedSearch(supabase, user.id, id)
 
   if (!record) {
     notFound()

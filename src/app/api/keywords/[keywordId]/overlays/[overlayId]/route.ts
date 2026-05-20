@@ -28,7 +28,12 @@ export async function DELETE(
     }
 
     const { keywordId, overlayId } = await params
-    const result = await deleteKeywordOverlay(supabase, keywordId, overlayId)
+    const result = await deleteKeywordOverlay(
+      supabase,
+      authResult.userId,
+      keywordId,
+      overlayId
+    )
     return createSuccessResponse(result, 200)
   } catch (error) {
     if (error instanceof ApiServiceError) {
