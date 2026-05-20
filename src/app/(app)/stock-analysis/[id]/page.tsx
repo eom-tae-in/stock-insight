@@ -6,7 +6,7 @@ import { UnifiedChart } from '@/components/stock/unified-chart'
 import { CustomChartBuilder } from '@/components/stock/custom-chart-builder'
 import { CustomChartView } from '@/components/stock/custom-chart-view'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getSearchById } from '@/lib/db/queries'
+import { getSavedSearch } from '@/server/stock-search-service'
 import { calculateMetrics, calculateMA13 } from '@/lib/calculations'
 import { Table as TableIcon } from 'lucide-react'
 
@@ -34,8 +34,7 @@ export default async function StockAnalysisDetailPage({
     notFound()
   }
 
-  // userId를 전달하여 RLS 검증 (필수)
-  const record = await getSearchById(id, user.id, supabase)
+  const record = await getSavedSearch(supabase, user.id, id)
 
   if (!record) {
     notFound()

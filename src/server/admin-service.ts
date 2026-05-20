@@ -1,6 +1,8 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import YahooFinance from 'yahoo-finance2'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import type { AdminReportRepository } from './repositories/admin-report-repository'
+import { SupabaseAdminReportRepository } from './repositories/supabase-admin-report-repository'
 
 export type AdminStatusLevel = 'ok' | 'warning' | 'error' | 'disabled'
 
@@ -66,76 +68,6 @@ export type AdminSummary = {
   anomalies: AdminAnomaly[]
 }
 
-type TrendsPoint = {
-  date?: unknown
-  value?: unknown
-}
-
-type TimeseriesPoint = {
-  date?: unknown
-}
-
-type KeywordJoin = {
-  name?: string | null
-  user_id?: string | null
-}
-
-type AnalysisJoin = {
-  region?: string | null
-  search_type?: string | null
-  keywords?: KeywordJoin | KeywordJoin[] | null
-}
-
-type AnalysisRow = {
-  id: string
-  region: string | null
-  period: string | null
-  search_type: string | null
-  trends_data: TrendsPoint[] | null
-  updated_at: string | null
-  created_at: string | null
-  keywords?: KeywordJoin | KeywordJoin[] | null
-}
-
-type AdminRecentAnalysisRow = {
-  id: string
-  keyword_name: string | null
-  region: string | null
-  period: string | null
-  search_type: string | null
-  trends_data: TrendsPoint[] | null
-  created_at: string | null
-  updated_at: string | null
-  recent_at: string | null
-}
-
-type OverlayRow = {
-  id: string
-  ticker: string | null
-  company_name: string | null
-  last_refreshed_at: string | null
-  created_at: string | null
-  overlay_chart_timeseries?: TimeseriesPoint[] | null
-  keyword_analysis?: AnalysisJoin | AnalysisJoin[] | null
-}
-
-type AdminRecentOverlayRow = {
-  id: string
-  ticker: string | null
-  company_name: string | null
-  last_refreshed_at: string | null
-  created_at: string | null
-  recent_at: string | null
-  region: string | null
-  period: string | null
-  search_type: string | null
-  keyword_name: string | null
-  overlay_chart_timeseries?: TimeseriesPoint[] | null
-}
-
-const MIN_TREND_POINTS = 52
-const RECENT_DISPLAY_LIMIT = 20
-
 const yf = new YahooFinance()
 const ADMIN_KEY_PLACEHOLDERS = new Set([
   '추가해야함',
@@ -144,9 +76,6 @@ const ADMIN_KEY_PLACEHOLDERS = new Set([
   'your_supabase_service_role_key_here',
   'your_legacy_supabase_service_role_key_here',
 ])
-
-type SupabaseTableQuery = ReturnType<SupabaseClient['from']>
-type CountQuery = ReturnType<SupabaseTableQuery['select']>
 
 function readAdminKey(value: string | undefined) {
   const trimmed = value?.trim()
@@ -174,56 +103,6 @@ function getAdminDataClient(fallbackClient: SupabaseClient) {
     scope: 'global' as const,
     scopeMessage: '서비스 역할 키로 전체 운영 데이터를 표시합니다.',
   }
-}
-
-function getJoinedKeyword(join?: KeywordJoin | KeywordJoin[] | null) {
-  const keyword = Array.isArray(join) ? join[0] : join
-  return keyword?.name ?? '-'
-}
-
-function getJoinedAnalysis(join?: AnalysisJoin | AnalysisJoin[] | null) {
-  return Array.isArray(join) ? join[0] : join
-}
-
-function getTrendDates(trendsData: TrendsPoint[] | null | undefined) {
-  const dates = (trendsData ?? [])
-    .map(point => point.date)
-    .filter((date): date is string => typeof date === 'string')
-    .sort((a, b) => a.localeCompare(b))
-
-  return {
-    pointCount: dates.length,
-    firstDate: dates[0] ?? null,
-    lastDate: dates.at(-1) ?? null,
-  }
-}
-
-function getTimeseriesDates(points: TimeseriesPoint[] | null | undefined) {
-  const dates = (points ?? [])
-    .map(point => point.date)
-    .filter((date): date is string => typeof date === 'string')
-    .sort((a, b) => a.localeCompare(b))
-
-  return {
-    pointCount: dates.length,
-    firstDate: dates[0] ?? null,
-    lastDate: dates.at(-1) ?? null,
-  }
-}
-
-async function getCount(
-  supabase: SupabaseClient,
-  table: string,
-  build?: (query: CountQuery) => CountQuery
-) {
-  let query = supabase.from(table).select('*', { count: 'exact', head: true })
-  if (build) {
-    query = build(query)
-  }
-
-  const { count, error } = await query
-  if (error) throw error
-  return count ?? 0
 }
 
 async function getRedisStatus(): Promise<AdminSystemStatus> {
@@ -323,10 +202,10 @@ async function getYahooStatus(): Promise<AdminSystemStatus> {
 }
 
 async function getSupabaseStatus(
-  supabase: SupabaseClient
+  repository: AdminReportRepository
 ): Promise<AdminSystemStatus> {
   try {
-    await getCount(supabase, 'keywords')
+    await repository.checkDatabase()
     return {
       id: 'supabase',
       label: 'Supabase',
@@ -343,147 +222,77 @@ async function getSupabaseStatus(
   }
 }
 
-async function getUserCount(
-  supabase: SupabaseClient,
-  scope: AdminSummary['scope']
+export function createAdminSummaryService(
+  reportRepository: AdminReportRepository
 ) {
-  if (scope !== 'global') return null
+  return {
+    async getAdminSummary(
+      scope: AdminSummary['scope'],
+      scopeMessage: string
+    ): Promise<AdminSummary> {
+      const [supabaseStatus, redisStatus, yahooStatus] = await Promise.all([
+        getSupabaseStatus(reportRepository),
+        getRedisStatus(),
+        getYahooStatus(),
+      ])
 
-  const { data, error } = await supabase.auth.admin.listUsers({
-    page: 1,
-    perPage: 1,
-  })
+      const [
+        userCount,
+        keywordCount,
+        analysisCount,
+        overlayCount,
+        unrefreshedOverlayCount,
+        recentAnalyses,
+        recentOverlays,
+        anomalies,
+      ] = await Promise.all([
+        reportRepository.getUserCount(scope),
+        reportRepository.getKeywordCount(),
+        reportRepository.getAnalysisCount(),
+        reportRepository.getOverlayCount(),
+        reportRepository.getUnrefreshedOverlayCount(),
+        reportRepository.findRecentAnalyses(),
+        reportRepository.findRecentOverlays(),
+        reportRepository.findAnomalies(),
+      ])
 
-  if (error) return null
-  return data.total ?? null
-}
-
-async function getRecentAnalyses(supabase: SupabaseClient) {
-  const { data, error } = await supabase
-    .from('admin_recent_keyword_analysis')
-    .select(
-      'id, keyword_name, region, period, search_type, trends_data, created_at, updated_at, recent_at'
-    )
-    .order('recent_at', { ascending: false })
-    .limit(RECENT_DISPLAY_LIMIT)
-
-  if (error) throw error
-
-  return ((data ?? []) as AdminRecentAnalysisRow[]).map(row => {
-    const dates = getTrendDates(row.trends_data)
-    return {
-      id: row.id,
-      keyword: row.keyword_name ?? '-',
-      region: row.region ?? '-',
-      searchType: row.search_type ?? '-',
-      period: row.period ?? '-',
-      pointCount: dates.pointCount,
-      firstDate: dates.firstDate,
-      lastDate: dates.lastDate,
-      refreshedAt: row.recent_at ?? row.updated_at ?? row.created_at,
-    }
-  })
-}
-
-async function getRecentOverlays(supabase: SupabaseClient) {
-  const { data, error } = await supabase
-    .from('admin_recent_keyword_stock_overlays')
-    .select(
-      'id, ticker, company_name, last_refreshed_at, created_at, recent_at, region, period, search_type, keyword_name, overlay_chart_timeseries'
-    )
-    .order('recent_at', { ascending: false })
-    .limit(RECENT_DISPLAY_LIMIT)
-
-  if (error) throw error
-
-  return ((data ?? []) as AdminRecentOverlayRow[]).map(row => {
-    const dates = getTimeseriesDates(row.overlay_chart_timeseries)
-
-    return {
-      id: row.id,
-      keyword: row.keyword_name ?? '-',
-      conditionLabel: `${row.region ?? '-'} / ${row.search_type ?? '-'}`,
-      ticker: row.ticker ?? '-',
-      companyName: row.company_name ?? '-',
-      pointCount: dates.pointCount,
-      firstDate: dates.firstDate,
-      lastDate: dates.lastDate,
-      refreshedAt: row.recent_at ?? row.last_refreshed_at ?? row.created_at,
-    }
-  })
-}
-
-async function getAnomalies(supabase: SupabaseClient): Promise<AdminAnomaly[]> {
-  const anomalies: AdminAnomaly[] = []
-
-  const { data: analyses } = await supabase
-    .from('keyword_analysis')
-    .select(
-      'id, region, search_type, trends_data, created_at, updated_at, keywords(name, user_id)'
-    )
-    .order('updated_at', { ascending: false, nullsFirst: false })
-    .limit(100)
-
-  for (const row of ((analyses ?? []) as AnalysisRow[]).slice(0, 100)) {
-    const dates = getTrendDates(row.trends_data)
-    if (dates.pointCount === 0 || dates.pointCount < MIN_TREND_POINTS) {
-      anomalies.push({
-        id: row.id,
-        type: 'analysis',
-        label: getJoinedKeyword(row.keywords),
-        reason:
-          dates.pointCount === 0 ? '트렌드 데이터 없음' : '트렌드 포인트 부족',
-        detail: `${row.region ?? '-'} / ${row.search_type ?? '-'} · ${dates.pointCount}개`,
-      })
-    }
+      return {
+        generatedAt: new Date().toISOString(),
+        scope,
+        scopeMessage,
+        environment: {
+          nodeEnv: process.env.NODE_ENV ?? 'development',
+          vercelEnv: process.env.VERCEL_ENV ?? null,
+          vercelUrl: process.env.VERCEL_URL ?? null,
+        },
+        statuses: [
+          supabaseStatus,
+          redisStatus,
+          getPytrendsStatus(),
+          yahooStatus,
+        ],
+        metrics: [
+          { id: 'users', label: '사용자', value: userCount },
+          { id: 'keywords', label: '키워드', value: keywordCount },
+          { id: 'analyses', label: '분석 조건', value: analysisCount },
+          { id: 'overlays', label: '티커 연동', value: overlayCount },
+          {
+            id: 'unrefreshedOverlays',
+            label: '갱신 이력 없음',
+            value: unrefreshedOverlayCount,
+            helper: '수동 갱신 기록 없음',
+          },
+        ],
+        recentAnalyses,
+        recentOverlays,
+        anomalies,
+      }
+    },
   }
+}
 
-  const { data: overlays } = await supabase
-    .from('keyword_stock_overlays')
-    .select(
-      'id, ticker, company_name, last_refreshed_at, created_at, overlay_chart_timeseries(date), keyword_analysis(region, search_type, keywords(name, user_id))'
-    )
-    .order('created_at', { ascending: false })
-    .limit(100)
-
-  for (const row of ((overlays ?? []) as OverlayRow[]).slice(0, 100)) {
-    const analysis = getJoinedAnalysis(row.keyword_analysis)
-    const dates = getTimeseriesDates(row.overlay_chart_timeseries)
-
-    if (!row.ticker?.trim()) {
-      anomalies.push({
-        id: row.id,
-        type: 'overlay',
-        label: `- · ${getJoinedKeyword(analysis?.keywords)}`,
-        reason: '티커 값 없음',
-        detail: `${analysis?.region ?? '-'} / ${analysis?.search_type ?? '-'} · ${dates.pointCount}개`,
-      })
-      continue
-    }
-
-    if (!analysis) {
-      anomalies.push({
-        id: row.id,
-        type: 'overlay',
-        label: `${row.ticker} · -`,
-        reason: '분석 조건 연결 없음',
-        detail: `연결된 keyword_analysis 없음 · ${dates.pointCount}개`,
-      })
-      continue
-    }
-
-    if (dates.pointCount === 0) {
-      anomalies.push({
-        id: row.id,
-        type: 'overlay',
-        label: `${row.ticker} · ${getJoinedKeyword(analysis.keywords)}`,
-        reason: '주가 데이터 없음',
-        detail: `${analysis.region ?? '-'} / ${analysis.search_type ?? '-'} · ${dates.pointCount}개`,
-      })
-    }
-  }
-
-  return anomalies.slice(0, 30)
+function createSupabaseAdminReportRepository(supabase: SupabaseClient) {
+  return new SupabaseAdminReportRepository(supabase)
 }
 
 export async function getAdminSummary(): Promise<AdminSummary> {
@@ -493,59 +302,9 @@ export async function getAdminSummary(): Promise<AdminSummary> {
     scope,
     scopeMessage,
   } = getAdminDataClient(sessionClient)
+  const service = createAdminSummaryService(
+    createSupabaseAdminReportRepository(supabase)
+  )
 
-  const [supabaseStatus, redisStatus, yahooStatus] = await Promise.all([
-    getSupabaseStatus(supabase),
-    getRedisStatus(),
-    getYahooStatus(),
-  ])
-
-  const [
-    userCount,
-    keywordCount,
-    analysisCount,
-    overlayCount,
-    unrefreshedOverlayCount,
-    recentAnalyses,
-    recentOverlays,
-    anomalies,
-  ] = await Promise.all([
-    getUserCount(supabase, scope),
-    getCount(supabase, 'keywords'),
-    getCount(supabase, 'keyword_analysis'),
-    getCount(supabase, 'keyword_stock_overlays'),
-    getCount(supabase, 'keyword_stock_overlays', query =>
-      query.is('last_refreshed_at', null)
-    ),
-    getRecentAnalyses(supabase),
-    getRecentOverlays(supabase),
-    getAnomalies(supabase),
-  ])
-
-  return {
-    generatedAt: new Date().toISOString(),
-    scope,
-    scopeMessage,
-    environment: {
-      nodeEnv: process.env.NODE_ENV ?? 'development',
-      vercelEnv: process.env.VERCEL_ENV ?? null,
-      vercelUrl: process.env.VERCEL_URL ?? null,
-    },
-    statuses: [supabaseStatus, redisStatus, getPytrendsStatus(), yahooStatus],
-    metrics: [
-      { id: 'users', label: '사용자', value: userCount },
-      { id: 'keywords', label: '키워드', value: keywordCount },
-      { id: 'analyses', label: '분석 조건', value: analysisCount },
-      { id: 'overlays', label: '티커 연동', value: overlayCount },
-      {
-        id: 'unrefreshedOverlays',
-        label: '갱신 이력 없음',
-        value: unrefreshedOverlayCount,
-        helper: '수동 갱신 기록 없음',
-      },
-    ],
-    recentAnalyses,
-    recentOverlays,
-    anomalies,
-  }
+  return service.getAdminSummary(scope, scopeMessage)
 }

@@ -8,13 +8,11 @@ import {
   type StockDataPeriod,
 } from '@/server/cached-stock-service'
 import { calculateMetrics, getWeeklyOHLC } from '@/lib/calculations'
-import {
-  deleteSearch,
-  getSearchByTicker,
-  insertPriceData,
-  upsertSearch,
-} from '@/lib/db/queries'
 import type { PriceDataPoint, SearchRecord } from '@/types'
+import type { StockPriceRepository } from './repositories/stock-price-repository'
+import type { StockSearchRepository } from './repositories/stock-search-repository'
+import { SupabaseStockPriceRepository } from './repositories/supabase-stock-price-repository'
+import { SupabaseStockSearchRepository } from './repositories/supabase-stock-search-repository'
 
 export type StockAnalysisData = {
   ticker: string
@@ -83,62 +81,87 @@ export async function saveStockAnalysisAsSearch(
   userId: string,
   input: SaveStockAnalysisInput
 ) {
-  const normalizedTicker = input.ticker.trim().toUpperCase()
-  if (!normalizedTicker || input.priceData.length === 0) {
-    throw new StockAnalysisServiceError(
-      'STOCK_DATA_NOT_FOUND',
-      '종목 데이터를 찾을 수 없습니다.',
-      404
-    )
-  }
-
-  const existingSearch = await getSearchByTicker(
-    normalizedTicker,
+  return createSupabaseStockAnalysisService(supabase).saveStockAnalysisAsSearch(
     userId,
-    supabase
+    input
   )
-  if (existingSearch) {
-    throw new StockAnalysisServiceError(
-      'ALREADY_SAVED',
-      '이미 저장된 종목입니다.',
-      409
-    )
-  }
+}
 
-  const now = new Date()
-  const metrics = calculateMetrics(input.priceData)
-  const weeklyOHLC = getWeeklyOHLC(input.priceData)
-
-  const searchRecord: SearchRecord = {
-    id: crypto.randomUUID(),
-    ticker: normalizedTicker,
-    company_name: input.companyName,
-    currency: input.currency,
-    weekly_open: weeklyOHLC.open,
-    weekly_high: weeklyOHLC.high,
-    weekly_low: weeklyOHLC.low,
-    current_price: metrics.currentPrice,
-    previous_close: metrics.previousClose,
-    ma13: metrics.ma13,
-    yoy_change: metrics.yoyChange,
-    price_data: input.priceData,
-    searched_at: now.toISOString(),
-    created_at: now.toISOString(),
-    last_updated_at: now.toISOString(),
-    user_id: userId,
-  }
-
-  const savedId = await upsertSearch(searchRecord, supabase)
-
-  try {
-    await insertPriceData(savedId, input.priceData, supabase)
-  } catch (error) {
-    await deleteSearch(savedId, supabase)
-    throw error
-  }
-
+export function createStockAnalysisService(
+  searchRepository: StockSearchRepository,
+  priceRepository: StockPriceRepository
+) {
   return {
-    id: savedId,
-    ticker: normalizedTicker,
+    async saveStockAnalysisAsSearch(
+      userId: string,
+      input: SaveStockAnalysisInput
+    ) {
+      const normalizedTicker = input.ticker.trim().toUpperCase()
+      if (!normalizedTicker || input.priceData.length === 0) {
+        throw new StockAnalysisServiceError(
+          'STOCK_DATA_NOT_FOUND',
+          '종목 데이터를 찾을 수 없습니다.',
+          404
+        )
+      }
+
+      const existingSearch = await searchRepository.findByTicker(
+        userId,
+        normalizedTicker
+      )
+      if (existingSearch) {
+        throw new StockAnalysisServiceError(
+          'ALREADY_SAVED',
+          '이미 저장된 종목입니다.',
+          409
+        )
+      }
+
+      const now = new Date()
+      const metrics = calculateMetrics(input.priceData)
+      const weeklyOHLC = getWeeklyOHLC(input.priceData)
+
+      const searchRecord: SearchRecord = {
+        id: crypto.randomUUID(),
+        ticker: normalizedTicker,
+        company_name: input.companyName,
+        currency: input.currency,
+        weekly_open: weeklyOHLC.open,
+        weekly_high: weeklyOHLC.high,
+        weekly_low: weeklyOHLC.low,
+        current_price: metrics.currentPrice,
+        previous_close: metrics.previousClose,
+        ma13: metrics.ma13,
+        yoy_change: metrics.yoyChange,
+        price_data: input.priceData,
+        searched_at: now.toISOString(),
+        created_at: now.toISOString(),
+        last_updated_at: now.toISOString(),
+        user_id: userId,
+      }
+
+      const savedId = await searchRepository.upsert(searchRecord)
+
+      try {
+        await priceRepository.upsertMany(savedId, input.priceData)
+      } catch (error) {
+        await searchRepository.deleteById(userId, savedId)
+        throw error
+      }
+
+      return {
+        id: savedId,
+        ticker: normalizedTicker,
+      }
+    },
   }
+}
+
+function createSupabaseStockAnalysisService(supabase: SupabaseClient) {
+  const priceRepository = new SupabaseStockPriceRepository(supabase)
+  const searchRepository = new SupabaseStockSearchRepository(
+    supabase,
+    priceRepository
+  )
+  return createStockAnalysisService(searchRepository, priceRepository)
 }

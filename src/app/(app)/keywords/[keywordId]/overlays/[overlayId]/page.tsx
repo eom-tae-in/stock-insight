@@ -10,7 +10,6 @@
 import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { OverlayDetailClient } from '@/components/overlays/overlay-detail-client'
-import { getOverlayChartTimeseries } from '@/lib/db/queries'
 import { getKeyword } from '@/server/keywords-service'
 import type { Region, SearchType, TrendsDataPoint } from '@/types/database'
 
@@ -56,45 +55,20 @@ export default async function OverlayDetailPage({
     redirect('/keyword-analysis')
   }
 
-  // 2. overlayId가 실제 속한 analysis 조회
-  const { data: overlayRecord, error: overlayError } = await supabase
-    .from('keyword_stock_overlays')
-    .select(
-      `
-        id,
-        ticker,
-        company_name,
-        analysis_id,
-        keyword_analysis!inner(
-          id,
-          keyword_id,
-          region,
-          search_type,
-          trends_data
-        )
-      `
-    )
-    .eq('id', overlayId)
-    .single()
+  const analysis = keyword.analyses?.find(item =>
+    item.overlays?.some(overlay => overlay.id === overlayId)
+  )
+  const overlayRecord = analysis?.overlays?.find(
+    overlay => overlay.id === overlayId
+  )
 
-  if (overlayError || !overlayRecord) {
-    redirect(`/keywords/${keywordId}`)
-  }
-
-  const analysis = Array.isArray(overlayRecord.keyword_analysis)
-    ? overlayRecord.keyword_analysis[0]
-    : overlayRecord.keyword_analysis
-
-  if (!analysis || analysis.keyword_id !== keywordId) {
+  if (!analysis || !overlayRecord) {
     redirect(`/keywords/${keywordId}`)
   }
 
   const chartTimeseries = toChartTimeseries(
     (analysis.trends_data as TrendsDataPoint[]) ?? []
   )
-
-  // 4. 오버레이 차트 시계열 조회
-  const overlayChartData = await getOverlayChartTimeseries(overlayId, supabase)
 
   return (
     <OverlayDetailClient
@@ -110,7 +84,11 @@ export default async function OverlayDetailPage({
         companyName: overlayRecord.company_name,
       }}
       chartData={chartTimeseries}
-      overlayChartData={overlayChartData}
+      overlayChartData={(overlayRecord.chart_data ?? []).map(point => ({
+        date: point.date,
+        normalizedPrice: point.normalizedPrice ?? 0,
+        rawPrice: point.rawPrice ?? 0,
+      }))}
     />
   )
 }

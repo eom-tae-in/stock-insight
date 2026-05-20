@@ -10,7 +10,7 @@
 import { Container } from '@/components/layout/container'
 import { DashboardClient } from '@/components/stock/dashboard-client'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getAllSearches } from '@/lib/db/queries'
+import { getSavedSearches } from '@/server/stock-search-service'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,8 +37,7 @@ export default async function StockAnalysisPage() {
     )
   }
 
-  // userId를 전달하여 RLS 검증 (필수)
-  const records = await getAllSearches(user.id, supabase)
+  const records = await getSavedSearches(supabase, user.id)
 
   return (
     <Container className="py-8">

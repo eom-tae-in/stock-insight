@@ -39,6 +39,8 @@ Thumbs.db
 
 # Generated files
 next-env.d.ts
+test-results/
+playwright-report/
 
 # Python virtual environment
 venv/

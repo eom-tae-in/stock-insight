@@ -11,7 +11,6 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getAllSearches } from '@/lib/db/queries'
 import {
   createSuccessResponse,
   createErrorResponse,
@@ -21,6 +20,7 @@ import {
   saveStockAnalysisAsSearch,
   StockAnalysisServiceError,
 } from '@/server/stock-analysis-service'
+import { getSavedSearches } from '@/server/stock-search-service'
 import { PriceDataPointSchema, TickerInputSchema } from '@/lib/validation'
 import { z } from 'zod'
 
@@ -44,8 +44,7 @@ export async function GET() {
     }
     const { userId } = authResult
 
-    // 인증된 클라이언트로 DB에서 자신의 저장된 종목 조회 (RLS 적용)
-    const records = await getAllSearches(userId, supabase)
+    const records = await getSavedSearches(supabase, userId)
 
     return createSuccessResponse(records, 200)
   } catch (error) {

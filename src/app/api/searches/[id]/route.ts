@@ -10,12 +10,15 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getSearchById, deleteSearch } from '@/lib/db/queries'
 import {
   createErrorResponse,
   validateApiAuth,
   createSuccessResponse,
 } from '@/lib/api-helpers'
+import {
+  deleteSavedSearch,
+  getSavedSearch,
+} from '@/server/stock-search-service'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,8 +42,7 @@ export async function GET(
       return createErrorResponse('INVALID_ID', '유효하지 않은 ID입니다.', 400)
     }
 
-    // userId를 전달하여 RLS 검증 (필수)
-    const search = await getSearchById(id, userId, supabase)
+    const search = await getSavedSearch(supabase, userId, id)
 
     if (!search) {
       return createErrorResponse(
@@ -80,8 +82,7 @@ export async function DELETE(
       return createErrorResponse('INVALID_ID', '유효하지 않은 ID입니다.', 400)
     }
 
-    // 인증된 클라이언트로 삭제 (RLS가 본인 데이터만 삭제 보장)
-    const deleted = await deleteSearch(id, supabase)
+    const deleted = await deleteSavedSearch(supabase, authResult.userId, id)
 
     if (!deleted) {
       return createErrorResponse(
