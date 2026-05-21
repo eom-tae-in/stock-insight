@@ -5,6 +5,10 @@ import {
   AnalysisOverlayServiceError,
   refreshAnalysisOverlay,
 } from '@/server/analysis-overlays-service'
+import {
+  AnalysisServiceError,
+  refreshKeywordAnalysis,
+} from '@/server/keyword-analyses-service'
 
 const supabaseMock = vi.hoisted(() => ({
   auth: {
@@ -23,6 +27,16 @@ vi.mock('@/server/analysis-overlays-service', async importOriginal => {
   return {
     AnalysisOverlayServiceError: actual.AnalysisOverlayServiceError,
     refreshAnalysisOverlay: vi.fn(),
+  }
+})
+
+vi.mock('@/server/keyword-analyses-service', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/server/keyword-analyses-service')>()
+
+  return {
+    AnalysisServiceError: actual.AnalysisServiceError,
+    refreshKeywordAnalysis: vi.fn(),
   }
 })
 
@@ -47,7 +61,7 @@ async function readJson(response: Response) {
 
 describe('analysis overlay refresh API integration', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    vi.resetAllMocks()
     authenticate()
   })
 
@@ -71,10 +85,13 @@ describe('analysis overlay refresh API integration', () => {
       error: { code: 'UNAUTHORIZED' },
     })
     expect(refreshAnalysisOverlay).not.toHaveBeenCalled()
+    expect(refreshKeywordAnalysis).not.toHaveBeenCalled()
   })
 
-  it('refreshes an overlay for the authenticated user', async () => {
+  it('refreshes the shared analysis before refreshing the overlay', async () => {
+    const analysis = { id: 'analysis-1', trends_data: [] }
     const overlay = { id: 'overlay-1', ticker: 'AAPL' }
+    vi.mocked(refreshKeywordAnalysis).mockResolvedValue(analysis as never)
     vi.mocked(refreshAnalysisOverlay).mockResolvedValue(overlay as never)
 
     const response = await POST(
@@ -90,12 +107,47 @@ describe('analysis overlay refresh API integration', () => {
       success: true,
       data: overlay,
     })
+    expect(refreshKeywordAnalysis).toHaveBeenCalledWith(
+      supabaseMock,
+      'user-1',
+      'analysis-1'
+    )
     expect(refreshAnalysisOverlay).toHaveBeenCalledWith(
       supabaseMock,
       'user-1',
       'analysis-1',
       'overlay-1'
     )
+    expect(
+      vi.mocked(refreshKeywordAnalysis).mock.invocationCallOrder[0]
+    ).toBeLessThan(
+      vi.mocked(refreshAnalysisOverlay).mock.invocationCallOrder[0]
+    )
+  })
+
+  it('maps analysis refresh service errors before refreshing the overlay', async () => {
+    vi.mocked(refreshKeywordAnalysis).mockRejectedValue(
+      new AnalysisServiceError(
+        'TRENDS_RATE_LIMITED',
+        '트렌드 데이터를 갱신하지 못했습니다.',
+        429
+      )
+    )
+
+    const response = await POST(
+      new NextRequest(
+        'http://localhost/api/analyses/analysis-1/overlays/overlay-1/refreshes'
+      ),
+      params()
+    )
+    const body = await readJson(response)
+
+    expect(response.status).toBe(429)
+    expect(body).toMatchObject({
+      success: false,
+      error: { code: 'TRENDS_RATE_LIMITED' },
+    })
+    expect(refreshAnalysisOverlay).not.toHaveBeenCalled()
   })
 
   it('maps overlay refresh service errors', async () => {

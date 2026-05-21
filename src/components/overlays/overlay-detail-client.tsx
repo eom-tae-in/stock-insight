@@ -47,6 +47,12 @@ const SEARCH_TYPE_LABEL: Record<string, string> = {
   SHOPPING: '쇼핑',
 }
 
+function getFiveYearCutoffDate(latestDate: string) {
+  const cutoff = new Date(`${latestDate}T00:00:00.000Z`)
+  cutoff.setUTCFullYear(cutoff.getUTCFullYear() - 5)
+  return cutoff.toISOString().slice(0, 10)
+}
+
 interface OverlayDetailClientProps {
   keyword: KeywordRecord
   analysisContext: {
@@ -86,13 +92,31 @@ export function OverlayDetailClient({
   // 차트 데이터 병합
   const mergedChartData = useMemo(() => {
     const keywordMap = new Map(chartData.map(d => [d.date, d]))
-    return overlayChartData.map(point => ({
-      date: point.date,
-      trendsValue: keywordMap.get(point.date)?.trendsValue ?? null,
-      ma13Value: keywordMap.get(point.date)?.ma13Value ?? null,
-      normalizedPrice: point.normalizedPrice,
-      yoyValue: keywordMap.get(point.date)?.yoyValue ?? null,
-    }))
+    const overlayMap = new Map(overlayChartData.map(d => [d.date, d]))
+    const dates = Array.from(
+      new Set([
+        ...chartData.map(point => point.date),
+        ...overlayChartData.map(point => point.date),
+      ])
+    ).sort((a, b) => a.localeCompare(b))
+
+    const latestDate = dates.at(-1)
+    const cutoffDate = latestDate ? getFiveYearCutoffDate(latestDate) : null
+
+    return dates
+      .filter(date => !cutoffDate || date >= cutoffDate)
+      .map(date => {
+        const keywordPoint = keywordMap.get(date)
+        const overlayPoint = overlayMap.get(date)
+
+        return {
+          date,
+          trendsValue: keywordPoint?.trendsValue ?? null,
+          ma13Value: keywordPoint?.ma13Value ?? null,
+          normalizedPrice: overlayPoint?.normalizedPrice ?? null,
+          yoyValue: keywordPoint?.yoyValue ?? null,
+        }
+      })
   }, [chartData, overlayChartData])
 
   // 현재 MA13 값 (서버에서 계산된 값 사용)
@@ -129,13 +153,13 @@ export function OverlayDetailClient({
         `/api/analyses/${analysisContext.analysisId}/overlays/${overlay.id}/refreshes`,
         { method: 'POST' }
       )
-      toast.success('티커 연동 차트를 최신화했습니다.')
+      toast.success('연동 차트를 최신화했습니다.')
       router.refresh()
     } catch (error) {
       toast.error(
         error instanceof Error
           ? error.message
-          : '티커 연동 차트 최신화에 실패했습니다.'
+          : '연동 차트 최신화에 실패했습니다.'
       )
     } finally {
       setIsRefreshingOverlay(false)
@@ -170,7 +194,7 @@ export function OverlayDetailClient({
             <RefreshCw
               className={`mr-2 h-4 w-4 ${isRefreshingOverlay ? 'animate-spin' : ''}`}
             />
-            {isRefreshingOverlay ? '최신화 중' : '티커 최신화'}
+            {isRefreshingOverlay ? '최신화 중' : '연동 차트 최신화'}
           </Button>
         </div>
 
@@ -348,7 +372,7 @@ export function OverlayDetailClient({
                       d.date,
                       d.trendsValue ?? '',
                       d.ma13Value ?? '',
-                      d.normalizedPrice,
+                      d.normalizedPrice ?? '',
                       d.yoyValue ?? '',
                     ]),
                   ]

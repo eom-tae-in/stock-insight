@@ -62,6 +62,13 @@ const chartData = [
     ma13Value: 48.2,
     yoyValue: 12.34,
   },
+  {
+    weekIndex: 1,
+    date: '2026-01-08',
+    trendsValue: 55,
+    ma13Value: 49.5,
+    yoyValue: 15.25,
+  },
 ]
 
 const overlayChartData = [
@@ -106,8 +113,8 @@ describe('OverlayDetailClient integration', () => {
     expect(
       screen.getByText('현재 분석 조건: 전체 · 웹 검색 · 5Y')
     ).toBeInTheDocument()
-    expect(screen.getByText('48.20')).toBeInTheDocument()
-    expect(screen.getByText('+12.34%')).toHaveClass('text-green-600')
+    expect(screen.getByText('49.50')).toBeInTheDocument()
+    expect(screen.getByText('+15.25%')).toHaveClass('text-green-600')
     expect(screen.getByTestId('line-chart')).toBeInTheDocument()
     expect(screen.getByText('AAPL 주가')).toBeInTheDocument()
   })
@@ -134,7 +141,7 @@ describe('OverlayDetailClient integration', () => {
       />
     )
 
-    await user.click(screen.getByRole('button', { name: /티커 최신화/ }))
+    await user.click(screen.getByRole('button', { name: /연동 차트 최신화/ }))
 
     await waitFor(() =>
       expect(apiFetchJson).toHaveBeenCalledWith(
@@ -143,7 +150,7 @@ describe('OverlayDetailClient integration', () => {
       )
     )
     expect(toastMock.success).toHaveBeenCalledWith(
-      '티커 연동 차트를 최신화했습니다.'
+      '연동 차트를 최신화했습니다.'
     )
     expect(routerMock.refresh).toHaveBeenCalled()
   })
@@ -170,7 +177,7 @@ describe('OverlayDetailClient integration', () => {
       />
     )
 
-    await user.click(screen.getByRole('button', { name: /티커 최신화/ }))
+    await user.click(screen.getByRole('button', { name: /연동 차트 최신화/ }))
 
     await waitFor(() =>
       expect(toastMock.error).toHaveBeenCalledWith('refresh failed')
