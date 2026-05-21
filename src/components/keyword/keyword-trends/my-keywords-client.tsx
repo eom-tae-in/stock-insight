@@ -434,7 +434,7 @@ function KeywordConditionCard({
       ? `${chartData[0].date} ~ ${chartData[chartData.length - 1].date}`
       : '데이터 없음'
   const tooltipRect = chartWrapperRef.current?.getBoundingClientRect()
-  const refreshLabel = entry.overlay ? '티커 최신화' : '분석 최신화'
+  const refreshLabel = entry.overlay ? '연동 차트 최신화' : '분석 최신화'
   const href = entry.overlay
     ? `/keywords/${entry.keyword.id}/overlays/${entry.overlay.id}`
     : `/keywords/${entry.keyword.id}?region=${entry.analysis.region}&searchType=${entry.analysis.search_type}`
@@ -1449,12 +1449,12 @@ export function MyKeywordsClient({ initialKeywords }: MyKeywordsClientProps) {
         }
       )
       await fetchKeywords()
-      toast.success('티커 연동 차트를 최신화했습니다.')
+      toast.success('연동 차트를 최신화했습니다.')
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
-          : '티커 연동 차트 최신화에 실패했습니다.'
+          : '연동 차트 최신화에 실패했습니다.'
       toast.error(message)
     } finally {
       setRefreshingOverlayIds(prev => {

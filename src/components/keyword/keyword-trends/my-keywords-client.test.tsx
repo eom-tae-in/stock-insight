@@ -312,4 +312,39 @@ describe('MyKeywordsClient integration', () => {
       '분석 조건을 최신화했습니다.'
     )
   })
+
+  it('refreshes a linked chart and reloads keyword cards in ticker mode', async () => {
+    const user = userEvent.setup()
+    const keyword = makeKeyword()
+    vi.mocked(apiFetchJson).mockImplementation(async input => {
+      if (
+        String(input) ===
+        '/api/analyses/analysis-1/overlays/overlay-1/refreshes'
+      ) {
+        return {}
+      }
+      if (String(input) === '/api/keywords') return [keyword]
+      throw new Error(`Unexpected request: ${String(input)}`)
+    })
+
+    render(<MyKeywordsClient initialKeywords={[keyword]} />)
+
+    await user.click(
+      screen.getByRole('button', {
+        name: '키워드 + 분석 조건 + 티커 연동',
+      })
+    )
+    await user.click(screen.getByRole('button', { name: /연동 차트 최신화/ }))
+
+    await waitFor(() =>
+      expect(apiFetchJson).toHaveBeenCalledWith(
+        '/api/analyses/analysis-1/overlays/overlay-1/refreshes',
+        { method: 'POST' }
+      )
+    )
+    expect(apiFetchJson).toHaveBeenCalledWith('/api/keywords')
+    expect(toastMock.success).toHaveBeenCalledWith(
+      '연동 차트를 최신화했습니다.'
+    )
+  })
 })

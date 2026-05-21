@@ -9,6 +9,10 @@ import {
   AnalysisOverlayServiceError,
   refreshAnalysisOverlay,
 } from '@/server/analysis-overlays-service'
+import {
+  AnalysisServiceError,
+  refreshKeywordAnalysis,
+} from '@/server/keyword-analyses-service'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,6 +28,7 @@ export async function POST(
     }
 
     const { analysisId, overlayId } = await params
+    await refreshKeywordAnalysis(supabase, authResult.userId, analysisId)
     const overlay = await refreshAnalysisOverlay(
       supabase,
       authResult.userId,
@@ -33,6 +38,10 @@ export async function POST(
 
     return createSuccessResponse(overlay, 200)
   } catch (error) {
+    if (error instanceof AnalysisServiceError) {
+      return createErrorResponse(error.code, error.message, error.status)
+    }
+
     if (error instanceof AnalysisOverlayServiceError) {
       return createErrorResponse(error.code, error.message, error.status)
     }

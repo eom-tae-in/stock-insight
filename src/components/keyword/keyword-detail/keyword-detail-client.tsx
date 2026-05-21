@@ -99,7 +99,7 @@ type MiniChartPoint = {
   date: string
   trendsValue: number | null
   ma13Value: number | null
-  normalizedPrice?: number
+  normalizedPrice?: number | null
   yoyValue: number | null
 }
 
@@ -305,6 +305,12 @@ function formatDisplayDate(value?: string | null) {
   })
 }
 
+function getFiveYearCutoffDate(latestDate: string) {
+  const cutoff = new Date(`${latestDate}T00:00:00.000Z`)
+  cutoff.setUTCFullYear(cutoff.getUTCFullYear() - 5)
+  return cutoff.toISOString().slice(0, 10)
+}
+
 interface KeywordDetailClientProps {
   keywordId: string
   keyword: KeywordRecord
@@ -331,7 +337,7 @@ function DragOverlayComponent({
     date: string
     trendsValue: number | null
     ma13Value: number | null
-    normalizedPrice: number
+    normalizedPrice: number | null
     yoyValue: number | null
   }>
   formattedDate: string
@@ -648,7 +654,7 @@ function SortableOverlayCard({
     date: string
     trendsValue: number | null
     ma13Value: number | null
-    normalizedPrice: number
+    normalizedPrice: number | null
     yoyValue: number | null
   }>
   formattedDate: string
@@ -785,7 +791,7 @@ function SortableOverlayCard({
                   void onRefresh(overlay.id)
                 }}
                 disabled={isRefreshing}
-                aria-label={`${overlay.ticker} 최신화`}
+                aria-label={`${overlay.ticker} 연동 차트 최신화`}
               >
                 <RefreshCw
                   className={cn('size-4.5', isRefreshing && 'animate-spin')}
@@ -1248,25 +1254,32 @@ export function KeywordDetailClient({
     })
   )
 
-  // 차트 데이터 병합 (date 기준, 5년치 전체 범위)
+  // 차트 데이터 병합 (키워드/티커 날짜 합집합 기준, 최근 5년 범위)
   const mergeChartData = (
     keywordData: typeof chartData,
     overlayData: OverlayItem['chartData']
   ) => {
     const keywordMap = new Map(keywordData.map(d => [d.date, d]))
+    const overlayMap = new Map(overlayData.map(d => [d.date, d]))
+    const dates = Array.from(
+      new Set([
+        ...keywordData.map(point => point.date),
+        ...overlayData.map(point => point.date),
+      ])
+    ).sort((a, b) => a.localeCompare(b))
 
-    // overlayData에서 keywordMap에 있는 date만 필터링
-    const filteredOverlayData = overlayData.filter(point =>
-      keywordMap.has(point.date)
-    )
+    const latestDate = dates.at(-1)
+    const cutoffDate = latestDate ? getFiveYearCutoffDate(latestDate) : null
 
-    const merged = filteredOverlayData.map(point => ({
-      date: point.date,
-      trendsValue: keywordMap.get(point.date)?.trendsValue ?? null,
-      ma13Value: keywordMap.get(point.date)?.ma13Value ?? null,
-      normalizedPrice: point.normalizedPrice,
-      yoyValue: keywordMap.get(point.date)?.yoyValue ?? null,
-    }))
+    const merged = dates
+      .filter(date => !cutoffDate || date >= cutoffDate)
+      .map(date => ({
+        date,
+        trendsValue: keywordMap.get(date)?.trendsValue ?? null,
+        ma13Value: keywordMap.get(date)?.ma13Value ?? null,
+        normalizedPrice: overlayMap.get(date)?.normalizedPrice ?? null,
+        yoyValue: keywordMap.get(date)?.yoyValue ?? null,
+      }))
 
     return merged
   }
@@ -1527,11 +1540,11 @@ export function KeywordDetailClient({
 
       if (!response.ok) throw new Error('Overlay refresh failed')
 
-      await loadOverlays(currentAnalysis.id)
-      toast.success('오버레이 종목을 최신화했습니다')
+      await loadAnalysis()
+      toast.success('연동 차트를 최신화했습니다')
     } catch (error) {
       console.error('Overlay refresh error:', error)
-      toast.error('오버레이 종목 최신화에 실패했습니다')
+      toast.error('연동 차트 최신화에 실패했습니다')
     } finally {
       setRefreshingOverlayIds(prev => {
         const next = new Set(prev)
@@ -2608,7 +2621,7 @@ export function KeywordDetailClient({
                     <span className="mt-0.5 font-bold text-green-500">✓</span>
                     <span>
                       종목 주가 데이터는 각 카드의 최신화 버튼이나 티커 상세
-                      페이지의 티커 최신화 버튼으로 갱신할 수 있습니다
+                      페이지의 연동 차트 최신화 버튼으로 갱신할 수 있습니다
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
