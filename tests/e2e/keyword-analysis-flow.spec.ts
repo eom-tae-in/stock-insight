@@ -1,16 +1,16 @@
 import { expect, test } from '@playwright/test'
-import { loginWithE2EUser, skipWhenE2ECredentialsMissing } from './helpers/auth'
+import { loginAsUser, skipWhenE2EUserCredentialsMissing } from './helpers/auth'
 import { mockKeywordAnalysisApis } from './helpers/api-mocks'
 
 test.describe('키워드 분석 흐름', () => {
   test.beforeEach(() => {
-    skipWhenE2ECredentialsMissing()
+    skipWhenE2EUserCredentialsMissing()
   })
 
   test('인증 사용자는 내 키워드에서 새 키워드 검색을 시작할 수 있다', async ({
     page,
   }) => {
-    await loginWithE2EUser(page, '/keyword-analysis')
+    await loginAsUser(page, '/keyword-analysis')
 
     await test.step('내 키워드 화면을 확인', async () => {
       await expect(
@@ -45,7 +45,7 @@ test.describe('키워드 분석 흐름', () => {
     page,
   }) => {
     await mockKeywordAnalysisApis(page)
-    await loginWithE2EUser(page, '/keyword-analysis/new')
+    await loginAsUser(page, '/keyword-analysis/new')
 
     await test.step('키워드 검색 조건을 입력하고 조회', async () => {
       await page
