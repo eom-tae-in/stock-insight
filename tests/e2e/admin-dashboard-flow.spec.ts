@@ -1,15 +1,18 @@
 import { expect, test } from '@playwright/test'
-import { loginWithE2EUser, skipWhenE2ECredentialsMissing } from './helpers/auth'
+import {
+  loginAsAdmin,
+  skipWhenE2EAdminCredentialsMissing,
+} from './helpers/auth'
 
 test.describe('관리자 대시보드 흐름', () => {
   test.beforeEach(() => {
-    skipWhenE2ECredentialsMissing()
+    skipWhenE2EAdminCredentialsMissing()
   })
 
   test('관리자 테스트 계정은 운영 대시보드를 확인하고 새로고침할 수 있다', async ({
     page,
   }) => {
-    await loginWithE2EUser(page, '/admin')
+    await loginAsAdmin(page, '/admin')
 
     await test.step('관리자 페이지로 이동', async () => {
       await expect(
