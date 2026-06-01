@@ -28,6 +28,7 @@ jobs:
       E2E_BASE_URL: ${{ github.event.deployment_status.environment_url || github.event.deployment_status.target_url }}
       E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
       E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
     steps:
       - uses: actions/checkout@v4
@@ -42,18 +43,6 @@ jobs:
       - run: npm ci
 
       - run: npx playwright install --with-deps chromium
-
-      - name: Debug deployment status
-        run: |
-          echo "environment=${{ github.event.deployment_status.environment }}"
-          echo "environment_url=${{ github.event.deployment_status.environment_url }}"
-          echo "target_url=${{ github.event.deployment_status.target_url }}"
-          echo "state=${{ github.event.deployment_status.state }}"
-          echo "E2E_BASE_URL=${E2E_BASE_URL}"
-
-      - name: Verify Playwright URL
-        run: |
-          echo "Playwright Base URL: ${E2E_BASE_URL}"
 
       - name: Run Playwright against Vercel Preview
         run: npm run test:e2e
