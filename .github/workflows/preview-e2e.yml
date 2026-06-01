@@ -43,6 +43,18 @@ jobs:
 
       - run: npx playwright install --with-deps chromium
 
+      - name: Debug deployment status
+        run: |
+          echo "environment=${{ github.event.deployment_status.environment }}"
+          echo "environment_url=${{ github.event.deployment_status.environment_url }}"
+          echo "target_url=${{ github.event.deployment_status.target_url }}"
+          echo "state=${{ github.event.deployment_status.state }}"
+          echo "E2E_BASE_URL=${E2E_BASE_URL}"
+
+      - name: Verify Playwright URL
+        run: |
+          echo "Playwright Base URL: ${E2E_BASE_URL}"
+
       - name: Run Playwright against Vercel Preview
         run: npm run test:e2e
 
