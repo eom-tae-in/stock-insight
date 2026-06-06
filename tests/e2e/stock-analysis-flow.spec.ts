@@ -1,16 +1,16 @@
 import { expect, test } from '@playwright/test'
-import { loginWithE2EUser, skipWhenE2ECredentialsMissing } from './helpers/auth'
+import { loginAsUser, skipWhenE2EUserCredentialsMissing } from './helpers/auth'
 import { mockStockSearchSuggestions } from './helpers/api-mocks'
 
 test.describe('종목 분석 흐름', () => {
   test.beforeEach(() => {
-    skipWhenE2ECredentialsMissing()
+    skipWhenE2EUserCredentialsMissing()
   })
 
   test('인증 사용자는 내 종목에서 새 종목 조회를 시작할 수 있다', async ({
     page,
   }) => {
-    await loginWithE2EUser(page, '/stock-analysis')
+    await loginAsUser(page, '/stock-analysis')
 
     await test.step('내 종목 화면을 확인', async () => {
       await expect(page.getByRole('heading', { name: '내 종목' })).toBeVisible()
@@ -45,7 +45,7 @@ test.describe('종목 분석 흐름', () => {
     page,
   }) => {
     await mockStockSearchSuggestions(page)
-    await loginWithE2EUser(page, '/search')
+    await loginAsUser(page, '/search')
 
     await test.step('회사명으로 종목을 검색', async () => {
       await page
