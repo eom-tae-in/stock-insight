@@ -12,6 +12,7 @@ resp: { success, data?: [{date, value}], error?, code? }
 import json
 import os
 import sys
+import time
 import traceback
 from http.server import BaseHTTPRequestHandler
 
@@ -22,15 +23,38 @@ if _SRC_LIB_DIR not in sys.path:
 from get_trends import TrendsFetchError, get_trends  # noqa: E402
 
 
+def _log_pytrends(event: str, **fields) -> None:
+    print(
+        '[pytrends] ' + json.dumps(
+            {'event': event, **fields},
+            ensure_ascii=False,
+            default=str,
+        ),
+        file=sys.stderr,
+    )
+
+
 class handler(BaseHTTPRequestHandler):
     """Vercel Python Serverless Function Handler"""
 
     def do_POST(self):
+        started_at = time.monotonic()
+        keyword = ''
+        geo = ''
+        timeframe = ''
+        gprop = ''
+
         try:
             internal_secret = os.environ.get('PYTRENDS_INTERNAL_SECRET')
             request_secret = self.headers.get('x-internal-api-secret')
 
             if not internal_secret:
+                _log_pytrends(
+                    'failure',
+                    code='CONFIG_ERROR',
+                    status=500,
+                    duration_ms=int((time.monotonic() - started_at) * 1000),
+                )
                 self._send_json(500, {
                     'success': False,
                     'error': 'PYTRENDS_INTERNAL_SECRET is not configured',
@@ -39,6 +63,12 @@ class handler(BaseHTTPRequestHandler):
                 return
 
             if request_secret != internal_secret:
+                _log_pytrends(
+                    'failure',
+                    code='UNAUTHORIZED',
+                    status=401,
+                    duration_ms=int((time.monotonic() - started_at) * 1000),
+                )
                 self._send_json(401, {
                     'success': False,
                     'error': 'Unauthorized',
@@ -48,6 +78,13 @@ class handler(BaseHTTPRequestHandler):
 
             content_length = int(self.headers.get('Content-Length', 0))
             if content_length == 0:
+                _log_pytrends(
+                    'failure',
+                    code='INVALID_INPUT',
+                    status=400,
+                    reason='empty_body',
+                    duration_ms=int((time.monotonic() - started_at) * 1000),
+                )
                 self._send_json(400, {
                     'success': False,
                     'error': 'Empty request body',
@@ -63,6 +100,13 @@ class handler(BaseHTTPRequestHandler):
             gprop = body.get('gprop', '') or ''
 
             if not keyword:
+                _log_pytrends(
+                    'failure',
+                    code='INVALID_INPUT',
+                    status=400,
+                    reason='missing_keyword',
+                    duration_ms=int((time.monotonic() - started_at) * 1000),
+                )
                 self._send_json(400, {
                     'success': False,
                     'error': 'Keyword is required',
@@ -70,8 +114,26 @@ class handler(BaseHTTPRequestHandler):
                 })
                 return
 
+            _log_pytrends(
+                'request',
+                keyword=keyword,
+                geo=geo or 'GLOBAL',
+                timeframe=timeframe,
+                gprop=gprop or 'WEB',
+            )
+
             data = get_trends(keyword, geo, timeframe, gprop)
             if not data:
+                _log_pytrends(
+                    'failure',
+                    keyword=keyword,
+                    geo=geo or 'GLOBAL',
+                    timeframe=timeframe,
+                    gprop=gprop or 'WEB',
+                    code='NO_TRENDS_DATA',
+                    status=502,
+                    duration_ms=int((time.monotonic() - started_at) * 1000),
+                )
                 self._send_json(502, {
                     'success': False,
                     'error': 'No trends data returned',
@@ -79,15 +141,41 @@ class handler(BaseHTTPRequestHandler):
                 })
                 return
 
+            _log_pytrends(
+                'success',
+                keyword=keyword,
+                geo=geo or 'GLOBAL',
+                timeframe=timeframe,
+                gprop=gprop or 'WEB',
+                points=len(data),
+                duration_ms=int((time.monotonic() - started_at) * 1000),
+            )
             self._send_json(200, {'success': True, 'data': data})
 
         except json.JSONDecodeError:
+            _log_pytrends(
+                'failure',
+                code='INVALID_INPUT',
+                status=400,
+                reason='invalid_json',
+                duration_ms=int((time.monotonic() - started_at) * 1000),
+            )
             self._send_json(400, {
                 'success': False,
                 'error': 'Invalid JSON body',
                 'code': 'INVALID_INPUT',
             })
         except TrendsFetchError as exc:
+            _log_pytrends(
+                'failure',
+                keyword=keyword or None,
+                geo=(geo or 'GLOBAL') if keyword else None,
+                timeframe=timeframe or None,
+                gprop=(gprop or 'WEB') if keyword else None,
+                code=exc.code,
+                status=exc.status,
+                duration_ms=int((time.monotonic() - started_at) * 1000),
+            )
             print(traceback.format_exc(), file=sys.stderr)
             self._send_json(exc.status, {
                 'success': False,
@@ -95,6 +183,16 @@ class handler(BaseHTTPRequestHandler):
                 'code': exc.code,
             })
         except Exception as exc:
+            _log_pytrends(
+                'failure',
+                keyword=keyword or None,
+                geo=(geo or 'GLOBAL') if keyword else None,
+                timeframe=timeframe or None,
+                gprop=(gprop or 'WEB') if keyword else None,
+                code='SERVER_ERROR',
+                status=500,
+                duration_ms=int((time.monotonic() - started_at) * 1000),
+            )
             print(traceback.format_exc(), file=sys.stderr)
             self._send_json(500, {
                 'success': False,
@@ -109,3 +207,6 @@ class handler(BaseHTTPRequestHandler):
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def log_message(self, format: str, *args) -> None:
+        return

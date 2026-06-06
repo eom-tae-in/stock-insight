@@ -179,7 +179,12 @@ async function redisSetTrends(
       console.warn(
         `[trends-cache] set failed key="${key}" status=${response.status}`
       )
+      return
     }
+
+    console.info(
+      `[trends-cache] set success key="${key}" points=${value.length} ttl=${TRENDS_CACHE_TTL_SECONDS}s`
+    )
   } catch (error) {
     console.warn(`[trends-cache] set failed key="${key}"`, error)
   }
