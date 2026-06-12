@@ -73,6 +73,9 @@ __pycache__/
 /test-results/
 /playwright-report/
 
+# Local k6 load test scratch files
+/tests/k6-local/
+
 # Python
 __pycache__/
 *.py[cod]
