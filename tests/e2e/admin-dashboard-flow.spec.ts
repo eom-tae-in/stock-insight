@@ -35,8 +35,17 @@ test.describe('관리자 대시보드 흐름', () => {
     })
 
     await test.step('대시보드를 새로고침할 수 있다', async () => {
-      await page.getByRole('button', { name: '새로고침' }).click()
-      await expect(page.getByRole('button', { name: '새로고침' })).toBeEnabled()
+      const refreshButton = page.getByRole('button', { name: '새로고침' })
+      const summaryResponse = page.waitForResponse(
+        response =>
+          response.url().includes('/api/admin/summary') &&
+          response.request().method() === 'GET',
+        { timeout: 15_000 }
+      )
+
+      await refreshButton.click()
+      expect((await summaryResponse).ok()).toBe(true)
+      await expect(refreshButton).toBeEnabled({ timeout: 15_000 })
     })
   })
 })
