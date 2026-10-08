@@ -8,6 +8,10 @@ on:
       - 'infra/local/**'
       - '.github/workflows/msa-runtime.yml'
       - 'package*.json'
+      - 'src/**'
+      - 'tests/**'
+      - '*config*'
+      - 'vitest.setup.ts'
   push:
     branches: [develop]
     paths:
@@ -34,6 +38,12 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
+      - name: Check existing web code
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run test
+          npm run test:integration
       - name: Build Java services
         working-directory: services
         run: ./gradlew --no-daemon build
