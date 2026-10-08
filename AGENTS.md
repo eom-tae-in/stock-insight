@@ -22,6 +22,9 @@ without explicit authorization for those operations.
 - Open PRs against `develop`; `dev` in conversation means `develop`.
 - Merge only with squash merge after required checks pass. Do not bypass checks.
 - Keep local `scripts/` ignored. Do not commit credentials or local prompts.
+- The user requested removing every CI/CD workflow, including MSA Runtime,
+  and disabling GitHub Actions for this repository. Do not recreate or enable
+  automated workflows without a new user instruction. Keep manual test commands.
 
 ## Verification failure limit
 
@@ -38,8 +41,10 @@ add replacement build, authentication, and full-stack checks for the new runtime
 The two-failure stop rule still applies to the replacement verifications.
 
 The user also waived the two local Docker startup failures caused by host disk
-exhaustion. Validate the new container runtime in isolated GitHub Actions;
-record local startup as failed, not passed. New CI failures retain the limit.
+exhaustion. GitHub Actions was subsequently disabled at the user's request.
+Record historical remote passes separately from new, unexecuted runtime checks;
+do not retry the broken local Docker environment or claim a new runtime pass.
+The two-failure stop rule still applies to manual replacement verifications.
 
 ## Continuity
 

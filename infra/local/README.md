@@ -49,8 +49,8 @@ After startup, run the dedicated runtime checks from the repository root:
 node --test infra/local/runtime-smoke.test.mjs
 ```
 
-The MSA Runtime GitHub workflow builds and starts the same Compose environment
-and runs these checks. They exercise real OIDC code/PKCE login, token refresh,
+GitHub Actions and all workflows were removed at the user's request. These
+commands are manual checks. They exercise real OIDC code/PKCE login, token refresh,
 Gateway routing and token rejection through HTTP; they are not browser product
 E2E tests. This suite is separate from the default Vitest unit suite.
 
