@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import { ThemeProvider } from '@/components/providers/theme-provider'
 import { Toaster } from '@/components/ui/sonner'
+import { ReactDevTools } from '@/components/providers/react-dev-tools'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -39,6 +40,7 @@ export default function RootLayout({
         >
           {children}
           <Toaster />
+          {process.env.NODE_ENV === 'development' && <ReactDevTools />}
         </ThemeProvider>
       </body>
     </html>

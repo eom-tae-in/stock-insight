@@ -13,6 +13,8 @@ import { ThemeToggle } from '@/components/shared/theme-toggle'
 import { OAuthLoginButton } from '@/components/auth/login-button'
 import { LoginForm } from '@/components/auth/login-form'
 import { Separator } from '@/components/ui/separator'
+import { isOidcMode, safeOidcNext } from '@/server/oidc/config'
+import { OidcLogin } from '@/components/auth/oidc-login'
 
 function getSafeNextPath(input?: string): string {
   if (!input || !input.startsWith('/')) return '/'
@@ -23,9 +25,16 @@ function getSafeNextPath(input?: string): string {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ next?: string }>
+  searchParams?: Promise<{ next?: string; error?: string }>
 }) {
   const params = await searchParams
+  if (isOidcMode())
+    return (
+      <OidcLogin
+        nextPath={safeOidcNext(params?.next ?? null)}
+        failed={params?.error === 'auth_error'}
+      />
+    )
   const nextPath = getSafeNextPath(params?.next)
 
   return (

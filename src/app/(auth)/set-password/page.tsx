@@ -7,8 +7,11 @@
 import { Container } from '@/components/layout/container'
 import { ThemeToggle } from '@/components/shared/theme-toggle'
 import { SetPasswordForm } from '@/components/auth/set-password-form'
+import { redirect } from 'next/navigation'
+import { isOidcMode } from '@/server/oidc/config'
 
 export default function SetPasswordPage() {
+  if (isOidcMode()) redirect('/login')
   return (
     <div className="from-background via-background to-primary/5 flex min-h-screen flex-col bg-gradient-to-br">
       {/* 헤더 (테마 토글만) */}

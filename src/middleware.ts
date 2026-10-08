@@ -9,6 +9,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseMiddlewareClient } from '@/lib/supabase/middleware-client'
+import { isOidcMode, authCookieName, oidcConfig } from '@/server/oidc/config'
+import { readSession } from '@/server/oidc/session'
 
 // 인증 없이 접근 가능한 경로
 // 참고: /set-password 는 이메일 OTP 인증 완료 후 세션이 있는 사용자만 접근하므로
@@ -24,6 +26,7 @@ function getSafeNextPath(input: string | null): string {
 }
 
 export async function middleware(request: NextRequest) {
+  if (isOidcMode()) return oidcMiddleware(request)
   const { pathname, search } = request.nextUrl
   const response = NextResponse.next({ request })
 
@@ -76,8 +79,49 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
+  runtime: 'nodejs',
   matcher: [
     // 모든 경로 매칭 (정적 자산 제외)
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
+}
+
+async function oidcMiddleware(request: NextRequest) {
+  const path = request.nextUrl.pathname
+  if (
+    [
+      '/login',
+      '/signup',
+      '/set-password',
+      '/api/auth/oidc/login',
+      '/api/auth/oidc/callback',
+    ].includes(path)
+  ) {
+    return NextResponse.next()
+  }
+  const allowedApi =
+    path === '/api/auth/oidc/logout' || /^\/api\/trends-jobs(?:\/|$)/.test(path)
+  if (path.startsWith('/api/') && !allowedApi) {
+    return NextResponse.json(
+      { error: 'LEGACY_PATH_NOT_MIGRATED' },
+      { status: 501 }
+    )
+  }
+  try {
+    const session = await readSession(
+      request.cookies.get(authCookieName())?.value
+    )
+    if (!session) {
+      if (allowedApi)
+        return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 })
+      return NextResponse.redirect(new URL('/login', oidcConfig().origin))
+    }
+    return path === '/trends-jobs' || allowedApi
+      ? NextResponse.next()
+      : NextResponse.redirect(new URL('/trends-jobs', oidcConfig().origin))
+  } catch (error: unknown) {
+    if (error instanceof Error)
+      return NextResponse.json({ error: 'AUTH_UNAVAILABLE' }, { status: 503 })
+    throw error
+  }
 }

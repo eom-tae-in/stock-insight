@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react'
 import { Moon, Sun, Leaf } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
-export function ThemeToggle() {
+export function ThemeToggle({ className }: { readonly className?: string }) {
   const [mounted, setMounted] = useState(false)
   const { resolvedTheme, setTheme } = useTheme()
 
@@ -24,7 +25,10 @@ export function ThemeToggle() {
     <Button
       size="icon"
       onClick={cycleTheme}
-      className="border-primary/50 bg-primary/5 text-primary hover:bg-primary/15 hover:border-primary rounded-full border transition-colors"
+      className={cn(
+        'border-primary/50 bg-primary/5 text-primary hover:bg-primary/15 hover:border-primary rounded-full border transition-colors',
+        className
+      )}
     >
       {mounted && (
         <>
