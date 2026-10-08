@@ -25,6 +25,7 @@
 *.pem
 
 # local editor / agent tooling
+/scripts/
 .vscode/
 .idea/
 .claude/
