@@ -14,6 +14,9 @@ const eslintConfig = [
   {
     ignores: [
       'node_modules/**',
+      '**/.venv/**',
+      'services/**/build/**',
+      'services/.gradle/**',
       '.next/**',
       'out/**',
       'build/**',

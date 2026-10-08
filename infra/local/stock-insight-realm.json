@@ -13,11 +13,14 @@
       "publicClient": true,
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
-      "redirectUris": ["http://localhost:3000/api/auth/callback"],
+      "redirectUris": [
+        "http://localhost:3000/api/auth/callback",
+        "http://localhost:3000/api/auth/oidc/callback"
+      ],
       "webOrigins": ["http://localhost:3000"],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:3000/"
+        "post.logout.redirect.uris": "http://localhost:3000/##http://localhost:3000/login"
       },
       "protocolMappers": [
         {

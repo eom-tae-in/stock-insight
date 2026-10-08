@@ -13,8 +13,11 @@ import { ThemeToggle } from '@/components/shared/theme-toggle'
 import { OAuthLoginButton } from '@/components/auth/login-button'
 import { SignupForm } from '@/components/auth/signup-form'
 import { Separator } from '@/components/ui/separator'
+import { redirect } from 'next/navigation'
+import { isOidcMode } from '@/server/oidc/config'
 
 export default function SignupPage() {
+  if (isOidcMode()) redirect('/login')
   return (
     <div className="from-background via-background to-primary/5 flex min-h-screen flex-col bg-gradient-to-br">
       {/* 헤더 (테마 토글만) */}
