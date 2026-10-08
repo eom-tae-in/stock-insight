@@ -6,8 +6,13 @@ Source baseline: `6ee984024d1545d35377d3ae6214caf89b7badb1` on `develop`.
 Stage 0 issue: https://github.com/eom-tae-in/stock-insight/issues/14
 Stage 0 PR: https://github.com/eom-tae-in/stock-insight/pull/15
 Squash merged to develop: `d5f21483beee2b94dca167e9bb2f5b9e697b54a4`.
-Active issue: https://github.com/eom-tae-in/stock-insight/issues/16
-Working branch: `feat/16/local-msa-runtime`.
+Runtime foundation issue: https://github.com/eom-tae-in/stock-insight/issues/16
+Runtime foundation PR: https://github.com/eom-tae-in/stock-insight/pull/17
+Squash merged to develop: `d888e90db6ee57e6bf566e7ab4c6a912986a77a3`.
+Active cleanup issue: https://github.com/eom-tae-in/stock-insight/issues/19
+Working branch: `feat/19/remove-legacy-ci`.
+Trends backend issue #18 and branch `feat/18/trends-job-pipeline` are paused
+before implementation while retiring legacy CI/CD, as the user requested.
 
 The user authorized database and configuration redesign, issue-first branches,
 PRs to develop, and squash merge. Cloud deployment artifacts are in scope;
@@ -40,10 +45,11 @@ Existing web authentication/hosting paths have not been cut over yet.
   replacement runtime verification will run in isolated GitHub Actions.
   Only this task's reproducible Java build directories were removed to recover
   host space after file writes failed. No Docker volumes or user data were removed.
-  The project has no running Compose containers. Discovery, real OIDC login,
-  Gateway routing, token rejection and DB isolation are still unverified.
-- OIDC/Gateway smoke scenarios and an MSA runtime CI workflow are written but
-  have not executed. Do not count them as passing tests.
+  Local startup remains unverified. GitHub MSA Runtime run 37712814214 passed
+  Java build, container startup and all eight OIDC/Gateway HTTP scenarios.
+  Discovery routing, login, refresh, anonymous rejection and tampered-token
+  rejection passed remotely. Business DB isolation was not exercised by these
+  scenarios. Existing CI run 37712814168 also passed before PR #17 was merged.
 - Trends worker, jobs/outbox/inbox, business migration, Next auth cutover,
   replacement CI and cloud IaC are not implemented.
 - Stage 0 GitHub CI passed (run 37709736931). Legacy Vercel deployment passed;
@@ -137,8 +143,15 @@ with isolated local fixtures and dedicated test accounts. Preserve useful tests
 from `npm run check` and `npm run test:integration`. Replace the legacy build/E2E
 environment as affected paths migrate, while keeping the failure evidence above.
 
-Existing GitHub CI still includes the legacy build and Preview E2E workflow.
-The local waiver is not authorization to bypass required GitHub checks. Update
-those workflows with the replacement runtime checks as part of the migration.
+The user explicitly requested retiring the legacy CI/CD before further migration.
+Issue #19 removes the Supabase-dependent CI and Vercel deployment-status Preview
+E2E workflows. Useful lint/typecheck/unit/PostgreSQL integration checks move to
+MSA Runtime; the legacy web build and platform Preview E2E are retired, not passed.
+`vercel.json` contains only the automatic Git deployment opt-out, so the installed
+Vercel GitHub app cannot trigger new automatic deployments from these commits.
+The external Vercel project/app itself is not deleted. Manual deployment and
+previously created deployments are outside this repository switch.
+GitHub develop/prod rulesets were inspected: both contain deletion protection
+only, with no required status checks. No required-check rule is bypassed.
 Never classify removed checks as passing or call mocked HTTP tests full-stack.
 Do not use the nonexistent `check-all` script from older docs.
