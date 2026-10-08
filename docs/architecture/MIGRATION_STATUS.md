@@ -13,7 +13,9 @@ Legacy cleanup PR #20 was squash merged to develop (`a6e30a498b59bf944f98f36f960
 Vercel cleanup issue #21 was closed by squash-merged PR #23
 (`de1a71b860e5c9ffe2823db6c59ce98a5f2ab93f`).
 Active issue: https://github.com/eom-tae-in/stock-insight/issues/18
-Working branch: `feat/18/trends-job-pipeline`.
+Implementation branch: `feat/18/trends-job-pipeline`.
+Trends backend delivery PR: https://github.com/eom-tae-in/stock-insight/pull/25
+Deferred runtime verification: https://github.com/eom-tae-in/stock-insight/issues/24
 Repository automation cleanup PR #22 was squash merged to develop
 (`adaf86ca22444b50058f057d8d94edfbd6706b87`).
 Trends backend implementation resumed after CI/CD and Vercel cleanup.
@@ -28,7 +30,7 @@ only if verification of that recovery fix also fails.
 ## Trends backend implementation and verification
 
 Job API, transactional outbox/inbox, generation/deletion guards, Flyway schema
-and an explicit fixture-only Python consumer are implemented but not yet merged.
+and an explicit fixture-only Python consumer are implemented in delivery PR #25.
 Live Google collection, web integration and runtime verification remain incomplete.
 Java compilation initially failed on nested type annotations and a deprecated
 AMQP confirm accessor; both corrected and second compilation passed.
