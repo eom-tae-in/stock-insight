@@ -5,6 +5,7 @@ import { isOidcMode, OidcError } from '@/server/oidc/config'
 import { requestSession } from '@/server/oidc/http'
 import { TrendsJobsClient } from '@/components/trends-jobs/trends-jobs-client'
 import { ThemeToggle } from '@/components/shared/theme-toggle'
+import { ThemeMenu } from '@/components/shared/theme-menu'
 import { Container } from '@/components/layout/container'
 import { Button } from '@/components/ui/button'
 
@@ -28,9 +29,7 @@ export default async function TrendsJobsPage() {
               StockInsight
             </Link>
             <div className="flex items-center gap-3">
-              <span className="max-w-40 truncate text-sm">
-                {session.displayName}
-              </span>
+              <ThemeMenu displayName={session.displayName} />
               <ThemeToggle className="size-11" />
               <form method="post" action="/api/auth/oidc/logout">
                 <input type="hidden" name="csrf" value={session.csrf} />

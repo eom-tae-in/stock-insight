@@ -240,7 +240,7 @@ export function UnifiedChart({
                 onClick={() => handleRangeChange(preset.weeks)}
                 className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
                   displayRange === preset.weeks
-                    ? 'bg-blue-500 text-white'
+                    ? 'bg-brand-subtle text-brand-text'
                     : 'bg-muted text-muted-foreground hover:bg-muted/80'
                 }`}
               >
@@ -281,12 +281,12 @@ export function UnifiedChart({
                         isDisabled
                           ? 'cursor-not-allowed opacity-50'
                           : enabledSeries[key as SeriesKey]
-                            ? 'bg-opacity-100 text-white'
+                            ? 'bg-surface-raised text-foreground'
                             : 'border-muted-foreground/30 text-muted-foreground hover:border-muted-foreground/50 border bg-transparent'
                       }`}
                       style={
                         !isDisabled && enabledSeries[key as SeriesKey]
-                          ? { backgroundColor: config.color }
+                          ? { backgroundColor: 'var(--surface-raised)' }
                           : {}
                       }
                     >

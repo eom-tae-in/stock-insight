@@ -272,10 +272,10 @@ export function KeywordStandaloneChart({
               onClick={() => onToggleLine('trendsValue')}
               variant={visibleLines.trendsValue ? 'default' : 'outline'}
               size="sm"
-              className={visibleLines.trendsValue ? 'text-white' : ''}
+              className={visibleLines.trendsValue ? 'text-foreground' : ''}
               style={
                 visibleLines.trendsValue
-                  ? { backgroundColor: CHART_SERIES_COLORS.googleTrends }
+                  ? { backgroundColor: 'var(--surface-raised)' }
                   : undefined
               }
             >
@@ -285,10 +285,10 @@ export function KeywordStandaloneChart({
               onClick={() => onToggleLine('ma13Value')}
               variant={visibleLines.ma13Value ? 'default' : 'outline'}
               size="sm"
-              className={visibleLines.ma13Value ? 'text-white' : ''}
+              className={visibleLines.ma13Value ? 'text-foreground' : ''}
               style={
                 visibleLines.ma13Value
-                  ? { backgroundColor: CHART_SERIES_COLORS.ma13 }
+                  ? { backgroundColor: 'var(--surface-raised)' }
                   : undefined
               }
             >
@@ -298,10 +298,10 @@ export function KeywordStandaloneChart({
               onClick={() => onToggleLine('yoyValue')}
               variant={visibleLines.yoyValue ? 'default' : 'outline'}
               size="sm"
-              className={visibleLines.yoyValue ? 'text-white' : ''}
+              className={visibleLines.yoyValue ? 'text-foreground' : ''}
               style={
                 visibleLines.yoyValue
-                  ? { backgroundColor: CHART_SERIES_COLORS.yoy }
+                  ? { backgroundColor: 'var(--surface-raised)' }
                   : undefined
               }
             >
@@ -312,10 +312,10 @@ export function KeywordStandaloneChart({
                 onClick={() => onToggleLine('stockPrice')}
                 variant={visibleLines.stockPrice ? 'default' : 'outline'}
                 size="sm"
-                className={visibleLines.stockPrice ? 'text-white' : ''}
+                className={visibleLines.stockPrice ? 'text-foreground' : ''}
                 style={
                   visibleLines.stockPrice
-                    ? { backgroundColor: CHART_SERIES_COLORS.price }
+                    ? { backgroundColor: 'var(--surface-raised)' }
                     : undefined
                 }
               >
@@ -335,20 +335,20 @@ export function KeywordStandaloneChart({
             data={mergedData}
             margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
             <XAxis
               dataKey="date"
-              tick={{ fontSize: 12, fill: 'hsl(var(--foreground))' }}
+              tick={{ fontSize: 12, fill: 'var(--foreground)' }}
             />
             <YAxis
               yAxisId="left"
               domain={[0, 100]}
-              tick={{ fontSize: 12, fill: 'hsl(var(--foreground))' }}
+              tick={{ fontSize: 12, fill: 'var(--foreground)' }}
               label={{
                 value: '검색량 기반 (0-100)',
                 angle: -90,
                 position: 'insideLeft',
-                fill: 'hsl(var(--foreground))',
+                fill: 'var(--foreground)',
               }}
             />
             {(overlayStock || overlays.length > 0) && (
@@ -356,14 +356,14 @@ export function KeywordStandaloneChart({
                 yAxisId="right"
                 orientation="right"
                 domain={priceAxisDomain}
-                tick={{ fontSize: 12, fill: 'hsl(var(--foreground))' }}
+                tick={{ fontSize: 12, fill: 'var(--foreground)' }}
                 label={{
                   value: overlayStock
                     ? `${overlayStock.ticker} 주가 ($)`
                     : '가격 (정규화)',
                   angle: 90,
                   position: 'insideRight',
-                  fill: 'hsl(var(--foreground))',
+                  fill: 'var(--foreground)',
                 }}
               />
             )}
