@@ -36,10 +36,39 @@ services, DB, Redis and broker have no host-published ports. Java validates the
 public issuer while retrieving keys over the internal network.
 
 PostgreSQL creates independent identity, analysis and market databases/accounts
-and revokes public CONNECT. These local business roles currently own their DBs;
-separate Flyway migration/runtime roles must be implemented before production.
+and revokes public CONNECT. Analysis uses separate `analysis_migration` and
+`analysis_app` roles; Flyway runs as the migration role, while runtime receives
+schema usage and table DML privileges. Identity and market role separation
+remains incomplete.
 Redis AOF, PostgreSQL and RabbitMQ volumes persist across normal stop/start.
-There is no Python consumer or business schema yet.
+The new Trends schema and fixture-only Python consumer are implemented but their
+complete runtime integration has not yet been verified. See
+[the job contract](../../docs/architecture/TRENDS_JOB_CONTRACT.md).
+The new migration role is created only on first volume initialization. Existing
+volumes require a data-preserving upgrade before starting this revision; do not
+delete volumes or use the initialization script as an upgrade script.
+
+## 기존 analysis 볼륨의 역할 업그레이드
+
+`upgrades/001-analysis-migration-role.sql`은 기존 analysis DB와 업무 테이블을
+보존하고 migration/runtime 역할을 분리한다. 먼저 DB 백업을 확보하고 업무
+서비스·워커를 중지한 뒤 관리자로 실행한다. 기본 동작은 ROLLBACK이며
+`apply=true`일 때만 COMMIT한다. 현재 로컬 Docker 장애로 실제 실행 검증은
+미완료이므로 아래 절차를 운영에 적용하지 않는다.
+
+기존 postgres 컨테이너에 `ANALYSIS_MIGRATION_PASSWORD`가 없으면 셸에서 값을
+설정하고 `docker compose exec -e ANALYSIS_MIGRATION_PASSWORD`로 전달한다.
+자격증명 파일을 커밋하지 않는다. 다음 예시는 로컬 컨테이너 전용이다.
+
+```sh
+docker compose -f infra/local/compose.yml exec -T postgres sh -c \
+  'exec psql --username postgres --dbname analysis --set=analysis_migration_password="$ANALYSIS_MIGRATION_PASSWORD" --set=apply=false' \
+  < infra/local/upgrades/001-analysis-migration-role.sql
+```
+
+dry-run 결과와 백업을 확인한 후 동일 명령의 `apply=false`를 `apply=true`로
+변경하여 적용한다. 초기화 스크립트를 다시 실행하거나 볼륨을 삭제하지 않는다.
+Flyway는 다음 서비스 시작 시 새 migration 역할로 업무 스키마를 생성한다.
 
 ## Stop and inspect
 

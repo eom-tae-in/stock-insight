@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "eventId": "00000000-0000-4000-8000-000000000001",
+  "jobId": "00000000-0000-4000-8000-000000000002",
+  "correlationId": "00000000-0000-4000-8000-000000000003",
+  "generation": 1,
+  "attempt": 1,
+  "requestedAt": "2026-10-08T00:00:00Z",
+  "deadline": "2026-10-08T00:05:00Z",
+  "completedWeek": "2026-09-28",
+  "query": {
+    "keyword": "coffee",
+    "geo": "",
+    "timeframe": "today 5-y",
+    "gprop": ""
+  }
+}
