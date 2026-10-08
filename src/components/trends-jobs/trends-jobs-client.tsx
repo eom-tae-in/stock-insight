@@ -348,11 +348,23 @@ export function TrendsJobsClient({ csrf }: { readonly csrf: string }) {
                   <LineChart data={job.points.map(point => ({ ...point }))}>
                     <XAxis
                       dataKey="date"
-                      tick={{ fontSize: 12 }}
+                      tick={{ fill: 'var(--text-tertiary)', fontSize: 12 }}
+                      stroke="var(--border-strong)"
                       minTickGap={32}
                     />
-                    <YAxis domain={[0, 100]} width={40} />
-                    <Tooltip />
+                    <YAxis
+                      domain={[0, 100]}
+                      width={40}
+                      tick={{ fill: 'var(--text-tertiary)', fontSize: 12 }}
+                      stroke="var(--border-strong)"
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'var(--popover)',
+                        color: 'var(--foreground)',
+                        borderColor: 'var(--border)',
+                      }}
+                    />
                     <Line
                       type="monotone"
                       dataKey="value"

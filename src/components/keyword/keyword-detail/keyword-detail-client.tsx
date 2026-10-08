@@ -582,7 +582,7 @@ function AnalysisConditionChartCard({
                   <Tooltip
                     content={() => null}
                     cursor={{
-                      stroke: 'hsl(var(--border))',
+                      stroke: 'var(--chart-grid)',
                       strokeDasharray: '3 3',
                     }}
                   />
@@ -862,7 +862,7 @@ function SortableOverlayCard({
                   <Tooltip
                     content={() => null}
                     cursor={{
-                      stroke: 'hsl(var(--border))',
+                      stroke: 'var(--chart-grid)',
                       strokeDasharray: '3 3',
                     }}
                   />

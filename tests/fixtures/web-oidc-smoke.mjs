@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import assert from 'node:assert/strict'
 import { chromium } from '@playwright/test'
 import ky from 'ky'
+import { captureThemeMatrix, verifyThemePreferences } from './ui-theme-qa.mjs'
 import { startOidcProvider, listen, stop } from './oidc-provider.ts'
 import { startRedisFixture } from './redis-server.ts'
 
@@ -131,70 +132,45 @@ try {
     viewport: { width: 1440, height: 1000 },
   })
   const page = await context.newPage()
-  async function captureMatrix(screen) {
-    for (const theme of ['light', 'dark']) {
-      for (let attempt = 0; attempt < 3; attempt++) {
-        if (
-          await page.evaluate(
-            value => document.documentElement.classList.contains(value),
-            theme
-          )
-        )
-          break
-        await page.getByRole('button', { name: '테마 전환' }).click()
-      }
-      for (const width of [390, 1440, 1920]) {
-        await page.setViewportSize({
-          width,
-          height: width === 390 ? 844 : 1000,
-        })
-        await page.evaluate(() => document.fonts.ready)
-        await page.waitForFunction(() =>
-          document
-            .getAnimations()
-            .every(animation => animation.playState !== 'running')
-        )
-        if (screen === 'result') {
-          await page.waitForFunction(() => {
-            const container = document.querySelector(
-              '[aria-label="주간 검색 관심도 차트"]'
-            )
-            const svg = container?.querySelector('svg.recharts-surface')
-            return (
-              container &&
-              svg &&
-              Math.abs(
-                svg.getBoundingClientRect().width - container.clientWidth
-              ) < 2 &&
-              container.querySelector('.recharts-line-curve')
-            )
-          })
-        }
-        await page.evaluate(
-          () =>
-            new Promise(resolve =>
-              requestAnimationFrame(() => requestAnimationFrame(resolve))
-            )
-        )
-        await page.screenshot({
-          path: join(artifacts, `${screen}-${width}-${theme}.png`),
-          fullPage: true,
-        })
-      }
-    }
-    await page.setViewportSize({ width: 1440, height: 1000 })
-  }
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(`${origin}/login`)
-  await captureMatrix('login')
+  await verifyThemePreferences(page)
+  await captureThemeMatrix(page, { screen: 'login', artifacts })
   await page.getByRole('link', { name: /로그인/ }).click()
   await page.waitForURL('**/trends-jobs')
+  await page.getByRole('button', { name: '화면 모드 선택' }).click()
+  await page.waitForFunction(
+    () =>
+      document.activeElement instanceof HTMLInputElement &&
+      document.activeElement.value === 'dark'
+  )
+  await page.keyboard.press('ArrowRight')
+  assert(await page.getByRole('radio', { name: '시스템' }).isChecked())
+  assert.equal(
+    await page.evaluate(() => localStorage.getItem('theme')),
+    'system'
+  )
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await page.waitForFunction(() =>
+    document.documentElement.classList.contains('dark')
+  )
+  await page.emulateMedia({ colorScheme: 'light' })
+  await page.waitForFunction(() =>
+    document.documentElement.classList.contains('light')
+  )
+  await page.keyboard.press('Escape')
+  assert(
+    await page
+      .getByRole('button', { name: '화면 모드 선택' })
+      .evaluate(element => element === document.activeElement)
+  )
   await page.getByLabel('검색어', { exact: true }).fill('coffee')
   await page.getByRole('button', { name: '분석 요청', exact: true }).click()
   await page.getByText('분석 완료', { exact: true }).waitFor()
   await page.locator('.recharts-surface').waitFor()
-  await captureMatrix('result')
+  await captureThemeMatrix(page, { screen: 'result', artifacts })
+  await captureThemeMatrix(page, { screen: 'account', artifacts })
   await page.screenshot({
     path: join(artifacts, 'desktop-light.png'),
     fullPage: true,
@@ -299,7 +275,7 @@ try {
       {
         passed: true,
         scope: 'real Next/Redis/browser; fixture OIDC/Gateway',
-        screenshots: 17,
+        screenshots: 29,
       },
       null,
       2

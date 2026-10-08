@@ -29,8 +29,7 @@ describe('ThemeToggle', () => {
 
   it.each([
     ['light', 'dark'],
-    ['dark', 'calm'],
-    ['calm', 'light'],
+    ['dark', 'light'],
     [undefined, 'dark'],
   ])('cycles from %s to %s', async (resolvedTheme, expectedTheme) => {
     const user = userEvent.setup()

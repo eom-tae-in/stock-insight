@@ -613,7 +613,7 @@ function KeywordConditionCard({
                   <Tooltip
                     content={() => null}
                     cursor={{
-                      stroke: 'hsl(var(--border))',
+                      stroke: 'var(--chart-grid)',
                       strokeDasharray: '3 3',
                     }}
                   />

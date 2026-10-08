@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { UserMenu } from './user-menu'
+import { ThemeProvider } from '@/components/providers/theme-provider'
 
 const routerMock = vi.hoisted(() => ({
   push: vi.fn(),
@@ -57,5 +58,44 @@ describe('UserMenu', () => {
     expect(authMock.signOut).toHaveBeenCalled()
     expect(routerMock.push).toHaveBeenCalledWith('/login')
     expect(routerMock.refresh).toHaveBeenCalled()
+  })
+
+  it('opens the selected mode with keyboard focus and preserves logout', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockReturnValue({
+        matches: false,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+      })
+    )
+    localStorage.setItem('theme', 'system')
+    authMock.getUser.mockResolvedValue({
+      data: { user: { email: 'taein@example.com' } },
+    })
+    const user = userEvent.setup()
+    render(
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="system"
+        enableSystem
+        themes={['light', 'dark']}
+      >
+        <UserMenu />
+      </ThemeProvider>
+    )
+    await screen.findByText('T')
+    await user.tab()
+    await user.keyboard('{Enter}')
+    const system = await screen.findByRole('radio', { name: '시스템' })
+    expect(system).toHaveFocus()
+    await user.keyboard('{ArrowRight}')
+    expect(screen.getByRole('radio', { name: '라이트' })).toBeChecked()
+    expect(localStorage.getItem('theme')).toBe('light')
+    await user.keyboard('{ArrowRight}')
+    expect(screen.getByRole('radio', { name: '다크' })).toBeChecked()
+    expect(localStorage.getItem('theme')).toBe('dark')
+    await user.keyboard('{Escape}')
+    expect(screen.getByRole('button')).toHaveFocus()
   })
 })

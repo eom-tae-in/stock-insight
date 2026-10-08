@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Moon, Sun, Leaf } from 'lucide-react'
+import { Moon, Sun } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -14,19 +14,20 @@ export function ThemeToggle({ className }: { readonly className?: string }) {
     setMounted(true)
   }, [])
 
-  const cycleTheme = () => {
-    const themes = ['light', 'dark', 'calm']
-    const currentIndex = themes.indexOf(resolvedTheme || 'light')
-    const nextIndex = (currentIndex + 1) % themes.length
-    setTheme(themes[nextIndex])
-  }
+  const toggleTheme = () =>
+    setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')
 
   return (
     <Button
       size="icon"
-      onClick={cycleTheme}
+      variant="ghost"
+      onClick={toggleTheme}
+      disabled={!mounted}
+      title={
+        resolvedTheme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'
+      }
       className={cn(
-        'border-primary/50 bg-primary/5 text-primary hover:bg-primary/15 hover:border-primary rounded-full border transition-colors',
+        'text-text-secondary hover:bg-surface-raised focus-visible:ring-ring focus-visible:ring-offset-background size-11 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40',
         className
       )}
     >
@@ -42,13 +43,6 @@ export function ThemeToggle({ className }: { readonly className?: string }) {
           <Moon
             className={`absolute h-5 w-5 transition-all ${
               resolvedTheme === 'dark'
-                ? 'scale-100 rotate-0'
-                : 'scale-0 rotate-90'
-            }`}
-          />
-          <Leaf
-            className={`absolute h-5 w-5 transition-all ${
-              resolvedTheme === 'calm'
                 ? 'scale-100 rotate-0'
                 : 'scale-0 rotate-90'
             }`}

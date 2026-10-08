@@ -17,7 +17,7 @@ export async function captureChartAsPng(
     throw new Error('차트 요소를 찾을 수 없습니다.')
   }
 
-  // 현재 테마 감지 (dark 또는 light/calm)
+  // 현재 테마 감지
   const isDark = document.documentElement.classList.contains('dark')
 
   try {

@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { ThemeSelector } from '@/components/shared/theme-selector'
 
 export function UserMenu() {
   const router = useRouter()
@@ -60,10 +61,14 @@ export function UserMenu() {
           </Avatar>
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent align="end" className="shadow-popover w-[300px]">
         <div className="flex flex-col space-y-1 p-2">
           <p className="text-muted-foreground text-xs font-medium">로그인됨</p>
           <p className="truncate text-sm font-semibold">{user?.email}</p>
+        </div>
+        <DropdownMenuSeparator />
+        <div className="p-2">
+          <ThemeSelector autoFocus />
         </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">

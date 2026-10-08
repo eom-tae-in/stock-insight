@@ -207,10 +207,10 @@ export default function KeywordTrendsChart({
             onClick={() => toggleSeries('trendsValue')}
             variant={visibleSeries.trendsValue ? 'default' : 'outline'}
             size="sm"
-            className={visibleSeries.trendsValue ? 'text-white' : ''}
+            className={visibleSeries.trendsValue ? 'text-foreground' : ''}
             style={
               visibleSeries.trendsValue
-                ? { backgroundColor: CHART_SERIES_COLORS.googleTrends }
+                ? { backgroundColor: 'var(--surface-raised)' }
                 : undefined
             }
           >
@@ -221,10 +221,10 @@ export default function KeywordTrendsChart({
             onClick={() => toggleSeries('ma13')}
             variant={visibleSeries.ma13 ? 'default' : 'outline'}
             size="sm"
-            className={visibleSeries.ma13 ? 'text-white' : ''}
+            className={visibleSeries.ma13 ? 'text-foreground' : ''}
             style={
               visibleSeries.ma13
-                ? { backgroundColor: CHART_SERIES_COLORS.ma13 }
+                ? { backgroundColor: 'var(--surface-raised)' }
                 : undefined
             }
           >
@@ -236,10 +236,10 @@ export default function KeywordTrendsChart({
               onClick={() => toggleSeries('yoyValue')}
               variant={visibleSeries.yoyValue ? 'default' : 'outline'}
               size="sm"
-              className={visibleSeries.yoyValue ? 'text-white' : ''}
+              className={visibleSeries.yoyValue ? 'text-foreground' : ''}
               style={
                 visibleSeries.yoyValue
-                  ? { backgroundColor: CHART_SERIES_COLORS.yoy }
+                  ? { backgroundColor: 'var(--surface-raised)' }
                   : undefined
               }
             >
@@ -253,10 +253,10 @@ export default function KeywordTrendsChart({
             data={chartData}
             margin={{ top: 20, right: 80, bottom: 20, left: 20 }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
             <XAxis
               dataKey="date"
-              tick={{ fontSize: 12, fill: 'hsl(var(--foreground))' }}
+              tick={{ fontSize: 12, fill: 'var(--foreground)' }}
               interval={xAxisInterval}
             />
 
@@ -264,12 +264,12 @@ export default function KeywordTrendsChart({
             <YAxis
               yAxisId="left"
               domain={[0, 100]}
-              tick={{ fontSize: 12, fill: 'hsl(var(--foreground))' }}
+              tick={{ fontSize: 12, fill: 'var(--foreground)' }}
               label={{
                 value: '검색량 기반 (0-100)',
                 angle: -90,
                 position: 'insideLeft',
-                fill: 'hsl(var(--foreground))',
+                fill: 'var(--foreground)',
               }}
             />
 
@@ -277,13 +277,13 @@ export default function KeywordTrendsChart({
               <YAxis
                 yAxisId="right"
                 orientation="right"
-                tick={{ fontSize: 12, fill: 'hsl(var(--foreground))' }}
+                tick={{ fontSize: 12, fill: 'var(--foreground)' }}
                 label={{
                   value:
                     '13주 이동평균 기준 전년동기 대비 증감률(52주 YoY) (%)',
                   angle: 90,
                   position: 'insideRight',
-                  fill: 'hsl(var(--foreground))',
+                  fill: 'var(--foreground)',
                 }}
               />
             )}
@@ -291,10 +291,10 @@ export default function KeywordTrendsChart({
             {/* P1-10: Tooltip - O(n) find 제거, Map O(1) 조회 */}
             <Tooltip
               contentStyle={{
-                backgroundColor: 'hsl(var(--background))',
-                border: '1px solid hsl(var(--border))',
+                backgroundColor: 'var(--background)',
+                border: '1px solid var(--border)',
                 borderRadius: '4px',
-                color: 'hsl(var(--foreground))',
+                color: 'var(--foreground)',
               }}
               labelFormatter={label => {
                 const labelStr = String(label)
