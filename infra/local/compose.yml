@@ -1,0 +1,115 @@
+name: stock-insight-local
+
+x-java-env: &java-env
+  OIDC_ISSUER: http://localhost:8180/realms/stock-insight
+  OIDC_JWKS_URI: http://identity:8080/realms/stock-insight/protocol/openid-connect/certs
+  EUREKA_URL: http://discovery-server:8761/eureka/
+
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-bootstrap-only}
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:-local-identity-only}
+      ANALYSIS_DB_PASSWORD: ${ANALYSIS_DB_PASSWORD:-local-analysis-only}
+      MARKET_DB_PASSWORD: ${MARKET_DB_PASSWORD:-local-market-only}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-db.sh:/docker-entrypoint-initdb.d/01-databases.sh:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [backend]
+
+  redis:
+    image: redis:8.2.1-alpine
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [backend]
+
+  rabbitmq:
+    image: rabbitmq:4.1.4-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-stock-insight-local}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-local-broker-only}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    networks: [backend]
+
+  identity:
+    image: quay.io/keycloak/keycloak:26.8.0
+    command: ['start-dev', '--import-realm']
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/identity
+      KC_DB_USERNAME: identity_app
+      KC_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:-local-identity-only}
+      KC_HOSTNAME: http://localhost:8180
+      KC_HEALTH_ENABLED: 'true'
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${IDENTITY_ADMIN_USER:-local-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${IDENTITY_ADMIN_PASSWORD:-local-admin-only}
+    volumes:
+      - ./stock-insight-realm.json:/opt/keycloak/data/import/stock-insight-realm.json:ro
+    ports:
+      - '127.0.0.1:8180:8080'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [backend]
+
+  discovery-server:
+    build:
+      context: ../../services
+      args:
+        SERVICE: discovery-server
+    networks: [backend]
+
+  analysis-service:
+    build:
+      context: ../../services
+      args:
+        SERVICE: analysis-service
+    environment: *java-env
+    depends_on: [discovery-server, identity]
+    networks: [backend]
+
+  market-data-service:
+    build:
+      context: ../../services
+      args:
+        SERVICE: market-data-service
+    environment: *java-env
+    depends_on: [discovery-server, identity]
+    networks: [backend]
+
+  api-gateway:
+    build:
+      context: ../../services
+      args:
+        SERVICE: api-gateway
+    environment: *java-env
+    ports:
+      - '127.0.0.1:8080:8080'
+    depends_on: [discovery-server, analysis-service, market-data-service]
+    networks: [backend]
+
+volumes:
+  postgres-data:
+  redis-data:
+  rabbitmq-data:
+
+networks:
+  backend:

@@ -1,0 +1,2 @@
+rootProject.name = 'stock-insight-services'
+include 'discovery-server', 'api-gateway', 'analysis-service', 'market-data-service'
