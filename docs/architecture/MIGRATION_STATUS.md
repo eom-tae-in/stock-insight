@@ -9,8 +9,9 @@ Squash merged to develop: `d5f21483beee2b94dca167e9bb2f5b9e697b54a4`.
 Runtime foundation issue: https://github.com/eom-tae-in/stock-insight/issues/16
 Runtime foundation PR: https://github.com/eom-tae-in/stock-insight/pull/17
 Squash merged to develop: `d888e90db6ee57e6bf566e7ab4c6a912986a77a3`.
-Active cleanup issue: https://github.com/eom-tae-in/stock-insight/issues/19
-Working branch: `feat/19/remove-legacy-ci`.
+Legacy cleanup PR #20 was squash merged to develop (`a6e30a498b59bf944f98f36f960c4f252275d35b`).
+Active cleanup issue: https://github.com/eom-tae-in/stock-insight/issues/21
+Working branch: `feat/21/remove-all-cicd`.
 Trends backend issue #18 and branch `feat/18/trends-job-pipeline` are paused
 before implementation while retiring legacy CI/CD, as the user requested.
 
@@ -143,14 +144,22 @@ with isolated local fixtures and dedicated test accounts. Preserve useful tests
 from `npm run check` and `npm run test:integration`. Replace the legacy build/E2E
 environment as affected paths migrate, while keeping the failure evidence above.
 
-The user explicitly requested retiring the legacy CI/CD before further migration.
-Issue #19 removes the Supabase-dependent CI and Vercel deployment-status Preview
-E2E workflows. Useful lint/typecheck/unit/PostgreSQL integration checks move to
-MSA Runtime; the legacy web build and platform Preview E2E are retired, not passed.
-`vercel.json` contains only the automatic Git deployment opt-out, so the installed
-Vercel GitHub app cannot trigger new automatic deployments from these commits.
-The external Vercel project/app itself is not deleted. Manual deployment and
-previously created deployments are outside this repository switch.
+The user superseded the previous cleanup scope: remove ALL CI/CD, including
+MSA Runtime, and delete the Vercel project. Issue #21 removes the remaining
+workflow and Playwright's platform bypass headers. GitHub Actions
+is disabled for the entire repository (`actions/permissions.enabled = false`).
+Legacy Preview run 37713291297 still displays queued. GitHub rejected normal
+cancellation and force-cancellation (409: re-run has not yet queued). Do not
+claim it was cancelled or retry cancellation without new evidence.
+Keep test sources and manual commands; do not recreate automated workflows
+without a new user instruction. Historical run 37713976094 passed 521 unit,
+42 PostgreSQL integration and eight OIDC/Gateway scenarios before retirement.
+The Vercel CLI has no credentials and browser access is not connected. External
+project deletion is blocked on account access; no project deletion is claimed.
+The deployment opt-out in `vercel.json` remains temporarily until external project
+deletion is verified. Removing it now would restore the default automatic Git
+deployment behavior while the project/app remains connected. Delete the opt-out
+after verifying deletion of the connected Vercel project with authenticated access.
 GitHub develop/prod rulesets were inspected: both contain deletion protection
 only, with no required status checks. No required-check rule is bypassed.
 Never classify removed checks as passing or call mocked HTTP tests full-stack.

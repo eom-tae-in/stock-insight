@@ -33,7 +33,7 @@ StockInsight는 로그인한 개인 사용자를 기준으로 세 가지 흐름�
 - Supabase Auth + PostgreSQL + RLS
 - Upstash Redis REST
 - Yahoo Finance, pytrends
-- Vercel, Vercel Python Function
+- 컨테이너 기반 MSA 전환 진행 중: [현재 상태](./docs/architecture/MIGRATION_STATUS.md)
 
 ## 설치
 
@@ -97,13 +97,10 @@ TRENDS_CACHE_TTL_SECONDS=86400
 npm run dev
 ```
 
-Trends Python Function까지 포함한 로컬 검증:
-
-```bash
-vercel dev
-```
-
-`/api/trends`는 내부적으로 `/api/pytrends` Python Function을 self-fetch합니다. `next dev`만 실행하면 Python Function 경로가 없어서 로컬 Trends 조회가 실패할 수 있습니다.
+기존 `/api/trends`는 `/api/pytrends` Python 런타임을 self-fetch합니다.
+현재 배포 연결은 제거됐으며 이 경로는 RabbitMQ worker로 이전 예정입니다.
+`next dev`만으로 Python 수집 런타임이 실행되지는 않습니다.
+새 컨테이너 실행 방법은 [로컬 MSA 안내](./infra/local/README.md)를 참고하세요.
 
 ## 기본 명령어
 
@@ -114,24 +111,15 @@ npm run start
 npm run typecheck
 npm run lint
 npm run format
-npm run check-all
+npm run check
 ```
 
 ## 배포 개요
 
-- 배포 기준 플랫폼: Vercel
-- 빌드 명령: `npm run build`
-- Python runtime: [api/pytrends.py](./api/pytrends.py)
-- Python 의존성: [requirements.txt](./requirements.txt)
-- Python Function 번들 제외 규칙: [vercel.json](./vercel.json)
-
-배포 전 확인:
-
-- Supabase URL/publishable key 설정
-- `PYTRENDS_INTERNAL_SECRET`를 Next와 Python Function 양쪽에서 동일하게 읽을 수 있도록 설정
-- 필요 시 `SUPABASE_SECRET_KEY`, `ADMIN_EMAILS` 설정
-- 필요 시 Upstash Redis REST URL/token 설정
-- Supabase 마이그레이션 적용
+- 기존 배포 설정과 모든 GitHub Actions 워크플로를 제거했습니다.
+- GitHub Actions는 저장소 설정에서도 비활성화했습니다. 검증은 수동 명령으로 실행합니다.
+- 웹·인증·Trends의 제품 기능은 단계적으로 컨테이너 서비스로 이전 중입니다.
+- 실제 클라우드 배포와 운영 데이터 이전은 아직 수행하지 않았습니다.
 
 ## 문서
 
