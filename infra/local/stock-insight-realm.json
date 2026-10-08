@@ -1,0 +1,49 @@
+{
+  "realm": "stock-insight",
+  "enabled": true,
+  "registrationAllowed": true,
+  "resetPasswordAllowed": true,
+  "roles": {
+    "realm": [{ "name": "stock-insight-admin" }]
+  },
+  "clients": [
+    {
+      "clientId": "stock-insight-web",
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:3000/api/auth/callback"],
+      "webOrigins": ["http://localhost:3000"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3000/"
+      },
+      "protocolMappers": [
+        {
+          "name": "api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "stock-insight-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "local-user",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Local",
+      "lastName": "User",
+      "email": "local-user@example.invalid",
+      "credentials": [
+        { "type": "password", "value": "local-user-only", "temporary": false }
+      ]
+    }
+  ]
+}

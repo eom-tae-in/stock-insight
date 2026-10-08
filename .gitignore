@@ -19,6 +19,9 @@
 
 # production
 /build
+services/**/build/
+services/.gradle/
+infra/local/.env
 
 # misc
 .DS_Store

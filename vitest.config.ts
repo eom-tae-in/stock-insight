@@ -16,6 +16,7 @@ export default defineConfig({
       '**/coverage/**',
       'tests/integration/**',
       'tests/e2e/**',
+      'infra/local/runtime-smoke.test.mjs',
     ],
 
     coverage: {

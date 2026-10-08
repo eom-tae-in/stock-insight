@@ -3,8 +3,11 @@
 ## Scope and workflow
 
 Source baseline: `6ee984024d1545d35377d3ae6214caf89b7badb1` on `develop`.
-Tracking issue: https://github.com/eom-tae-in/stock-insight/issues/14
-Working branch: `feat/14/msa-baseline`.
+Stage 0 issue: https://github.com/eom-tae-in/stock-insight/issues/14
+Stage 0 PR: https://github.com/eom-tae-in/stock-insight/pull/15
+Squash merged to develop: `d5f21483beee2b94dca167e9bb2f5b9e697b54a4`.
+Active issue: https://github.com/eom-tae-in/stock-insight/issues/16
+Working branch: `feat/16/local-msa-runtime`.
 
 The user authorized database and configuration redesign, issue-first branches,
 PRs to develop, and squash merge. Cloud deployment artifacts are in scope;
@@ -16,7 +19,36 @@ Auth/hosting requirements are superseded. The user authorized proceeding
 without fixing the legacy environment failures. Authentication replacement uses
 the Keycloak/OIDC engineering direction in ADR-001. Legacy account mapping and
 import feasibility still require validation. RAG is excluded.
-No authentication implementation or hosting dependency has been removed yet.
+Existing web authentication/hosting paths have not been cut over yet.
+
+## Stage 1 in progress
+
+- Java 21, Spring Boot 4.1.1, Spring Cloud 2025.1.3, Gradle Wrapper 8.14.3.
+  Versions checked against official Spring compatibility/system requirements.
+- Four Java applications compile and package successfully with warnings as errors.
+  This build has no Java test source yet and is not evidence of runtime behavior.
+- Compose configuration and PostgreSQL init shell syntax checks pass.
+- First `docker compose -f infra/local/compose.yml up -d --build` attempt FAIL:
+  BuildKit cannot create its image ingest directory (`input/output error`).
+  `df -h` reports the host data volume at 100%, with only 133 MiB available.
+  Docker logs also report unreadable existing image metadata and unwritable
+  `containerdmeta.db`; `docker system df` cannot read/write `snapshots.db`.
+  Host space exhaustion is observed; Docker filesystem damage is not confirmed.
+  Second attempt FAIL: containerd cannot create a temporary lease because
+  `meta.db` writes return `input/output error`. Development stopped and both
+  failures were reported. The user waived this local infrastructure blocker;
+  replacement runtime verification will run in isolated GitHub Actions.
+  Only this task's reproducible Java build directories were removed to recover
+  host space after file writes failed. No Docker volumes or user data were removed.
+  The project has no running Compose containers. Discovery, real OIDC login,
+  Gateway routing, token rejection and DB isolation are still unverified.
+- OIDC/Gateway smoke scenarios and an MSA runtime CI workflow are written but
+  have not executed. Do not count them as passing tests.
+- Trends worker, jobs/outbox/inbox, business migration, Next auth cutover,
+  replacement CI and cloud IaC are not implemented.
+- Stage 0 GitHub CI passed (run 37709736931). Legacy Vercel deployment passed;
+  legacy Preview E2E was still running at merge and later failed (37709842315).
+  It was not the migration gate; failure cause has not been investigated here.
 
 ## Observed baseline (2026-10-08)
 
@@ -93,8 +125,9 @@ Source runtime remains unchanged; this is not a passing replacement build/E2E.
 4. Verify ownership, authentication, exports, migration dry-run and rollback.
 5. Add observability, CI, minimal cloud IaC and operational recovery runbooks.
 
-Each increment needs its own issue before its branch. No new service is
-implemented yet. Do not classify HTTP-mocked Playwright as full-stack MSA E2E.
+Each increment needs its own issue before its branch. Service shells and auth
+diagnostics exist; business APIs are not implemented yet. Do not classify
+HTTP-mocked Playwright as full-stack MSA E2E.
 
 ## Next verification and prerequisite
 

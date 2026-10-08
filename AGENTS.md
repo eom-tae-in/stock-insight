@@ -37,6 +37,10 @@ checks, never as passing. Keep useful calculation, ownership, and data tests;
 add replacement build, authentication, and full-stack checks for the new runtime.
 The two-failure stop rule still applies to the replacement verifications.
 
+The user also waived the two local Docker startup failures caused by host disk
+exhaustion. Validate the new container runtime in isolated GitHub Actions;
+record local startup as failed, not passed. New CI failures retain the limit.
+
 ## Continuity
 
 Read `docs/architecture/MIGRATION_STATUS.md` before resuming the migration.
