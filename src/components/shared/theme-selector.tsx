@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useRef } from 'react'
+import { useEffect, useId, useRef, useSyncExternalStore } from 'react'
 import { useTheme } from 'next-themes'
 
 const modes = [
@@ -8,6 +8,10 @@ const modes = [
   { value: 'light', label: '라이트' },
   { value: 'dark', label: '다크' },
 ] as const
+
+const subscribe = () => () => {}
+const clientSnapshot = () => true
+const serverSnapshot = () => false
 
 export function ThemeSelector({
   autoFocus = false,
@@ -17,6 +21,12 @@ export function ThemeSelector({
   const id = useId()
   const groupRef = useRef<HTMLFieldSetElement>(null)
   const { theme, setTheme } = useTheme()
+  const mounted = useSyncExternalStore(
+    subscribe,
+    clientSnapshot,
+    serverSnapshot
+  )
+  const selectedTheme = mounted ? (theme ?? 'system') : 'system'
 
   useEffect(() => {
     if (autoFocus) {
@@ -38,7 +48,7 @@ export function ThemeSelector({
               type="radio"
               name={id}
               value={mode.value}
-              checked={(theme ?? 'system') === mode.value}
+              checked={selectedTheme === mode.value}
               onChange={() => setTheme(mode.value)}
               aria-describedby={`${id}-description`}
               className="peer sr-only"
@@ -50,7 +60,7 @@ export function ThemeSelector({
         ))}
       </div>
       <p id={`${id}-description`} className="text-tertiary text-xs">
-        {theme === 'light' || theme === 'dark'
+        {selectedTheme === 'light' || selectedTheme === 'dark'
           ? '이 기기(브라우저)에 저장돼요.'
           : 'prefers-color-scheme을 따라요.'}
       </p>

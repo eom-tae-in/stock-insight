@@ -18,6 +18,7 @@
     "test:integration": "vitest run --config vitest.db.config.ts",
     "test:e2e": "playwright test",
     "test:web-oidc": "node tests/fixtures/web-oidc-smoke.mjs",
+    "test:ui-components": "node tests/fixtures/ui-components-smoke.mjs",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test",

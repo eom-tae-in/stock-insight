@@ -5,7 +5,8 @@
 확정된 StockInsight UI 리디자인 명세 §1을 토큰 원본으로 사용한다.
 Figma [Foundations](https://www.figma.com/design/WEmeHbbzBqEfBxez9dMk9o?node-id=2-2),
 [상태·공유·계정 패턴](https://www.figma.com/design/WEmeHbbzBqEfBxez9dMk9o?node-id=15-2366)이 대응 참조다.
-UI-1은 기존 화면의 토큰·글꼴과 D2만 적용한다. 화면 구조와 공통 컴포넌트는 후속 단계다.
+UI-1은 기존 화면의 토큰·글꼴과 D2를 적용했다. UI-2는 명세 §2·§3의 공통 컴포넌트와
+숫자 표시 도우미·개발 미리보기를 추가한다. 제품 화면 구조는 후속 단계다.
 Pretendard는 Figma의 대체 표시 글꼴보다 우선한다.
 
 ## 2. 색상
@@ -57,8 +58,8 @@ sidebar=surface, sidebar-accent=brand/subtle, sidebar-accent-foreground=brand/te
 sidebar-border=border/subtle이다. 추가 변수도 Tailwind color 유틸리티에 등록한다.
 
 상승은 up(빨강), 하락은 down(파랑), 관심도는 보라다. 오류·삭제는 danger(주홍)다.
-0·결측은 지시서 D7의 tertiary를 우선한다(명세 §1.1은 secondary).
-등락 표시와 YoY 양수·음수 적용은 후속 D7 작업이다.
+0·결측은 사용자가 정정한 D7에 따라 text/secondary다(Figma Flat 상태).
+등락 표시의 색은 ChangeBadge/ChangeText에서만 정한다. 화면별 연결과 YoY 막대는 후속 단계다.
 UI-1의 기존 YoY 단색은 up, open/high/low는 series-a/b/c를 사용한다.
 기존 계산·차트 구조를 유지한다. 밝은 PNG 프레임과 워터마크는 UI-9 범위다.
 
@@ -104,7 +105,26 @@ Popover·모달·드롭다운은 0 16px 40px -8px rgba(0,0,0,.24), 0 2px 6px rgb
 기존 shadcn/Radix Button/Input/Card/DropdownMenu를 재사용한다.
 hover·focus·disabled·오류·빈 상태를 구분한다.
 비활성은 40% 불투명도와 cursor-not-allowed, 포커스는 배경색 간격2px + 브랜드 링2px다.
-기존 primitive 전체 상태 적용은 UI-2에서 진행하며 테마 컨트롤은 이 규칙을 사용한다.
+UI-2는 명세 §2의 공통 primitive와 개발 전용 미리보기를 구현한다.
+Button md=36/14/10px, sm=30/10/8px, 모바일=44px. 아이콘16px·간격6px.
+Primary는 brand/primary-hover, Secondary는 raised/default border, Ghost는 raised hover,
+Danger는 danger-subtle/danger이며 hover 테두리를 사용한다. 기존 variant 이름은 호환 별칭으로 유지한다.
+Segmented는 raised 트랙(반경10·패딩3), 항목28px(모바일36)·반경8·좌우12,
+선택 brand-subtle/brand-text/600. Tabs는44px·활성밑줄2px. SelectChip은32px·반경8.
+SearchField는38px·raised·검색 아이콘·데스크톱 Kbd, TextField는44px·연결 라벨/설명/오류.
+Checkbox는18px·반경5·brand 선택. StatusBadge는22px·full·좌우8·선택적6px점.
+ChangeBadge는22px·반경6·좌우6·13px/500, ChangeText는배경없음. null은—와사유툴팁.
+SeriesToggle은28px(모바일36)·full·10×3막대·aria-pressed. AlertBanner는반경12·패딩16/14.
+MetricTile은반경14·패딩16·값20/28px. Sparkline은목록96×32/카드폭×48·선1.5px·면14%,
+최대52점이며 결측 구간을 잇지 않는다. TickerLogo는36/28px·2글자·해시색16%배경.
+Kbd는20px·반경6·11px. Dialog는420px·반경20·패딩24·popover그림자·overlay60%.
+Menu는반경12·패딩6·항목최소36px/반경8. 표헤더40·목록행64·데이터행44·subtle구분선.
+컴포넌트별 명세 반경8/12/5는 공통 CSS 토큰으로 정의한다. 브랜드 테두리는 입력 focus·SelectChip 열림만,
+danger 테두리는 Danger hover·오류 입력만 허용하는 명세 예외다. 키보드 링은2px/offset2px.
+모션은 색·opacity 전환이며 reduced-motion에서 전환/진입을 끈다. 라디오·탭은 Radix의 키보드 규칙을 따른다.
+숫자는 §3 기준: 등락2자리/U+2212/항상부호, 비율1자리, 관심도정수와/100,
+차이p, 가격통화기호와2자리, 거래량K/M/B최대2자리, 주차ISO, null은대시.
+기존 통화 유틸의 통화 판정과 계산은 유지하고 새 표시 도우미만 별도로 제공한다.
 
 ThemeToggle은 해석된 모드의 반대 라이트/다크를 선택한다.
 계정 메뉴의 화면 모드는 시스템/라이트/다크이며 기본값은 시스템이다.
@@ -132,6 +152,8 @@ role="alert"와 aria-live를 유지한다. 테마 변경 중 전환은 끈다.
 390/1440/1920px × light/dark와 지시서의 1280px를 확인한다.
 토큰 값은 그대로 쓰되 실제 조합 대비는 확인한다. 명세의 대비 주장과 다르면
 임의로 색을 바꾸지 않고 검증 부채로 기록한다.
+UI-2 실측에서 다크 Primary hover의 #8B5CF6와 흰 글자는 약4.23:1이다.
+지정 토큰과 지시서의4.5:1 기준이 충돌해 디자인 검토가 필요하다.
 
 ## 8. 검증 부채와 후속 단계
 
