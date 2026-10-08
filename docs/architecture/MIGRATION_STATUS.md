@@ -11,7 +11,9 @@ Runtime foundation PR: https://github.com/eom-tae-in/stock-insight/pull/17
 Squash merged to develop: `d888e90db6ee57e6bf566e7ab4c6a912986a77a3`.
 Legacy cleanup PR #20 was squash merged to develop (`a6e30a498b59bf944f98f36f960c4f252275d35b`).
 Active cleanup issue: https://github.com/eom-tae-in/stock-insight/issues/21
-Working branch: `feat/21/remove-all-cicd`.
+Working branch: `feat/21/delete-vercel-project`.
+Repository automation cleanup PR #22 was squash merged to develop
+(`adaf86ca22444b50058f057d8d94edfbd6706b87`).
 Trends backend issue #18 and branch `feat/18/trends-job-pipeline` are paused
 before implementation while retiring legacy CI/CD, as the user requested.
 
@@ -154,12 +156,15 @@ claim it was cancelled or retry cancellation without new evidence.
 Keep test sources and manual commands; do not recreate automated workflows
 without a new user instruction. Historical run 37713976094 passed 521 unit,
 42 PostgreSQL integration and eight OIDC/Gateway scenarios before retirement.
-The Vercel CLI has no credentials and browser access is not connected. External
-project deletion is blocked on account access; no project deletion is claimed.
-The deployment opt-out in `vercel.json` remains temporarily until external project
-deletion is verified. Removing it now would restore the default automatic Git
-deployment behavior while the project/app remains connected. Delete the opt-out
-after verifying deletion of the connected Vercel project with authenticated access.
+After the user logged into Vercel, the project was matched to the repository:
+team `eom-tae-ins-projects`, project `stock-insight`, ID
+`prj_DzttC6D01h1O47XONaKMqjHP5GyT`, GitHub link `eom-tae-in/stock-insight`.
+On 2026-10-08 the authorized project DELETE returned HTTP 204. A subsequent
+complete team project listing confirmed its absence and that the unrelated
+`doc-insight` project remains. The temporary `vercel.json` deployment opt-out
+is now removed. No Vercel account, shared GitHub app installation or unrelated
+project was deleted. Existing application source still has legacy runtime paths;
+this cleanup retires deployments, not the remaining business/auth migration.
 GitHub develop/prod rulesets were inspected: both contain deletion protection
 only, with no required status checks. No required-check rule is bypassed.
 Never classify removed checks as passing or call mocked HTTP tests full-stack.
