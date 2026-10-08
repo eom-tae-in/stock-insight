@@ -124,6 +124,15 @@ try {
     }
   }
   assert(ready, `Next startup failed: ${logs}`)
+  assert.equal(
+    (
+      await ky(`${origin}/design-preview/components`, {
+        retry: 0,
+        throwHttpErrors: false,
+      })
+    ).status,
+    404
+  )
   browser = await chromium.launch({
     channel: 'chrome',
     args: ['--disable-gpu'],
