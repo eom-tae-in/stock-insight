@@ -6,9 +6,7 @@
  * - 키워드 클릭 시 /keyword-analysis/search로 이동
  */
 
-import { redirect } from 'next/navigation'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getKeywords } from '@/server/keywords-service'
+import { getAppShellData } from '@/server/app-shell-data'
 import { MyKeywordsClient } from '@/components/keyword/keyword-trends/my-keywords-client'
 
 export const metadata = {
@@ -17,18 +15,7 @@ export const metadata = {
 }
 
 export default async function KeywordAnalysisPage() {
-  // 인증 확인
-  const supabase = await createSupabaseServerClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/login')
-  }
-
-  // 저장된 키워드 목록 조회
-  const initialKeywords = await getKeywords(supabase, user.id)
+  const { keywords: initialKeywords } = await getAppShellData()
 
   return (
     <main className="flex-1">

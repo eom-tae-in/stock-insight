@@ -24,7 +24,11 @@ export function ThemeToggle({ className }: { readonly className?: string }) {
       onClick={toggleTheme}
       disabled={!mounted}
       title={
-        resolvedTheme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'
+        !mounted
+          ? '테마 전환'
+          : resolvedTheme === 'dark'
+            ? '라이트 모드로 전환'
+            : '다크 모드로 전환'
       }
       className={cn(
         'text-text-secondary hover:bg-surface-raised focus-visible:ring-ring focus-visible:ring-offset-background size-11 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40',

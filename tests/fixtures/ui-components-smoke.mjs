@@ -8,10 +8,19 @@ import assert from 'node:assert/strict'
 import { chromium } from '@playwright/test'
 import ky from 'ky'
 import { inspectComponents } from './ui-components-qa.mjs'
+import { inspectShell } from './ui-shell-qa.mjs'
 import { startOidcProvider, listen, stop } from './oidc-provider.ts'
 import { startRedisFixture } from './redis-server.ts'
 
-const artifacts = await mkdtemp(join(tmpdir(), 'stock-insight-ui2-'))
+const shell = process.argv.includes('--shell')
+const stage = shell ? 'UI-3' : 'UI-2'
+const previewPath = shell
+  ? '/design-preview/shell'
+  : '/design-preview/components'
+
+const artifacts = await mkdtemp(
+  join(tmpdir(), shell ? 'stock-insight-ui3-' : 'stock-insight-ui2-')
+)
 const provider = await startOidcProvider()
 const redis = await startRedisFixture()
 const gateway = createServer((_request, response) =>
@@ -66,7 +75,7 @@ try {
   for (let attempt = 0; attempt < 100; attempt++) {
     if (application.exitCode !== null || application.signalCode !== null) break
     try {
-      const response = await ky(`${origin}/design-preview/components`, {
+      const response = await ky(`${origin}${previewPath}`, {
         timeout: 1500,
         retry: 0,
       })
@@ -82,7 +91,7 @@ try {
     channel: 'chrome',
     args: ['--disable-gpu'],
   })
-  browser.on('disconnected', () => console.log('UI-2 browser closed'))
+  browser.on('disconnected', () => console.log(`${stage} browser closed`))
   const results = []
   for (const width of [390, 1280, 1440]) {
     for (const theme of ['light', 'dark']) {
@@ -101,10 +110,15 @@ try {
         theme
       )
       try {
-        console.log(`UI-2 QA: ${width}px ${theme}`)
+        console.log(`${stage} QA: ${width}px ${theme}`)
         const page = await context.newPage()
         results.push(
-          await inspectComponents(page, { origin, artifacts, width, theme })
+          await (shell ? inspectShell : inspectComponents)(page, {
+            origin,
+            artifacts,
+            width,
+            theme,
+          })
         )
       } finally {
         await context.close()
@@ -124,7 +138,7 @@ try {
       2
     )
   )
-  console.log(`PASS UI-2 component browser QA: ${artifacts}`)
+  console.log(`PASS ${stage} browser QA: ${artifacts}`)
 } catch (error) {
   primaryFailure = error
   await writeFile(
@@ -138,7 +152,7 @@ try {
       2
     )
   )
-  console.error(`FAIL UI-2 component browser QA: ${artifacts}`)
+  console.error(`FAIL ${stage} browser QA: ${artifacts}`)
   throw error
 } finally {
   await writeFile(join(artifacts, 'next.log'), logs)
@@ -177,5 +191,5 @@ try {
     )
   )
   if (cleanupErrors.length && !primaryFailure)
-    throw new AggregateError(cleanupErrors, 'UI-2 fixture cleanup failed')
+    throw new AggregateError(cleanupErrors, `${stage} fixture cleanup failed`)
 }

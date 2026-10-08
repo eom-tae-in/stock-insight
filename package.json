@@ -19,6 +19,7 @@
     "test:e2e": "playwright test",
     "test:web-oidc": "node tests/fixtures/web-oidc-smoke.mjs",
     "test:ui-components": "node tests/fixtures/ui-components-smoke.mjs",
+    "test:ui-shell": "node tests/fixtures/ui-components-smoke.mjs --shell",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test",

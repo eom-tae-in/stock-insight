@@ -1,80 +1,81 @@
-/**
- * 사용자 메뉴 드롭다운
- * Client Component - 로그인 사용자 정보 표시 및 로그아웃
- */
-
 'use client'
 
 import { useEffect, useState } from 'react'
+import type { UserResponse } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
-import type { User } from '@supabase/supabase-js'
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { ThemeSelector } from '@/components/shared/theme-selector'
+import { Button } from '@/components/ui/button'
+import { LogOut } from 'lucide-react'
+import { AccountMenu } from './account-menu'
+import type { AccountProfile } from '@/lib/app-shell'
 
-export function UserMenu() {
+export function UserMenu({
+  initialProfile,
+  mode = 'avatar',
+}: {
+  readonly initialProfile?: AccountProfile
+  readonly mode?: 'profile' | 'avatar' | 'mobile'
+}) {
   const router = useRouter()
-  const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-
+  const [profile, setProfile] = useState<AccountProfile | null>(
+    initialProfile ?? null
+  )
+  const [pending, setPending] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   useEffect(() => {
-    // 현재 사용자 조회
+    if (initialProfile) return
+    let active = true
     const supabase = createSupabaseBrowserClient()
-
-    const checkUser = async () => {
-      const { data } = await supabase.auth.getUser()
-      setUser(data?.user ?? null)
-      setIsLoading(false)
+    void supabase.auth.getUser().then(({ data }: UserResponse) => {
+      if (active && data.user?.email)
+        setProfile({
+          name: data.user.email.split('@')[0],
+          email: data.user.email,
+        })
+    })
+    return () => {
+      active = false
     }
-
-    checkUser()
-  }, [])
+  }, [initialProfile])
 
   const handleLogout = async () => {
-    const supabase = createSupabaseBrowserClient()
-    await supabase.auth.signOut()
-    router.push('/login')
-    router.refresh()
+    setPending(true)
+    setErrorMessage(null)
+    try {
+      const { error } = await createSupabaseBrowserClient().auth.signOut()
+      if (error) throw error
+      router.push('/login')
+      router.refresh()
+    } catch (error: unknown) {
+      if (!(error instanceof Error)) throw error
+      setErrorMessage('로그아웃하지 못했어요. 다시 시도해 주세요.')
+    } finally {
+      setPending(false)
+    }
   }
-
-  if (isLoading || !user?.email) {
-    return null
-  }
-
-  const emailInitial = user.email[0].toUpperCase()
-
+  if (!profile) return null
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button className="focus-visible:ring-ring rounded-full focus-visible:ring-2 focus-visible:outline-none">
-          <Avatar className="h-8 w-8 cursor-pointer">
-            <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-              {emailInitial}
-            </AvatarFallback>
-          </Avatar>
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="shadow-popover w-[300px]">
-        <div className="flex flex-col space-y-1 p-2">
-          <p className="text-muted-foreground text-xs font-medium">로그인됨</p>
-          <p className="truncate text-sm font-semibold">{user?.email}</p>
-        </div>
-        <DropdownMenuSeparator />
-        <div className="p-2">
-          <ThemeSelector autoFocus />
-        </div>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
-          로그아웃
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <AccountMenu
+      profile={profile}
+      mode={mode}
+      logout={
+        <>
+          <Button
+            variant="ghost"
+            disabled={pending}
+            onClick={handleLogout}
+            className="w-full justify-start"
+          >
+            <LogOut aria-hidden />
+            로그아웃
+          </Button>
+          {errorMessage && (
+            <p role="alert" className="text-danger p-2 text-xs">
+              {errorMessage}
+            </p>
+          )}
+        </>
+      }
+    />
   )
 }
