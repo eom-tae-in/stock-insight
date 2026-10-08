@@ -3,6 +3,31 @@ server:
 spring:
   application:
     name: analysis-service
+  datasource:
+    url: ${ANALYSIS_DB_URL:jdbc:postgresql://localhost:5432/analysis}
+    username: ${ANALYSIS_DB_USER:analysis_app}
+    password: ${ANALYSIS_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 5000
+  flyway:
+    user: ${ANALYSIS_MIGRATION_USER:analysis_migration}
+    password: ${ANALYSIS_MIGRATION_PASSWORD}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    username: ${RABBITMQ_USER}
+    password: ${RABBITMQ_PASSWORD}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+    listener:
+      simple:
+        prefetch: 1
+        default-requeue-rejected: true
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
   security:
     oauth2:
       resourceserver:

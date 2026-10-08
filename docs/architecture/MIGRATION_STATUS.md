@@ -10,17 +10,97 @@ Runtime foundation issue: https://github.com/eom-tae-in/stock-insight/issues/16
 Runtime foundation PR: https://github.com/eom-tae-in/stock-insight/pull/17
 Squash merged to develop: `d888e90db6ee57e6bf566e7ab4c6a912986a77a3`.
 Legacy cleanup PR #20 was squash merged to develop (`a6e30a498b59bf944f98f36f960c4f252275d35b`).
-Active cleanup issue: https://github.com/eom-tae-in/stock-insight/issues/21
-Working branch: `feat/21/delete-vercel-project`.
+Vercel cleanup issue #21 was closed by squash-merged PR #23
+(`de1a71b860e5c9ffe2823db6c59ce98a5f2ab93f`).
+Active issue: https://github.com/eom-tae-in/stock-insight/issues/18
+Implementation branch: `feat/18/trends-job-pipeline`.
+Trends backend delivery PR: https://github.com/eom-tae-in/stock-insight/pull/25
+Deferred runtime verification: https://github.com/eom-tae-in/stock-insight/issues/24
 Repository automation cleanup PR #22 was squash merged to develop
 (`adaf86ca22444b50058f057d8d94edfbd6706b87`).
-Trends backend issue #18 and branch `feat/18/trends-job-pipeline` are paused
-before implementation while retiring legacy CI/CD, as the user requested.
+Trends backend implementation resumed after CI/CD and Vercel cleanup.
 
 The user authorized database and configuration redesign, issue-first branches,
 PRs to develop, and squash merge. Cloud deployment artifacts are in scope;
-actual provisioning and production data changes remain unexecuted. Two failures
-of the same verification require stopping and reporting before continuing.
+actual provisioning and production data changes remain unexecuted. The user
+replaced the original immediate-stop rule: after two verification failures,
+investigate and apply the best evidence-backed fix autonomously; stop and report
+only if verification of that recovery fix also fails.
+
+## Trends backend implementation and verification
+
+Job API, transactional outbox/inbox, generation/deletion guards, Flyway schema
+and an explicit fixture-only Python consumer are implemented in delivery PR #25.
+Live Google collection, web integration and runtime verification remain incomplete.
+Java compilation initially failed on nested type annotations and a deprecated
+AMQP confirm accessor; both corrected and second compilation passed.
+Python typecheck initially failed with 12 errors; after correction its second
+attempt failed with two unused queue-declaration return warnings. The original
+stop rule was observed. The user authorized recovery and changed the rule above;
+both queue declaration calls now explicitly discard their broker response.
+Recovery verification passed: `uv run basedpyright` reports zero errors and
+zero warnings. `uv run ruff check` also passes. The first pytest collection
+failed because `request` is a reserved pytest fixture name; renaming the fixture
+to `job_request` resolved it without weakening assertions. `uv run pytest`
+now passes all seven tests. These checks ran locally on 2026-10-08.
+Historical passes do not establish runtime verification of these new files.
+On resuming issue #18, one request instant now determines the query key, deadline
+and UTC completed week consistently, including requests crossing Monday midnight.
+Polling also acquires the owner advisory lock used by other owner operations.
+The Java analysis-service test/bootJar command passed with 13 tests, zero skipped,
+zero failures and zero errors. Tests cover stale/deleted/terminal/expired results,
+correlation mismatch, result-series validation and the UTC week boundary.
+HTTP and message behavior is documented in `TRENDS_JOB_CONTRACT.md`.
+Issue #18's body now uses Korean and reflects manual checks and the current
+failure-recovery and commit conventions.
+Runtime recovery remains blocked. On 2026-10-08 the host had 18 GiB available,
+but Docker's Unix socket `_ping` timed out after five seconds with no response.
+The installed host PostgreSQL 14 binary also cannot start: the ICU 74 dylib it
+links to is absent (the installed ICU is version 78). No host database was changed.
+A volume-preserving `docker desktop restart --timeout 45` was attempted; it did
+not report completion, and a subsequent bounded `_ping` again timed out.
+The waiting CLI was interrupted; this does not prove the Desktop restart was
+cancelled or completed. No Docker volumes were deleted or reset. Development and
+further recovery retries stopped under the user's recovery-then-stop rule.
+Next resolution: inspect Docker Desktop's engine diagnostics and confirm a
+successful non-destructive engine restart before running isolated runtime tests;
+alternatively use a healthy isolated Docker host for manual tests. Do not claim
+PostgreSQL/RabbitMQ/OIDC ownership or consumer integration passes from unit tests.
+At the initial recovery stop, issue #18 remained uncommitted and unmerged;
+no PR had yet been opened for the incomplete runtime increment.
+At the user's request, one further engine check was attempted on 2026-10-08:
+`curl --silent --show-error --max-time 5 --unix-socket
+/Users/taein/.docker/run/docker.sock http://localhost/_ping` exited 28 after
+five seconds without receiving a response. The engine still cannot be verified
+as ready; Compose startup was not attempted. The user instructed deferring
+further recovery if this retry failed, so runtime recovery remains deferred.
+
+The user subsequently authorized skipping this PC's Docker blocker and continuing
+development. No engine retry was made after that direction. Shared Java/Python
+wire fixtures, service idempotency tests, MVC input-validation tests and worker
+ACK-order tests were added. Latest verification on 2026-10-08:
+
+| Verification                                               | Result   | Evidence and limit                                                                  |
+| ---------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------- |
+| `./gradlew --no-daemon build` with Java 21                 | PASS     | Four service executables; analysis tests: 25, skipped: 0, failures: 0               |
+| `uv run ruff check`                                        | PASS     | Worker and test lint                                                                |
+| `uv run basedpyright`                                      | PASS     | Zero errors and warnings                                                            |
+| `uv run pytest`                                            | PASS     | 14 tests: fixture processing, shared wire contracts, ACK behavior, provider refusal |
+| `docker compose -f infra/local/compose.yml config --quiet` | PASS     | Configuration parsing only; no engine startup                                       |
+| `sh -n infra/local/init-db.sh`                             | PASS     | Shell syntax only; no database execution                                            |
+| PostgreSQL/RabbitMQ/OIDC job integration                   | DEFERRED | User waived this local blocker; follow-up issue #24                                 |
+| Existing-volume role upgrade SQL execution                 | DEFERRED | Dry-run-by-default script and procedure added; needs real PostgreSQL                |
+
+Self-review traced create/replay/conflict, refresh/generation, deletion/tombstone,
+deadline expiry, outbox confirms and result transaction/ACK paths. Unit service
+tests use a mocked repository, MVC tests use a fixture principal, and worker
+consumer tests use RecordingChannel. None proves actual ownership SQL, JWT
+verification or broker persistence. Real scenarios are tracked in
+https://github.com/eom-tae-in/stock-insight/issues/24. Issue #18 stays open until
+its remaining runtime acceptance criteria are observed; this increment can land
+under the user's explicit local-runtime waiver. Live Google collection and web
+cutover remain separate future increments. No CI/CD was recreated and GitHub
+Actions permissions still report `enabled=false`.
 
 Latest user direction: Supabase and Vercel will not be used. Their previous
 Auth/hosting requirements are superseded. The user authorized proceeding
@@ -34,7 +114,8 @@ Existing web authentication/hosting paths have not been cut over yet.
 - Java 21, Spring Boot 4.1.1, Spring Cloud 2025.1.3, Gradle Wrapper 8.14.3.
   Versions checked against official Spring compatibility/system requirements.
 - Four Java applications compile and package successfully with warnings as errors.
-  This build has no Java test source yet and is not evidence of runtime behavior.
+  Current analysis unit/contract tests are recorded above; this is not evidence
+  of full runtime behavior.
 - Compose configuration and PostgreSQL init shell syntax checks pass.
 - First `docker compose -f infra/local/compose.yml up -d --build` attempt FAIL:
   BuildKit cannot create its image ingest directory (`input/output error`).
@@ -53,8 +134,9 @@ Existing web authentication/hosting paths have not been cut over yet.
   Discovery routing, login, refresh, anonymous rejection and tampered-token
   rejection passed remotely. Business DB isolation was not exercised by these
   scenarios. Existing CI run 37712814168 also passed before PR #17 was merged.
-- Trends worker, jobs/outbox/inbox, business migration, Next auth cutover,
-  replacement CI and cloud IaC are not implemented.
+- Trends fixture worker, jobs/outbox/inbox and the initial job Flyway migration
+  are implemented. Live collection, actual new-job integration, Next auth cutover,
+  legacy-data migration and cloud IaC remain incomplete. CI/CD stays removed.
 - Stage 0 GitHub CI passed (run 37709736931). Legacy Vercel deployment passed;
   legacy Preview E2E was still running at merge and later failed (37709842315).
   It was not the migration gate; failure cause has not been investigated here.
@@ -132,10 +214,10 @@ Source runtime remains unchanged; this is not a passing replacement build/E2E.
    inbox/result transaction -> authorized job polling and chart display.
 3. Verify Yahoo provider parity and move stock search/cache and saved operations.
 4. Verify ownership, authentication, exports, migration dry-run and rollback.
-5. Add observability, CI, minimal cloud IaC and operational recovery runbooks.
+5. Add observability, manual verification, minimal cloud IaC and recovery runbooks.
 
-Each increment needs its own issue before its branch. Service shells and auth
-diagnostics exist; business APIs are not implemented yet. Do not classify
+Each increment needs its own issue before its branch. Service shells, auth
+diagnostics and fixture job APIs exist; saved business APIs remain unported. Do not classify
 HTTP-mocked Playwright as full-stack MSA E2E.
 
 ## Next verification and prerequisite

@@ -12,6 +12,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-bootstrap-only}
       IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:-local-identity-only}
       ANALYSIS_DB_PASSWORD: ${ANALYSIS_DB_PASSWORD:-local-analysis-only}
+      ANALYSIS_MIGRATION_PASSWORD: ${ANALYSIS_MIGRATION_PASSWORD:-local-analysis-migration-only}
       MARKET_DB_PASSWORD: ${MARKET_DB_PASSWORD:-local-market-only}
     volumes:
       - postgres-data:/var/lib/postgresql/data
@@ -82,8 +83,35 @@ services:
       context: ../../services
       args:
         SERVICE: analysis-service
-    environment: *java-env
-    depends_on: [discovery-server, identity]
+    environment:
+      <<: *java-env
+      ANALYSIS_DB_URL: jdbc:postgresql://postgres:5432/analysis
+      ANALYSIS_DB_PASSWORD: ${ANALYSIS_DB_PASSWORD:-local-analysis-only}
+      ANALYSIS_MIGRATION_PASSWORD: ${ANALYSIS_MIGRATION_PASSWORD:-local-analysis-migration-only}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER:-stock-insight-local}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-local-broker-only}
+    depends_on:
+      discovery-server:
+        condition: service_started
+      identity:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks: [backend]
+
+  trends-worker:
+    build:
+      context: ../../services/trends-worker
+    environment:
+      TRENDS_PROVIDER: fixture
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-stock-insight-local}:${RABBITMQ_PASSWORD:-local-broker-only}@rabbitmq:5672/%2F
+    restart: on-failure:3
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     networks: [backend]
 
   market-data-service:
