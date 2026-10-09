@@ -36,18 +36,23 @@ import { CSS } from '@dnd-kit/utilities'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { StockListFilters } from './stock-list-filters'
+import {
+  stockFilterSummary,
+  parseStockFilter,
+  type StockChangeFilter,
+} from '@/lib/stock/list-filter'
+import { isStale } from '@/lib/insights/calendar'
 import { StockEditToolbar, type StockEditMode } from './stock-edit-toolbar'
 import { StockDeleteDialog } from './stock-delete-dialog'
-import {
-  StockListRow,
-  StockListHeader,
-} from '@/components/stock/stock-list-row'
+import { StockListRow, StockListTable } from '@/components/stock/stock-list-row'
 import { GripVertical, Plus, Search } from 'lucide-react'
 import { EmptyState } from '@/components/shared/empty-state'
 import type { LinkedInterest } from '@/lib/stock/list-summary'
 import type { SearchRecord } from '@/types'
 
 interface DashboardClientProps {
+  readonly referenceTime?: string
   readonly initialRecords: SearchRecord[]
   readonly interests?: Readonly<Record<string, LinkedInterest>>
 }
@@ -95,11 +100,14 @@ function SortableStockRow({
 
 export function DashboardClient({
   initialRecords,
+  referenceTime,
   interests = {},
 }: DashboardClientProps) {
   const [records, setRecords] = useState(initialRecords)
   const { ordered, saveOrder } = useStockOrder(records)
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set())
+  const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState<StockChangeFilter>('all')
   const [editMode, setEditMode] = useState<StockEditMode>('none')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const reorderBackup = useRef<SearchRecord[] | null>(null)
@@ -123,13 +131,19 @@ export function DashboardClient({
     reorderBackup.current = null
   }
 
+  const clearFilters = () => {
+    setQuery('')
+    setFilter('all')
+  }
   const handleSelectDeleteMode = () => {
+    clearFilters()
     setEditMode('delete')
     setSelectedIds(new Set())
     reorderBackup.current = null
   }
 
   const handleSelectReorderMode = () => {
+    clearFilters()
     setRecords(ordered)
     setEditMode('reorder')
     setSelectedIds(new Set())
@@ -253,6 +267,14 @@ export function DashboardClient({
     <StockListRow
       record={record}
       rowProps={rowProps}
+      stale={
+        referenceTime
+          ? isStale(
+              record.last_updated_at ?? record.searched_at,
+              new Date(referenceTime)
+            )
+          : false
+      }
       interest={interests[record.ticker.toUpperCase()]}
       managing={editMode !== 'none'}
       selected={selectedIds.has(record.id)}
@@ -277,6 +299,14 @@ export function DashboardClient({
   )
 
   const isEmpty = records.length === 0
+  const summary = stockFilterSummary(ordered, query)
+  const visible = summary[filter]
+  const staleTime = referenceTime ? new Date(referenceTime) : null
+  const staleCount = staleTime
+    ? records.filter(record =>
+        isStale(record.last_updated_at ?? record.searched_at, staleTime)
+      ).length
+    : 0
 
   return (
     <>
@@ -304,6 +334,21 @@ export function DashboardClient({
                 </Link>
               </Button>
             )}
+            {editMode === 'none' && (
+              <StockListFilters
+                query={query}
+                filter={filter}
+                counts={{
+                  all: summary.all.length,
+                  up: summary.up.length,
+                  down: summary.down.length,
+                }}
+                staleCount={staleCount}
+                busy={loadingIds.size > 0}
+                onQueryChange={setQuery}
+                onFilterChange={value => setFilter(parseStockFilter(value))}
+              />
+            )}
             <StockEditToolbar
               mode={editMode}
               count={records.length}
@@ -323,7 +368,18 @@ export function DashboardClient({
             />
           </div>
 
-          {editMode === 'reorder' ? (
+          {editMode === 'none' && visible.length === 0 ? (
+            <EmptyState
+              icon={<Search className="size-5" />}
+              title="조건에 맞는 종목이 없어요."
+              description="티커·회사명이나 등락 조건을 바꿔 보세요."
+              action={
+                <Button variant="secondary" onClick={clearFilters}>
+                  필터 초기화
+                </Button>
+              }
+            />
+          ) : editMode === 'reorder' ? (
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -333,35 +389,23 @@ export function DashboardClient({
                 items={records.map(record => record.id)}
                 strategy={verticalListSortingStrategy}
               >
-                <table
-                  aria-label="관심 종목"
-                  className="bg-card block w-full overflow-hidden rounded-lg border"
-                >
-                  <StockListHeader />
-                  <tbody className="block">
-                    {records.map(record => (
-                      <SortableStockRow key={record.id} record={record}>
-                        {(handle, rowProps) =>
-                          renderStockRow(record, handle, rowProps)
-                        }
-                      </SortableStockRow>
-                    ))}
-                  </tbody>
-                </table>
+                <StockListTable>
+                  {records.map(record => (
+                    <SortableStockRow key={record.id} record={record}>
+                      {(handle, rowProps) =>
+                        renderStockRow(record, handle, rowProps)
+                      }
+                    </SortableStockRow>
+                  ))}
+                </StockListTable>
               </SortableContext>
             </DndContext>
           ) : (
-            <table
-              aria-label="관심 종목"
-              className="bg-card block w-full overflow-hidden rounded-lg border"
-            >
-              <StockListHeader />
-              <tbody className="block">
-                {ordered.map(record => (
-                  <Fragment key={record.id}>{renderStockRow(record)}</Fragment>
-                ))}
-              </tbody>
-            </table>
+            <StockListTable>
+              {visible.map(record => (
+                <Fragment key={record.id}>{renderStockRow(record)}</Fragment>
+              ))}
+            </StockListTable>
           )}
         </>
       )}

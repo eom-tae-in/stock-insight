@@ -60,9 +60,22 @@ export function StockListHeader() {
   )
 }
 
+export function StockListTable({ children }: { readonly children: ReactNode }) {
+  return (
+    <table
+      aria-label="관심 종목"
+      className="bg-card block w-full overflow-hidden rounded-lg border"
+    >
+      <StockListHeader />
+      <tbody className="block">{children}</tbody>
+    </table>
+  )
+}
+
 export function StockListRow({
   record,
   rowProps,
+  stale = false,
   interest,
   control,
   managing,
@@ -71,6 +84,7 @@ export function StockListRow({
   onRefresh,
   onDelete,
 }: {
+  readonly stale?: boolean
   readonly rowProps?: Pick<ComponentProps<'tr'>, 'ref' | 'style'>
   readonly record: SearchRecord
   readonly interest?: LinkedInterest
@@ -170,7 +184,11 @@ export function StockListRow({
         />
       </td>
       <td className="text-tertiary hidden text-right text-xs tabular-nums xl:block">
-        <time dateTime={updated} title={updated}>
+        <time
+          dateTime={updated}
+          title={stale ? `${updated} · 2주 이상 갱신하지 않았어요.` : updated}
+          className={stale ? 'text-warning' : undefined}
+        >
           {dateLabel}
         </time>
       </td>

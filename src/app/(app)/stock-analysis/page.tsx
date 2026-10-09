@@ -21,6 +21,7 @@ export default async function StockAnalysisPage() {
       </header>
       <DashboardClient
         initialRecords={records}
+        referenceTime={new Date().toISOString()}
         interests={linkedStockInterests(keywords)}
       />
       <p className="text-tertiary text-xs leading-5">

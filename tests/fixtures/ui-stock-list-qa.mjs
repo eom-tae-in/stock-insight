@@ -45,6 +45,28 @@ export async function inspectStockList(page, options) {
           page.getByRole('columnheader', { name: '1년 추이' })
         ).toHaveCount(options.width >= 1440 ? 1 : 0)
       }
+      await expect(
+        page.getByText('2주 이상 갱신 안 된 종목 1', { exact: true })
+      ).toBeVisible()
+      await page.getByRole('radio', { name: '하락 1', exact: true }).click()
+      await expect(page.getByRole('heading', { level: 3 })).toHaveText(['MSFT'])
+      await capture('down-filter')
+      await page
+        .getByRole('searchbox', { name: '티커·회사명으로 찾기' })
+        .fill('apple')
+      await expect(
+        page.getByRole('heading', { name: '조건에 맞는 종목이 없어요.' })
+      ).toBeVisible()
+      await capture('no-results')
+      await page.getByRole('button', { name: '필터 초기화' }).click()
+      await page.getByRole('searchbox').fill('microsoft')
+      await expect(page.getByRole('heading', { level: 3 })).toHaveText(['MSFT'])
+      await capture('company-search')
+      await page.getByRole('button', { name: '편집', exact: true }).click()
+      await page.getByRole('menuitem', { name: '삭제', exact: true }).click()
+      await expect(page.getByRole('heading', { level: 3 })).toHaveCount(3)
+      await page.getByRole('button', { name: '완료', exact: true }).click()
+      await expect(page.getByRole('searchbox')).toHaveValue('')
       await page.getByRole('button', { name: 'MSFT 작업' }).click()
       await capture('row-menu')
       await page.getByRole('menuitem', { name: '최신화', exact: true }).click()

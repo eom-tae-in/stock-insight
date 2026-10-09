@@ -22,7 +22,8 @@ const records: SearchRecord[] = ['AAPL', 'MSFT', 'NVDA'].map(
       close: 90 + index * 50 + week * 0.4 + Math.sin(week / 4) * 3,
     })),
     searched_at: '2026-10-02T00:00:00Z',
-    last_updated_at: '2026-10-02T00:00:00Z',
+    last_updated_at:
+      index === 1 ? '2026-09-20T00:00:00Z' : '2026-10-02T00:00:00Z',
   })
 )
 const week = completedWeek(new Date('2026-10-09T00:00:00+09:00'))
@@ -40,6 +41,7 @@ export function StockListShowcase() {
       </header>
       <DashboardClient
         initialRecords={records}
+        referenceTime="2026-10-09T00:00:00Z"
         interests={{
           NVDA: {
             keywordId: 'preview-keyword',

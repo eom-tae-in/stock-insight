@@ -6,9 +6,11 @@ import { Kbd } from './kbd'
 import { cn } from '@/lib/utils'
 export function SearchField({
   label,
+  showShortcut = true,
   className,
   ...props
 }: Omit<ComponentProps<typeof Input>, 'type' | 'aria-label'> & {
+  readonly showShortcut?: boolean
   readonly label: string
 }) {
   return (
@@ -23,12 +25,14 @@ export function SearchField({
         aria-label={label}
         className={cn('h-[38px] pr-14 pl-9', className)}
       />
-      <Kbd
-        aria-hidden
-        className="pointer-events-none absolute top-[9px] right-3 hidden md:inline-flex"
-      >
-        ⌘K
-      </Kbd>
+      {showShortcut && (
+        <Kbd
+          aria-hidden
+          className="pointer-events-none absolute top-[9px] right-3 hidden md:inline-flex"
+        >
+          ⌘K
+        </Kbd>
+      )}
     </div>
   )
 }
