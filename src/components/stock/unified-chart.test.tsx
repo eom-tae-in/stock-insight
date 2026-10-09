@@ -85,7 +85,7 @@ describe('UnifiedChart', () => {
       />
     )
 
-    expect(screen.getByText('통합 분석 차트')).toBeInTheDocument()
+    expect(screen.getByText('가격 차트')).toBeInTheDocument()
     expect(screen.queryByTestId('line-open')).not.toBeInTheDocument()
     expect(screen.getByTestId('line-close')).toHaveTextContent('종가')
     expect(screen.getByTestId('area-ma13')).toHaveTextContent('13주 MA')
@@ -126,6 +126,7 @@ describe('UnifiedChart', () => {
       />
     )
 
+    await user.click(screen.getByRole('button', { name: '기간 직접 입력' }))
     await user.clear(screen.getByPlaceholderText('주'))
     await user.type(screen.getByPlaceholderText('주'), '10')
 
@@ -134,6 +135,44 @@ describe('UnifiedChart', () => {
         name: '13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)',
       })
     ).toBeDisabled()
+    expect(screen.queryByTestId('area-yoy')).not.toBeInTheDocument()
+  })
+
+  it('기간 변경 시 종가만 남기고 필요한 기간에서 시리즈를 다시 켤 수 있다', async () => {
+    const user = userEvent.setup()
+    render(
+      <UnifiedChart
+        ticker="AAPL"
+        currency="USD"
+        priceData={priceData}
+        ma13={priceData.map(point => point.close)}
+        metrics={metrics}
+      />
+    )
+    await user.click(screen.getByRole('radio', { name: '1Y' }))
+    expect(screen.getByTestId('composed-chart')).toHaveAttribute(
+      'data-points',
+      '52'
+    )
+    expect(screen.queryByTestId('area-ma13')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('area-yoy')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('radio', { name: '2Y' }))
+    await user.click(screen.getByRole('button', { name: '13주 MA' }))
+    expect(screen.getByTestId('area-ma13')).toBeInTheDocument()
+  })
+
+  it('선택 기간이 길어도 저장된 종가가 부족하면 MA13과 YoY를 켤 수 없다', () => {
+    render(
+      <UnifiedChart
+        ticker="AAPL"
+        currency="USD"
+        priceData={priceData.slice(-10)}
+        ma13={Array(10).fill(null)}
+        metrics={metrics}
+      />
+    )
+    expect(screen.getByRole('button', { name: '13주 MA' })).toBeDisabled()
+    expect(screen.queryByTestId('area-ma13')).not.toBeInTheDocument()
     expect(screen.queryByTestId('area-yoy')).not.toBeInTheDocument()
   })
 
