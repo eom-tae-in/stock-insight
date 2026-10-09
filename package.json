@@ -29,6 +29,7 @@
     "coverage": "vitest run --coverage",
     "coverage:integration": "vitest run --coverage --config vitest.db.config.ts",
     "prepare": "husky",
+    "test:ui-stock-detail": "node tests/fixtures/ui-components-smoke.mjs --stock-detail",
     "test:ui-stock-list": "node tests/fixtures/ui-components-smoke.mjs --stock-list"
   },
   "dependencies": {

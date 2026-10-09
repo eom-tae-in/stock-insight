@@ -11,11 +11,20 @@ import { inspectComponents } from './ui-components-qa.mjs'
 import { inspectShell } from './ui-shell-qa.mjs'
 import { inspectCustomCharts } from './ui-custom-charts-qa.mjs'
 import { inspectStockList } from './ui-stock-list-qa.mjs'
+import { inspectStockDetail } from './ui-stock-detail-qa.mjs'
 import { inspectStockEdit } from './ui-stock-edit-qa.mjs'
 import { startOidcProvider, listen, stop } from './oidc-provider.ts'
 import { startRedisFixture } from './redis-server.ts'
 
 const scenario = [
+  {
+    flag: '--stock-detail',
+    stage: 'UI-5e',
+    path: '/design-preview/stock-detail',
+    prefix: 'stock-insight-ui5e-',
+    inspect: inspectStockDetail,
+    wide: true,
+  },
   {
     flag: '--stock-list',
     stage: 'UI-5c',
