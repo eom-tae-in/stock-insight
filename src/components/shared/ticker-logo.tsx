@@ -12,7 +12,7 @@ export function TickerLogo({
   size = 'md',
 }: {
   readonly ticker: string
-  readonly size?: 'md' | 'sm'
+  readonly size?: 'md' | 'sm' | 'lg'
 }) {
   const normalized = ticker.trim().toUpperCase()
   const hash = Array.from(normalized).reduce(
@@ -24,7 +24,7 @@ export function TickerLogo({
       aria-hidden
       className={cn(
         'relative isolate inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-semibold',
-        size === 'sm' ? 'size-7' : 'size-9',
+        size === 'sm' ? 'size-7' : size === 'lg' ? 'size-12' : 'size-9',
         colors[hash % colors.length]
       )}
     >

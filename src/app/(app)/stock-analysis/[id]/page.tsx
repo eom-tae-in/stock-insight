@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Container } from '@/components/layout/container'
-import { MetricsSummary } from '@/components/stock/metrics-summary'
+import { StockDetailSummary } from '@/components/stock/stock-detail-summary'
 import { UnifiedChart } from '@/components/stock/unified-chart'
 import { CustomChartBuilder } from '@/components/stock/custom-chart-builder'
 import { CustomChartView } from '@/components/stock/custom-chart-view'
@@ -46,27 +46,8 @@ export default async function StockAnalysisDetailPage({
   return (
     <main className="flex-1">
       <Container className="py-8">
-        {/* 제목 및 종목 정보 */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">
-            {record.ticker} - {record.company_name}
-          </h1>
-          <p className="text-muted-foreground mt-2 text-sm">
-            마지막 업데이트:{' '}
-            {new Date(
-              record.last_updated_at ?? record.searched_at
-            ).toLocaleDateString('ko-KR')}
-          </p>
-        </div>
-
-        {/* 지표 요약 */}
         <section className="mb-8">
-          <MetricsSummary
-            metrics={metrics}
-            lastUpdatedAt={record.last_updated_at}
-            ticker={record.ticker}
-            currency={record.currency}
-          />
+          <StockDetailSummary record={record} />
         </section>
 
         {/* 통합 분석 차트 */}
