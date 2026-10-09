@@ -9,41 +9,18 @@
 
 import { Container } from '@/components/layout/container'
 import { DashboardClient } from '@/components/stock/dashboard-client'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getSavedSearches } from '@/server/stock-search-service'
+import { getAppShellData } from '@/server/app-shell-data'
 
 export const dynamic = 'force-dynamic'
 
 export default async function StockAnalysisPage() {
-  // 인증된 서버 클라이언트로 DB 조회 (RLS 적용됨)
-  const supabase = await createSupabaseServerClient()
-
-  // 사용자 정보 조회
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  // 미인증 상태 처리
-  if (!user || authError) {
-    return (
-      <Container className="py-8">
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center dark:border-red-900 dark:bg-red-950">
-          <p className="text-sm text-red-700 dark:text-red-200">
-            로그인이 필요합니다.
-          </p>
-        </div>
-      </Container>
-    )
-  }
-
-  const records = await getSavedSearches(supabase, user.id)
+  const { records } = await getAppShellData()
 
   return (
     <Container className="py-8">
       {/* 내 종목 제목 */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold">내 종목</h1>
+        <h1 className="text-3xl font-bold">종목 분석</h1>
         <p className="text-muted-foreground mt-1 text-sm">
           저장한 종목의 주간 지표와 분석 차트를 확인합니다.
         </p>

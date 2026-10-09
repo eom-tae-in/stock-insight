@@ -46,16 +46,20 @@ describe('DashboardClient integration', () => {
   it('renders the empty dashboard state', () => {
     render(<DashboardClient initialRecords={[]} />)
 
-    expect(screen.getByText('내 종목이 없습니다.')).toBeInTheDocument()
+    expect(screen.getByText('저장한 종목이 없어요.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '+ 추가' })).toHaveAttribute(
       'href',
       '/search'
     )
   })
 
-  it('deletes selected records through edit mode and confirmation dialog', async () => {
+  it('deletes selected records while preserving the saved order of remaining records', async () => {
     const user = userEvent.setup()
     vi.mocked(fetch).mockResolvedValue({ ok: true } as Response)
+    localStorage.setItem(
+      'stock-sort-order',
+      JSON.stringify({ 'search-3': 0, 'search-2': 1, 'search-1': 2 })
+    )
 
     render(
       <DashboardClient
@@ -65,6 +69,11 @@ describe('DashboardClient integration', () => {
             id: 'search-2',
             ticker: 'MSFT',
             company_name: 'Microsoft Corporation',
+          }),
+          makeRecord({
+            id: 'search-3',
+            ticker: 'NVDA',
+            company_name: 'Nvidia',
           }),
         ]}
       />
@@ -93,6 +102,9 @@ describe('DashboardClient integration', () => {
     )
     expect(screen.queryByText('AAPL')).not.toBeInTheDocument()
     expect(screen.getByText('MSFT')).toBeInTheDocument()
+    expect(localStorage.getItem('stock-sort-order')).toBe(
+      JSON.stringify({ 'search-3': 0, 'search-2': 1 })
+    )
     expect(toastMock.success).toHaveBeenCalledWith('1개 종목이 삭제되었습니다.')
   })
 

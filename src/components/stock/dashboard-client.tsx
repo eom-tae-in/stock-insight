@@ -8,7 +8,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import { useStockOrder } from '@/hooks/use-stock-order'
 import {
   DndContext,
   closestCenter,
@@ -50,8 +51,6 @@ interface DashboardClientProps {
 
 type EditMode = 'none' | 'delete' | 'reorder'
 
-const SORT_ORDER_KEY = 'stock-sort-order'
-
 function SortableStockCard({
   record,
   children,
@@ -87,6 +86,7 @@ function SortableStockCard({
 
 export function DashboardClient({ initialRecords }: DashboardClientProps) {
   const [records, setRecords] = useState(initialRecords)
+  const { ordered, saveOrder } = useStockOrder(records)
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set())
   const [isEditMode, setIsEditMode] = useState(false)
   const [editMode, setEditMode] = useState<EditMode>('none')
@@ -102,32 +102,6 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   )
-
-  // 저장된 순서 복원 (초기 로딩 시에만)
-  useEffect(() => {
-    const savedOrder = localStorage.getItem(SORT_ORDER_KEY)
-    if (savedOrder) {
-      try {
-        const orderMap = JSON.parse(savedOrder) as Record<string, number>
-        const sorted = [...initialRecords].sort((a, b) => {
-          const orderA = orderMap[a.id] ?? Infinity
-          const orderB = orderMap[b.id] ?? Infinity
-          return orderA - orderB
-        })
-        setRecords(sorted)
-      } catch (error) {
-        console.error('Failed to restore sort order:', error)
-      }
-    }
-  }, [initialRecords])
-
-  const saveOrder = (nextRecords: SearchRecord[]) => {
-    const orderMap: Record<string, number> = {}
-    nextRecords.forEach((record, index) => {
-      orderMap[record.id] = index
-    })
-    localStorage.setItem(SORT_ORDER_KEY, JSON.stringify(orderMap))
-  }
 
   const closeEditMode = () => {
     if (editMode === 'reorder' && reorderBackup) {
@@ -147,9 +121,10 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
   }
 
   const handleSelectReorderMode = () => {
+    setRecords(ordered)
     setEditMode('reorder')
     setSelectedIds(new Set())
-    setReorderBackup(records)
+    setReorderBackup(ordered)
   }
 
   const handleToggleSelect = (id: string) => {
@@ -190,7 +165,7 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
         throw new Error('Some deletions failed')
       }
 
-      const nextRecords = records.filter(record => !selectedIds.has(record.id))
+      const nextRecords = ordered.filter(record => !selectedIds.has(record.id))
       setRecords(nextRecords)
       saveOrder(nextRecords)
       setSelectedIds(new Set())
@@ -325,7 +300,7 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
       {isEmpty ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <p className="text-muted-foreground mb-6 text-lg">
-            내 종목이 없습니다.
+            저장한 종목이 없어요.
           </p>
           <Button asChild>
             <Link href="/search">+ 추가</Link>
@@ -448,7 +423,7 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
             </DndContext>
           ) : (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {records.map(record => (
+              {ordered.map(record => (
                 <div key={record.id}>{renderStockCard(record)}</div>
               ))}
             </div>

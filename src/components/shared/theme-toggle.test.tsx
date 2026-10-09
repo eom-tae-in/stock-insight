@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { renderToString } from 'react-dom/server'
 import { ThemeToggle } from './theme-toggle'
 
 const themeMock = vi.hoisted(() => ({
@@ -17,6 +18,14 @@ describe('ThemeToggle', () => {
   beforeEach(() => {
     themeMock.resolvedTheme = 'light'
     themeMock.setTheme.mockReset()
+  })
+
+  it('서버 렌더링 제목은 저장된 테마와 관계없이 동일하다', () => {
+    themeMock.resolvedTheme = 'dark'
+    const dark = renderToString(<ThemeToggle />)
+    themeMock.resolvedTheme = 'light'
+    expect(renderToString(<ThemeToggle />)).toBe(dark)
+    expect(dark).toContain('title="테마 전환"')
   })
 
   it('renders an accessible theme toggle button after mount', async () => {
