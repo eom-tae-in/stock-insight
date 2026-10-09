@@ -111,6 +111,11 @@ OIDC 축소 셸은 서버 displayName과 POST/hidden csrf 로그아웃을 유지
 
 ## 5. 컴포넌트와 상태
 
+UI-5a 커스텀 차트 모달은560px·반경20·패딩24, 최대 화면 높이90dvh다.
+헤더·본문·푸터를 분리하고 본문이 스크롤을 소유한다. 모바일은 화면 좌우16px를 남기고
+기간 입력과 시리즈 설명·푸터를 줄바꿈한다. 기간 축소로 선택 해제된 시리즈는
+동일 위치의 상태 문구로 이유를 알린다. 저장 키와 customChartUpdated 이벤트를 유지한다.
+
 기존 shadcn/Radix Button/Input/Card/DropdownMenu를 재사용한다.
 hover·focus·disabled·오류·빈 상태를 구분한다.
 비활성은 40% 불투명도와 cursor-not-allowed, 포커스는 배경색 간격2px + 브랜드 링2px다.

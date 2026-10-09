@@ -9,17 +9,28 @@ import { chromium } from '@playwright/test'
 import ky from 'ky'
 import { inspectComponents } from './ui-components-qa.mjs'
 import { inspectShell } from './ui-shell-qa.mjs'
+import { inspectCustomCharts } from './ui-custom-charts-qa.mjs'
 import { startOidcProvider, listen, stop } from './oidc-provider.ts'
 import { startRedisFixture } from './redis-server.ts'
 
 const shell = process.argv.includes('--shell')
-const stage = shell ? 'UI-3' : 'UI-2'
-const previewPath = shell
-  ? '/design-preview/shell'
-  : '/design-preview/components'
+const customCharts = process.argv.includes('--custom-charts')
+const stage = customCharts ? 'UI-5a' : shell ? 'UI-3' : 'UI-2'
+const previewPath = customCharts
+  ? '/design-preview/custom-charts'
+  : shell
+    ? '/design-preview/shell'
+    : '/design-preview/components'
 
 const artifacts = await mkdtemp(
-  join(tmpdir(), shell ? 'stock-insight-ui3-' : 'stock-insight-ui2-')
+  join(
+    tmpdir(),
+    customCharts
+      ? 'stock-insight-ui5a-'
+      : shell
+        ? 'stock-insight-ui3-'
+        : 'stock-insight-ui2-'
+  )
 )
 const provider = await startOidcProvider()
 const redis = await startRedisFixture()
@@ -93,7 +104,9 @@ try {
   })
   browser.on('disconnected', () => console.log(`${stage} browser closed`))
   const results = []
-  for (const width of [390, 1280, 1440]) {
+  for (const width of customCharts
+    ? [390, 1280, 1440, 1920]
+    : [390, 1280, 1440]) {
     for (const theme of ['light', 'dark']) {
       const context = await browser.newContext({
         viewport: { width, height: 1000 },
@@ -113,7 +126,13 @@ try {
         console.log(`${stage} QA: ${width}px ${theme}`)
         const page = await context.newPage()
         results.push(
-          await (shell ? inspectShell : inspectComponents)(page, {
+          await (
+            customCharts
+              ? inspectCustomCharts
+              : shell
+                ? inspectShell
+                : inspectComponents
+          )(page, {
             origin,
             artifacts,
             width,

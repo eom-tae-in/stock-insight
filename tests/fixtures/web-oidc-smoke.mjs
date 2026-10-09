@@ -142,6 +142,15 @@ try {
     ).status,
     404
   )
+  assert.equal(
+    (
+      await ky(`${origin}/design-preview/custom-charts`, {
+        retry: 0,
+        throwHttpErrors: false,
+      })
+    ).status,
+    404
+  )
   browser = await chromium.launch({
     channel: 'chrome',
     args: ['--disable-gpu'],

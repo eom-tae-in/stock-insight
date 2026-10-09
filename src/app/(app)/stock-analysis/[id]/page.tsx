@@ -82,7 +82,11 @@ export default async function StockAnalysisDetailPage({
 
         {/* 커스텀 차트 빌더 */}
         <section className="mb-8">
-          <CustomChartBuilder searchId={record.id} />
+          <CustomChartBuilder
+            searchId={record.id}
+            ticker={record.ticker}
+            priceData={record.price_data}
+          />
         </section>
 
         {/* 저장된 커스텀 차트 */}
