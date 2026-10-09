@@ -49,7 +49,7 @@ describe('DashboardClient integration', () => {
       <DashboardClient initialRecords={[makeRecord()]} />
     )
     expect(html).toContain('편집')
-    expect(html).not.toContain('radix-')
+    expect(html).not.toContain('id="radix-')
     expect(html).not.toContain('aria-controls=')
   })
   it('renders the empty dashboard state', () => {
@@ -199,6 +199,65 @@ describe('DashboardClient integration', () => {
       screen.getAllByRole('heading', { level: 3 }).map(item => item.textContent)
     ).toEqual(['MSFT', 'AAPL'])
     expect(toastMock.success).not.toHaveBeenCalled()
+  })
+
+  it('검색과 하락 조건을 결합하고 결과 없음에서 필터를 초기화한다', async () => {
+    const user = userEvent.setup()
+    render(
+      <DashboardClient
+        initialRecords={[
+          makeRecord(),
+          makeRecord({
+            id: 'search-2',
+            ticker: 'MSFT',
+            company_name: 'Microsoft Corporation',
+            current_price: 90,
+            previous_close: 100,
+          }),
+        ]}
+      />
+    )
+    await user.click(screen.getByRole('radio', { name: '하락 1' }))
+    expect(
+      screen.queryByRole('heading', { name: 'AAPL' })
+    ).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'MSFT' })).toBeInTheDocument()
+    await user.type(
+      screen.getByRole('searchbox', { name: '티커·회사명으로 찾기' }),
+      'apple'
+    )
+    expect(screen.getByText('조건에 맞는 종목이 없어요.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '필터 초기화' }))
+    expect(screen.getByRole('heading', { name: 'AAPL' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'MSFT' })).toBeInTheDocument()
+  })
+
+  it('필터된 상태에서 편집하면 모든 종목을 표시하고 미갱신 안내를 유지한다', async () => {
+    const user = userEvent.setup()
+    render(
+      <DashboardClient
+        referenceTime="2026-10-09T00:00:00Z"
+        initialRecords={[
+          makeRecord(),
+          makeRecord({
+            id: 'search-2',
+            ticker: 'MSFT',
+            company_name: 'Microsoft Corporation',
+          }),
+        ]}
+      />
+    )
+    expect(screen.getByText('2주 이상 갱신 안 된 종목 2')).toBeInTheDocument()
+    await user.type(
+      screen.getByRole('searchbox', { name: '티커·회사명으로 찾기' }),
+      'aapl'
+    )
+    await user.click(screen.getByRole('button', { name: '편집' }))
+    await user.click(screen.getByRole('menuitem', { name: '삭제' }))
+    expect(screen.getAllByRole('checkbox')).toHaveLength(3)
+    await user.click(screen.getByRole('button', { name: '완료' }))
+    expect(screen.getByRole('searchbox')).toHaveValue('')
+    expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(2)
   })
 
   it('shows an error toast when selected deletion fails', async () => {

@@ -26,6 +26,9 @@ export async function inspectStockEdit(
   })
   await page.goto(`${origin}${previewPath}`)
   await page.evaluate(() => document.fonts.ready)
+  await expect(
+    page.getByRole('button', { name: '편집', exact: true })
+  ).toBeEnabled()
   const captures = []
   async function capture(state) {
     const path = join(artifacts, `${width}-${theme}-${state}.png`)

@@ -41,15 +41,19 @@ export function linkedStockInterests(keywords: readonly KeywordRecord[]) {
   return result
 }
 
+export function stockWeeklyChange(record: SearchRecord) {
+  return percentageChange(
+    record.current_price ?? record.price_data.at(-1)?.close,
+    record.previous_close ?? record.price_data.at(-2)?.close
+  )
+}
+
 export function stockListMetrics(record: SearchRecord) {
   const metrics = stockDisplayMetrics(record.price_data)
   const current = record.current_price ?? metrics.current
   return {
     ...metrics,
     current,
-    change: percentageChange(
-      current ?? undefined,
-      record.previous_close ?? record.price_data.at(-2)?.close
-    ),
+    change: stockWeeklyChange(record),
   }
 }
