@@ -28,7 +28,8 @@
     "check:full": "npm run check && npm run test:integration && npm run test:e2e",
     "coverage": "vitest run --coverage",
     "coverage:integration": "vitest run --coverage --config vitest.db.config.ts",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test:ui-stock-list": "node tests/fixtures/ui-components-smoke.mjs --stock-list"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -5,6 +5,7 @@ export function isDesignPreviewPath(path: string): boolean {
     path === DESIGN_PREVIEW_PATH ||
     path === '/design-preview/shell' ||
     path === '/design-preview/custom-charts' ||
-    path === '/design-preview/stock-edit'
+    path === '/design-preview/stock-edit' ||
+    path === '/design-preview/stock-list'
   )
 }

@@ -1,3 +1,4 @@
+import { renderToString } from 'react-dom/server'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -43,6 +44,14 @@ describe('DashboardClient integration', () => {
     toastMock.error.mockReset()
   })
 
+  it('서버 렌더링 중 편집 메뉴에 연결되지 않은 팝업 ID를 만들지 않는다', () => {
+    const html = renderToString(
+      <DashboardClient initialRecords={[makeRecord()]} />
+    )
+    expect(html).toContain('편집')
+    expect(html).not.toContain('radix-')
+    expect(html).not.toContain('aria-controls=')
+  })
   it('renders the empty dashboard state', () => {
     render(<DashboardClient initialRecords={[]} />)
 

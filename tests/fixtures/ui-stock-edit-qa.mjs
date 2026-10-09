@@ -4,7 +4,14 @@ import { expect } from '@playwright/test'
 
 export async function inspectStockEdit(
   page,
-  { origin, artifacts, width, theme }
+  {
+    origin,
+    artifacts,
+    width,
+    theme,
+    previewPath = '/design-preview/stock-edit',
+    beforeEditing,
+  }
 ) {
   const errors = []
   const deleted = []
@@ -17,7 +24,7 @@ export async function inspectStockEdit(
     deleted.push(new URL(route.request().url()).pathname)
     await route.fulfill({ status: 204 })
   })
-  await page.goto(`${origin}/design-preview/stock-edit`)
+  await page.goto(`${origin}${previewPath}`)
   await page.evaluate(() => document.fonts.ready)
   const captures = []
   async function capture(state) {
@@ -33,6 +40,7 @@ export async function inspectStockEdit(
     page.getByRole('heading', { level: 3 }).allTextContents()
   const savedOrder = () =>
     page.evaluate(() => localStorage.getItem('stock-sort-order'))
+  if (beforeEditing) await beforeEditing(page, capture)
   await capture('initial')
   await page.getByRole('button', { name: '편집', exact: true }).click()
   await capture('edit-menu')
@@ -76,7 +84,7 @@ export async function inspectStockEdit(
           requestAnimationFrame(() => requestAnimationFrame(resolve))
         })
     )
-    await page.keyboard.press(width < 640 ? 'ArrowDown' : 'ArrowRight')
+    await page.keyboard.press('ArrowDown')
     await expect(announcement).toContainText(
       'was moved over droppable area preview-stock-1'
     )
