@@ -27,20 +27,11 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Pencil, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+import { StockEditToolbar, type StockEditMode } from './stock-edit-toolbar'
+import { StockDeleteDialog } from './stock-delete-dialog'
 import { StockCard } from '@/components/stock/stock-card'
 import { cn } from '@/lib/utils'
 import type { SearchRecord } from '@/types'
@@ -48,8 +39,6 @@ import type { SearchRecord } from '@/types'
 interface DashboardClientProps {
   initialRecords: SearchRecord[]
 }
-
-type EditMode = 'none' | 'delete' | 'reorder'
 
 function SortableStockCard({
   record,
@@ -78,6 +67,7 @@ function SortableStockCard({
       }}
       {...attributes}
       {...listeners}
+      aria-label={`${record.ticker} 순서 변경`}
     >
       {children}
     </div>
@@ -88,8 +78,7 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
   const [records, setRecords] = useState(initialRecords)
   const { ordered, saveOrder } = useStockOrder(records)
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set())
-  const [isEditMode, setIsEditMode] = useState(false)
-  const [editMode, setEditMode] = useState<EditMode>('none')
+  const [editMode, setEditMode] = useState<StockEditMode>('none')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [reorderBackup, setReorderBackup] = useState<SearchRecord[] | null>(
     null
@@ -99,6 +88,7 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
+      scrollBehavior: 'auto',
       coordinateGetter: sortableKeyboardCoordinates,
     })
   )
@@ -108,7 +98,6 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
       setRecords(reorderBackup)
     }
 
-    setIsEditMode(false)
     setEditMode('none')
     setSelectedIds(new Set())
     setReorderBackup(null)
@@ -169,7 +158,6 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
       setRecords(nextRecords)
       saveOrder(nextRecords)
       setSelectedIds(new Set())
-      setIsEditMode(false)
       setEditMode('none')
       toast.success(`${idsToDelete.length}개 종목이 삭제되었습니다.`)
     } catch (error) {
@@ -183,19 +171,9 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
 
   const handleConfirmReorder = () => {
     saveOrder(records)
-    setIsEditMode(false)
     setEditMode('none')
     setReorderBackup(null)
     toast.success('종목 위치가 저장되었습니다.')
-  }
-
-  const handleEditDone = () => {
-    if (editMode === 'reorder') {
-      handleConfirmReorder()
-      return
-    }
-
-    closeEditMode()
   }
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -254,7 +232,7 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
         editMode === 'delete' && 'cursor-pointer',
         editMode === 'delete' &&
           selectedIds.has(record.id) &&
-          'ring-offset-background rounded-lg ring-2 ring-cyan-400 ring-offset-2'
+          '[&_[data-slot=card]]:bg-brand-subtle rounded-lg'
       )}
       onClick={
         editMode === 'delete' ? () => handleToggleSelect(record.id) : undefined
@@ -262,7 +240,7 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
     >
       {editMode === 'delete' && (
         <div
-          className="absolute top-4 left-4 z-20"
+          className="mb-2 flex min-h-11 items-center gap-2 px-2"
           onClick={event => event.stopPropagation()}
         >
           <Checkbox
@@ -270,6 +248,9 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
             onCheckedChange={() => handleToggleSelect(record.id)}
             aria-label={`${record.ticker} 선택`}
           />
+          <span className="text-text-secondary text-sm">
+            {record.ticker} 선택
+          </span>
         </div>
       )}
       <StockCard
@@ -308,99 +289,23 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
         </div>
       ) : (
         <>
-          <div className="mb-6 flex justify-end gap-2">
-            {!isEditMode ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsEditMode(true)}
-                className="border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:bg-slate-800"
-              >
-                <Pencil className="mr-2 h-4 w-4" />
-                편집
-              </Button>
-            ) : editMode === 'none' ? (
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSelectDeleteMode}
-                  className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300 dark:hover:bg-red-950/40"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  삭제
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSelectReorderMode}
-                  className="border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-800 dark:border-indigo-900/60 dark:bg-indigo-950/20 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
-                >
-                  <GripVertical className="mr-2 h-4 w-4" />
-                  순서 변경
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={closeEditMode}
-                  className="text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-                >
-                  <X className="mr-2 h-4 w-4" />
-                  완료
-                </Button>
-              </div>
-            ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleEditDone}
-                className="text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-              >
-                <X className="mr-2 h-4 w-4" />
-                완료
-              </Button>
-            )}
-          </div>
-
-          {editMode === 'delete' && (
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSelectAll}
-                  className="border-slate-300 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:bg-slate-800"
-                >
-                  전체 선택
-                </Button>
-                {selectedIds.size > 0 && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSelectedIds(new Set())}
-                    className="border-slate-300 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:bg-slate-800"
-                  >
-                    선택 해제
-                  </Button>
-                )}
-                <span className="text-muted-foreground text-sm">
-                  {selectedIds.size}개 선택됨
-                </span>
-              </div>
-              {selectedIds.size > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setDeleteConfirmOpen(true)}
-                  disabled={loadingIds.size > 0}
-                  className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300 dark:hover:bg-red-950/40"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  삭제
-                </Button>
-              )}
-            </div>
-          )}
+          <StockEditToolbar
+            mode={editMode}
+            count={records.length}
+            selectedCount={selectedIds.size}
+            busy={loadingIds.size > 0}
+            onModeChange={mode => {
+              if (mode === 'delete') handleSelectDeleteMode()
+              else handleSelectReorderMode()
+            }}
+            onSelectAll={handleSelectAll}
+            onClear={() => setSelectedIds(new Set())}
+            onCancel={closeEditMode}
+            onDone={
+              editMode === 'reorder' ? handleConfirmReorder : closeEditMode
+            }
+            onDelete={() => setDeleteConfirmOpen(true)}
+          />
 
           {editMode === 'reorder' ? (
             <DndContext
@@ -439,32 +344,22 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
         </div>
       )}
 
-      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>종목 삭제</AlertDialogTitle>
-            <AlertDialogDescription>
-              선택된 {selectedIds.size}개의 종목을 삭제하시겠습니까? 이 작업은
-              되돌릴 수 없습니다.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={loadingIds.size > 0}>
-              취소
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={event => {
-                event.preventDefault()
-                void handleDeleteSelected()
-              }}
-              disabled={loadingIds.size > 0}
-              className="bg-red-600 text-white hover:bg-red-700"
-            >
-              {loadingIds.size > 0 ? '삭제 중...' : '삭제'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {editMode !== 'none' && (
+        <p className="text-tertiary mt-4 text-xs leading-5">
+          {editMode === 'delete'
+            ? '삭제한 종목은 관심 종목 · 홈 · 사이드바에서 사라져요. 키워드 분석에 겹쳐 둔 종목은 그대로 남아요.'
+            : '‘완료’를 누르면 이 기기(브라우저)에 순서가 저장돼요. ‘취소’하면 편집 전 순서로 돌아가요.'}
+        </p>
+      )}
+      <StockDeleteDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        tickers={ordered
+          .filter(record => selectedIds.has(record.id))
+          .map(record => record.ticker)}
+        busy={loadingIds.size > 0}
+        onConfirm={() => void handleDeleteSelected()}
+      />
     </>
   )
 }

@@ -80,7 +80,7 @@ describe('DashboardClient integration', () => {
     )
 
     await user.click(screen.getByRole('button', { name: /편집/ }))
-    await user.click(screen.getByRole('button', { name: /삭제/ }))
+    await user.click(screen.getByRole('menuitem', { name: '삭제' }))
     await user.click(screen.getByRole('checkbox', { name: 'AAPL 선택' }))
 
     expect(screen.getByText('1개 선택됨')).toBeInTheDocument()
@@ -89,7 +89,7 @@ describe('DashboardClient integration', () => {
     await user.click(deleteButtons[deleteButtons.length - 1])
 
     expect(
-      await screen.findByText(/선택된 1개의 종목을 삭제하시겠습니까/)
+      await screen.findByText('종목 1개를 삭제할까요?')
     ).toBeInTheDocument()
 
     const dialog = screen.getByRole('alertdialog')
@@ -125,7 +125,7 @@ describe('DashboardClient integration', () => {
     )
 
     await user.click(screen.getByRole('button', { name: /편집/ }))
-    await user.click(screen.getByRole('button', { name: /순서 변경/ }))
+    await user.click(screen.getByRole('menuitem', { name: '순서 변경' }))
     await user.click(screen.getByRole('button', { name: /완료/ }))
 
     expect(localStorage.getItem('stock-sort-order')).toBe(
@@ -139,6 +139,59 @@ describe('DashboardClient integration', () => {
     )
   })
 
+  it('전체 선택을 다시 누르거나 선택 해제하면 삭제 선택을 비운다', async () => {
+    const user = userEvent.setup()
+    render(<DashboardClient initialRecords={[makeRecord()]} />)
+    await user.click(screen.getByRole('button', { name: '편집' }))
+    await user.click(screen.getByRole('menuitem', { name: '삭제' }))
+    const selectAll = screen.getByRole('checkbox', { name: '전체 선택' })
+    await user.click(selectAll)
+    expect(screen.getByRole('status')).toHaveTextContent('1개 선택됨')
+    await user.click(selectAll)
+    expect(screen.getByRole('status')).toHaveTextContent('0개 선택됨')
+    expect(screen.getByRole('button', { name: '삭제' })).toBeDisabled()
+    await user.click(selectAll)
+    await user.click(screen.getByRole('button', { name: '선택 해제' }))
+    expect(selectAll).not.toBeChecked()
+  })
+
+  it('삭제 확인을 취소하면 요청 없이 선택과 목록을 유지한다', async () => {
+    const user = userEvent.setup()
+    render(<DashboardClient initialRecords={[makeRecord()]} />)
+    await user.click(screen.getByRole('button', { name: '편집' }))
+    await user.click(screen.getByRole('menuitem', { name: '삭제' }))
+    await user.click(screen.getByRole('checkbox', { name: '전체 선택' }))
+    await user.click(screen.getByRole('button', { name: '삭제' }))
+    const dialog = screen.getByRole('alertdialog')
+    expect(dialog).toHaveTextContent('선택한 AAPL을 관심 종목에서 삭제해요')
+    await user.click(within(dialog).getByRole('button', { name: '취소' }))
+    expect(fetch).not.toHaveBeenCalled()
+    expect(screen.getByRole('status')).toHaveTextContent('1개 선택됨')
+    expect(screen.getByText('AAPL')).toBeInTheDocument()
+  })
+
+  it('순서 변경을 취소하면 기존 저장 순서를 다시 표시한다', async () => {
+    const user = userEvent.setup()
+    const saved = JSON.stringify({ 'search-2': 0, 'search-1': 1 })
+    localStorage.setItem('stock-sort-order', saved)
+    render(
+      <DashboardClient
+        initialRecords={[
+          makeRecord(),
+          makeRecord({ id: 'search-2', ticker: 'MSFT' }),
+        ]}
+      />
+    )
+    await user.click(screen.getByRole('button', { name: '편집' }))
+    await user.click(screen.getByRole('menuitem', { name: '순서 변경' }))
+    await user.click(screen.getByRole('button', { name: '취소' }))
+    expect(localStorage.getItem('stock-sort-order')).toBe(saved)
+    expect(
+      screen.getAllByRole('heading', { level: 3 }).map(item => item.textContent)
+    ).toEqual(['MSFT', 'AAPL'])
+    expect(toastMock.success).not.toHaveBeenCalled()
+  })
+
   it('shows an error toast when selected deletion fails', async () => {
     const user = userEvent.setup()
     vi.mocked(fetch).mockResolvedValue({ ok: false } as Response)
@@ -147,8 +200,8 @@ describe('DashboardClient integration', () => {
     render(<DashboardClient initialRecords={[makeRecord()]} />)
 
     await user.click(screen.getByRole('button', { name: /편집/ }))
-    await user.click(screen.getByRole('button', { name: /삭제/ }))
-    await user.click(screen.getByRole('button', { name: '전체 선택' }))
+    await user.click(screen.getByRole('menuitem', { name: '삭제' }))
+    await user.click(screen.getByRole('checkbox', { name: '전체 선택' }))
     await user.click(screen.getAllByRole('button', { name: /삭제/ }).at(-1)!)
     await user.click(
       within(await screen.findByRole('alertdialog')).getByRole('button', {

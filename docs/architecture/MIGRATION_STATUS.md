@@ -2,14 +2,26 @@
 
 ## 2026-10-09 현재 범위: 디자인 우선 완료
 
-UI-4는 PR #35로 squash 병합했다. 다음 이슈 #36의 커스텀 차트 디자인은
-`feat/36/custom-chart-design`에서 구현·검증을 마무리했다. 브라우저 복구 검증 실패로 중단한 뒤
+UI-4는 PR #35로 squash 병합했다. 이슈 #36의 커스텀 차트 디자인은
+PR #37로 squash 병합했다(`cfc3bd0b9b2e6ecdc4e6c66e9b4f25c7bc5cb631`). 브라우저 복구 검증 실패로 중단한 뒤
 사용자 승인으로 검증의 버튼 ID 조회 순서를 수정했다. 현재 소스의8개 화면 조합,
 98개 파일638개 테스트·타입·린트·포맷, OIDC 빌드·인증 브라우저 검증이 통과했다.
 실제 MSA 검증은 아니다. 주 세션에서 최종 캡처·Figma·diff를 검토했으며
 별도 에이전트의 독립 검토로 분류하지 않는다. 나머지 디자인 단계는 남아 있다.
 실패·대응·최신 증거는 `docs/ui/UI5A_CUSTOM_CHARTS.md`를 따른다.
-이슈 #36의 PR을 develop 대상으로 정리하며 UI-5~UI-10 디자인 전체는 아직 완료하지 않았다.
+공통 규칙 최신화는 이슈 #39·PR #40으로 squash 병합했다
+(`58255084e89d9e0963675d1495ea22222336aec8`). 자동 PR 작성·Closes 연결·
+담당자와 라벨·원인 기반 재시도 최대2회·제공된 컨텍스트 사용률55% 중단을 명시했다.
+현재 환경은 컨텍스트 사용률을 제공하지 않으며 수치를 만들지 않는다.
+후속 이슈 #38의 편집·삭제·순서 변경 도구를 구현하고 사용자 지시로 검증을 재개했다.
+기존 중단과 재개 후 첫 실패를 보존했다. KeyboardSensor 연결 시점과 smooth scroll
+이동 중 상태를 관측하고 즉시 스크롤 및 브라우저 입력 순서를 적용했다.
+임시 계측 제거 후 8개 화면 조합과99개 파일643개 테스트·타입·린트·포맷,
+OIDC 빌드와 인증 브라우저 검증이 통과했다. 브라우저 최초 실패 뒤 차트 준비
+검사 순서를 수정한 첫 재시도가 통과했다. 상세 증거와 남은 경고는 `docs/ui/UI5B_STOCK_EDIT.md`를 따른다.
+이슈 #38 담당자 eom-tae-in·enhancement 라벨을 적용했다.
+목록 본체·표·모바일 행·상세 화면은 다음 단계다.
+UI-5~UI-10 디자인 전체는 아직 완료하지 않았다.
 
 사용자는 본격적인 Spring/Eureka·클라우드 환경 구성 전에 디자인 부분을
 마무리하도록 지시했다. 기존 서비스 틀을 유지하고 UI-4~UI-10을 순차 진행한다.
@@ -68,8 +80,8 @@ Trends backend implementation resumed after CI/CD and Vercel cleanup.
 
 The user authorized database and configuration redesign, issue-first branches,
 PRs to develop, and squash merge. Cloud deployment artifacts are in scope;
-actual provisioning and production data changes remain unexecuted. The user
-replaced the original immediate-stop rule: after two verification failures,
+actual provisioning and production data changes remain unexecuted. Historical direction before the 2026-10-09 update:
+the user replaced the original immediate-stop rule: after two verification failures,
 investigate and apply the best evidence-backed fix autonomously; stop and report
 only if verification of that recovery fix also fails.
 

@@ -10,28 +10,45 @@ import ky from 'ky'
 import { inspectComponents } from './ui-components-qa.mjs'
 import { inspectShell } from './ui-shell-qa.mjs'
 import { inspectCustomCharts } from './ui-custom-charts-qa.mjs'
+import { inspectStockEdit } from './ui-stock-edit-qa.mjs'
 import { startOidcProvider, listen, stop } from './oidc-provider.ts'
 import { startRedisFixture } from './redis-server.ts'
 
-const shell = process.argv.includes('--shell')
-const customCharts = process.argv.includes('--custom-charts')
-const stage = customCharts ? 'UI-5a' : shell ? 'UI-3' : 'UI-2'
-const previewPath = customCharts
-  ? '/design-preview/custom-charts'
-  : shell
-    ? '/design-preview/shell'
-    : '/design-preview/components'
-
-const artifacts = await mkdtemp(
-  join(
-    tmpdir(),
-    customCharts
-      ? 'stock-insight-ui5a-'
-      : shell
-        ? 'stock-insight-ui3-'
-        : 'stock-insight-ui2-'
-  )
-)
+const scenario = [
+  {
+    flag: '--stock-edit',
+    stage: 'UI-5b',
+    path: '/design-preview/stock-edit',
+    prefix: 'stock-insight-ui5b-',
+    inspect: inspectStockEdit,
+    wide: true,
+  },
+  {
+    flag: '--custom-charts',
+    stage: 'UI-5a',
+    path: '/design-preview/custom-charts',
+    prefix: 'stock-insight-ui5a-',
+    inspect: inspectCustomCharts,
+    wide: true,
+  },
+  {
+    flag: '--shell',
+    stage: 'UI-3',
+    path: '/design-preview/shell',
+    prefix: 'stock-insight-ui3-',
+    inspect: inspectShell,
+    wide: false,
+  },
+].find(item => process.argv.includes(item.flag)) ?? {
+  stage: 'UI-2',
+  path: '/design-preview/components',
+  prefix: 'stock-insight-ui2-',
+  inspect: inspectComponents,
+  wide: false,
+}
+const stage = scenario.stage
+const previewPath = scenario.path
+const artifacts = await mkdtemp(join(tmpdir(), scenario.prefix))
 const provider = await startOidcProvider()
 const redis = await startRedisFixture()
 const gateway = createServer((_request, response) =>
@@ -104,7 +121,7 @@ try {
   })
   browser.on('disconnected', () => console.log(`${stage} browser closed`))
   const results = []
-  for (const width of customCharts
+  for (const width of scenario.wide
     ? [390, 1280, 1440, 1920]
     : [390, 1280, 1440]) {
     for (const theme of ['light', 'dark']) {
@@ -126,13 +143,7 @@ try {
         console.log(`${stage} QA: ${width}px ${theme}`)
         const page = await context.newPage()
         results.push(
-          await (
-            customCharts
-              ? inspectCustomCharts
-              : shell
-                ? inspectShell
-                : inspectComponents
-          )(page, {
+          await scenario.inspect(page, {
             origin,
             artifacts,
             width,
