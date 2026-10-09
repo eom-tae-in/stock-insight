@@ -2,6 +2,8 @@
 
 이슈: https://github.com/eom-tae-in/stock-insight/issues/42
 브랜치: `feat/42/stock-list-design`
+PR: https://github.com/eom-tae-in/stock-insight/pull/43
+PR 본문의 `Closes #42`로 이슈를 연결했다. 담당자와 enhancement 라벨을 양쪽에 지정했다.
 기준 develop: PR #41 squash 커밋 `adeab27cb5ff154d7d7a62bd90b2b46fd6ea1b07`.
 이슈를 먼저 만들고 브랜치를 생성했다. 담당자 eom-tae-in·라벨 enhancement다.
 

@@ -21,7 +21,7 @@ OIDC 빌드와 인증 브라우저 검증이 통과했다. 브라우저 최초 �
 검사 순서를 수정한 첫 재시도가 통과했다. 상세 증거와 남은 경고는 `docs/ui/UI5B_STOCK_EDIT.md`를 따른다.
 이슈 #38은 PR #41로 squash 병합했고 자동으로 닫혔다
 (`adeab27cb5ff154d7d7a62bd90b2b46fd6ea1b07`).
-현재 이슈 #42·`feat/42/stock-list-design`은 목록 본체·표·모바일 행과 기준 주차를 적용한다.
+이슈 #42·PR #43(`feat/42/stock-list-design`)은 목록 본체·표·모바일 행과 기준 주차를 적용한다.
 담당자 eom-tae-in·enhancement 라벨을 지정했다. 기존 열린 #18·#34는 enhancement,
 #24는 의미가 분명한 verification 라벨과 같은 담당자를 보완했다.
 서버 인증·소유자 조회를 유지하고 저장된5년 분석의 종목 연결 관심도 요약만 추가한다.
