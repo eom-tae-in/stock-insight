@@ -21,6 +21,7 @@
     "test:ui-components": "node tests/fixtures/ui-components-smoke.mjs",
     "test:ui-shell": "node tests/fixtures/ui-components-smoke.mjs --shell",
     "test:ui-custom-charts": "node tests/fixtures/ui-components-smoke.mjs --custom-charts",
+    "test:ui-stock-edit": "node tests/fixtures/ui-components-smoke.mjs --stock-edit",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test",

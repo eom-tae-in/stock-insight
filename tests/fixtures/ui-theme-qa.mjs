@@ -19,6 +19,22 @@ export async function captureThemeMatrix(page, { screen, artifacts }) {
         height: width === 390 ? 844 : 1000,
       })
       await page.evaluate(() => document.fonts.ready)
+      if (screen === 'result') {
+        await page.waitForFunction(() => {
+          const container = document.querySelector(
+            '[aria-label="주간 검색 관심도 차트"]'
+          )
+          const svg = container?.querySelector('svg.recharts-surface')
+          return (
+            container &&
+            svg &&
+            Math.abs(
+              svg.getBoundingClientRect().width - container.clientWidth
+            ) < 2 &&
+            container.querySelector('.recharts-line-curve')
+          )
+        })
+      }
       const appearance = await page.evaluate(() => {
         const style = getComputedStyle(document.body)
         return {
@@ -43,20 +59,6 @@ export async function captureThemeMatrix(page, { screen, artifacts }) {
           .every(animation => animation.playState !== 'running')
       )
       if (screen === 'result') {
-        await page.waitForFunction(() => {
-          const container = document.querySelector(
-            '[aria-label="주간 검색 관심도 차트"]'
-          )
-          const svg = container?.querySelector('svg.recharts-surface')
-          return (
-            container &&
-            svg &&
-            Math.abs(
-              svg.getBoundingClientRect().width - container.clientWidth
-            ) < 2 &&
-            container.querySelector('.recharts-line-curve')
-          )
-        })
         const tickColor = await page
           .locator('.recharts-cartesian-axis-tick-value')
           .first()
