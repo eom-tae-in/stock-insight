@@ -8,7 +8,13 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, type ReactNode } from 'react'
+import {
+  useState,
+  useRef,
+  Fragment,
+  type ReactNode,
+  type ComponentProps,
+} from 'react'
 import { useStockOrder } from '@/hooks/use-stock-order'
 import {
   DndContext,
@@ -22,7 +28,7 @@ import {
 import {
   SortableContext,
   arrayMove,
-  rectSortingStrategy,
+  verticalListSortingStrategy,
   sortableKeyboardCoordinates,
   useSortable,
 } from '@dnd-kit/sortable'
@@ -32,20 +38,29 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { StockEditToolbar, type StockEditMode } from './stock-edit-toolbar'
 import { StockDeleteDialog } from './stock-delete-dialog'
-import { StockCard } from '@/components/stock/stock-card'
-import { cn } from '@/lib/utils'
+import {
+  StockListRow,
+  StockListHeader,
+} from '@/components/stock/stock-list-row'
+import { GripVertical, Plus, Search } from 'lucide-react'
+import { EmptyState } from '@/components/shared/empty-state'
+import type { LinkedInterest } from '@/lib/stock/list-summary'
 import type { SearchRecord } from '@/types'
 
 interface DashboardClientProps {
-  initialRecords: SearchRecord[]
+  readonly initialRecords: SearchRecord[]
+  readonly interests?: Readonly<Record<string, LinkedInterest>>
 }
 
-function SortableStockCard({
+function SortableStockRow({
   record,
   children,
 }: {
   record: SearchRecord
-  children: ReactNode
+  children: (
+    handle: ReactNode,
+    rowProps: Pick<ComponentProps<'tr'>, 'ref' | 'style'>
+  ) => ReactNode
 }) {
   const {
     attributes,
@@ -56,33 +71,38 @@ function SortableStockCard({
     isDragging,
   } = useSortable({ id: record.id })
 
-  return (
-    <div
-      ref={setNodeRef}
-      style={{
+  return children(
+    <button
+      type="button"
+      {...attributes}
+      {...listeners}
+      aria-label={`${record.ticker} 순서 변경`}
+      className="text-text-secondary focus-visible:ring-ring relative z-10 flex size-11 shrink-0 cursor-grab items-center justify-center rounded-sm focus-visible:ring-2 focus-visible:ring-offset-2"
+    >
+      <GripVertical aria-hidden className="size-4" />
+    </button>,
+    {
+      ref: setNodeRef,
+      style: {
         transform: CSS.Transform.toString(transform),
         transition,
         opacity: isDragging ? 0.45 : 1,
         zIndex: isDragging ? 10 : 'auto',
-      }}
-      {...attributes}
-      {...listeners}
-      aria-label={`${record.ticker} 순서 변경`}
-    >
-      {children}
-    </div>
+      },
+    }
   )
 }
 
-export function DashboardClient({ initialRecords }: DashboardClientProps) {
+export function DashboardClient({
+  initialRecords,
+  interests = {},
+}: DashboardClientProps) {
   const [records, setRecords] = useState(initialRecords)
   const { ordered, saveOrder } = useStockOrder(records)
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set())
   const [editMode, setEditMode] = useState<StockEditMode>('none')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [reorderBackup, setReorderBackup] = useState<SearchRecord[] | null>(
-    null
-  )
+  const reorderBackup = useRef<SearchRecord[] | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
 
   const sensors = useSensors(
@@ -94,26 +114,26 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
   )
 
   const closeEditMode = () => {
-    if (editMode === 'reorder' && reorderBackup) {
-      setRecords(reorderBackup)
+    if (editMode === 'reorder' && reorderBackup.current) {
+      setRecords(reorderBackup.current)
     }
 
     setEditMode('none')
     setSelectedIds(new Set())
-    setReorderBackup(null)
+    reorderBackup.current = null
   }
 
   const handleSelectDeleteMode = () => {
     setEditMode('delete')
     setSelectedIds(new Set())
-    setReorderBackup(null)
+    reorderBackup.current = null
   }
 
   const handleSelectReorderMode = () => {
     setRecords(ordered)
     setEditMode('reorder')
     setSelectedIds(new Set())
-    setReorderBackup(ordered)
+    reorderBackup.current = ordered
   }
 
   const handleToggleSelect = (id: string) => {
@@ -172,7 +192,7 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
   const handleConfirmReorder = () => {
     saveOrder(records)
     setEditMode('none')
-    setReorderBackup(null)
+    reorderBackup.current = null
     toast.success('종목 위치가 저장되었습니다.')
   }
 
@@ -225,53 +245,35 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
     setDeleteConfirmOpen(true)
   }
 
-  const renderStockCard = (record: SearchRecord) => (
-    <div
-      className={cn(
-        'group relative',
-        editMode === 'delete' && 'cursor-pointer',
-        editMode === 'delete' &&
-          selectedIds.has(record.id) &&
-          '[&_[data-slot=card]]:bg-brand-subtle rounded-lg'
-      )}
-      onClick={
-        editMode === 'delete' ? () => handleToggleSelect(record.id) : undefined
+  const renderStockRow = (
+    record: SearchRecord,
+    handle?: ReactNode,
+    rowProps?: Pick<ComponentProps<'tr'>, 'ref' | 'style'>
+  ) => (
+    <StockListRow
+      record={record}
+      rowProps={rowProps}
+      interest={interests[record.ticker.toUpperCase()]}
+      managing={editMode !== 'none'}
+      selected={selectedIds.has(record.id)}
+      busy={loadingIds.has(record.id)}
+      onRefresh={() => void handleRefresh(record.id)}
+      onDelete={() => void handleDeleteOne(record.id)}
+      control={
+        editMode === 'delete' ? (
+          <label className="relative z-10 flex size-11 shrink-0 items-center justify-center">
+            <Checkbox
+              checked={selectedIds.has(record.id)}
+              onCheckedChange={() => handleToggleSelect(record.id)}
+              aria-label={`${record.ticker} 선택`}
+              disabled={loadingIds.size > 0}
+            />
+          </label>
+        ) : (
+          handle
+        )
       }
-    >
-      {editMode === 'delete' && (
-        <div
-          className="mb-2 flex min-h-11 items-center gap-2 px-2"
-          onClick={event => event.stopPropagation()}
-        >
-          <Checkbox
-            checked={selectedIds.has(record.id)}
-            onCheckedChange={() => handleToggleSelect(record.id)}
-            aria-label={`${record.ticker} 선택`}
-          />
-          <span className="text-text-secondary text-sm">
-            {record.ticker} 선택
-          </span>
-        </div>
-      )}
-      <StockCard
-        id={record.id}
-        ticker={record.ticker}
-        companyName={record.company_name}
-        currency={record.currency}
-        weeklyOpen={record.weekly_open ?? 0}
-        weeklyHigh={record.weekly_high ?? 0}
-        weeklyLow={record.weekly_low ?? 0}
-        currentPrice={record.current_price ?? 0}
-        previousClose={record.previous_close ?? 0}
-        ma13={record.ma13 ?? 0}
-        yoyChange={record.yoy_change ?? 0}
-        lastUpdatedAt={record.last_updated_at ?? record.searched_at}
-        onRefresh={() => handleRefresh(record.id)}
-        onDelete={() => handleDeleteOne(record.id)}
-        isLoading={loadingIds.has(record.id)}
-        editMode={editMode}
-      />
-    </div>
+    />
   )
 
   const isEmpty = records.length === 0
@@ -279,33 +281,47 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
   return (
     <>
       {isEmpty ? (
-        <div className="flex flex-col items-center justify-center py-24 text-center">
-          <p className="text-muted-foreground mb-6 text-lg">
-            저장한 종목이 없어요.
-          </p>
-          <Button asChild>
-            <Link href="/search">+ 추가</Link>
-          </Button>
-        </div>
+        <EmptyState
+          icon={<Search className="size-5" />}
+          title="저장한 종목이 없어요."
+          description="관심 있는 종목을 추가하면 주간 지표와 연결 키워드를 한눈에 볼 수 있어요."
+          action={
+            <Button asChild>
+              <Link href="/search">
+                <Plus aria-hidden className="size-4" />+ 추가
+              </Link>
+            </Button>
+          }
+        />
       ) : (
         <>
-          <StockEditToolbar
-            mode={editMode}
-            count={records.length}
-            selectedCount={selectedIds.size}
-            busy={loadingIds.size > 0}
-            onModeChange={mode => {
-              if (mode === 'delete') handleSelectDeleteMode()
-              else handleSelectReorderMode()
-            }}
-            onSelectAll={handleSelectAll}
-            onClear={() => setSelectedIds(new Set())}
-            onCancel={closeEditMode}
-            onDone={
-              editMode === 'reorder' ? handleConfirmReorder : closeEditMode
-            }
-            onDelete={() => setDeleteConfirmOpen(true)}
-          />
+          <div className="mb-4 flex flex-wrap items-start justify-end gap-2 [&>div]:mb-0 [&>div[role=group]]:w-full">
+            {editMode === 'none' && (
+              <Button asChild>
+                <Link href="/search">
+                  <Plus aria-hidden className="size-4" />
+                  종목 추가
+                </Link>
+              </Button>
+            )}
+            <StockEditToolbar
+              mode={editMode}
+              count={records.length}
+              selectedCount={selectedIds.size}
+              busy={loadingIds.size > 0}
+              onModeChange={mode => {
+                if (mode === 'delete') handleSelectDeleteMode()
+                else handleSelectReorderMode()
+              }}
+              onSelectAll={handleSelectAll}
+              onClear={() => setSelectedIds(new Set())}
+              onCancel={closeEditMode}
+              onDone={
+                editMode === 'reorder' ? handleConfirmReorder : closeEditMode
+              }
+              onDelete={() => setDeleteConfirmOpen(true)}
+            />
+          </div>
 
           {editMode === 'reorder' ? (
             <DndContext
@@ -315,33 +331,39 @@ export function DashboardClient({ initialRecords }: DashboardClientProps) {
             >
               <SortableContext
                 items={records.map(record => record.id)}
-                strategy={rectSortingStrategy}
+                strategy={verticalListSortingStrategy}
               >
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                  {records.map(record => (
-                    <SortableStockCard key={record.id} record={record}>
-                      {renderStockCard(record)}
-                    </SortableStockCard>
-                  ))}
-                </div>
+                <table
+                  aria-label="관심 종목"
+                  className="bg-card block w-full overflow-hidden rounded-lg border"
+                >
+                  <StockListHeader />
+                  <tbody className="block">
+                    {records.map(record => (
+                      <SortableStockRow key={record.id} record={record}>
+                        {(handle, rowProps) =>
+                          renderStockRow(record, handle, rowProps)
+                        }
+                      </SortableStockRow>
+                    ))}
+                  </tbody>
+                </table>
               </SortableContext>
             </DndContext>
           ) : (
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {ordered.map(record => (
-                <div key={record.id}>{renderStockCard(record)}</div>
-              ))}
-            </div>
+            <table
+              aria-label="관심 종목"
+              className="bg-card block w-full overflow-hidden rounded-lg border"
+            >
+              <StockListHeader />
+              <tbody className="block">
+                {ordered.map(record => (
+                  <Fragment key={record.id}>{renderStockRow(record)}</Fragment>
+                ))}
+              </tbody>
+            </table>
           )}
         </>
-      )}
-
-      {!isEmpty && editMode !== 'delete' && editMode !== 'reorder' && (
-        <div className="fixed right-6 bottom-6">
-          <Button size="lg" className="rounded-full shadow-lg" asChild>
-            <Link href="/search">+ 추가</Link>
-          </Button>
-        </div>
       )}
 
       {editMode !== 'none' && (

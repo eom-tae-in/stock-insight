@@ -20,7 +20,10 @@ const records: SearchRecord[] = [
   previous_close: 121.98,
   ma13: 119.85,
   yoy_change: 13.42,
-  price_data: [],
+  price_data: Array.from({ length: 80 }, (_, week) => ({
+    date: new Date(Date.UTC(2025, 2, 24 + week * 7)).toISOString().slice(0, 10),
+    close: 90 + week * 0.4 + Math.sin(week / 4) * 3,
+  })),
   trends_data: [],
   searched_at: '2026-10-02T00:00:00.000Z',
   last_updated_at: '2026-10-02T00:00:00.000Z',

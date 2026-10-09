@@ -1,5 +1,6 @@
 'use client'
 
+import { useHydrated } from '@/hooks/use-hydrated'
 import { GripVertical, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -35,25 +36,33 @@ export function StockEditToolbar({
   readonly onDone: () => void
   readonly onDelete: () => void
 }) {
+  const hydrated = useHydrated()
   if (mode === 'none') {
     return (
       <div className="mb-4 flex justify-end">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="secondary" disabled={busy}>
-              <Pencil aria-hidden className="size-4" />
-              편집
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={() => onModeChange('delete')}>
-              <Trash2 aria-hidden /> 삭제
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => onModeChange('reorder')}>
-              <GripVertical aria-hidden /> 순서 변경
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {hydrated ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="secondary" disabled={busy}>
+                <Pencil aria-hidden className="size-4" />
+                편집
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => onModeChange('delete')}>
+                <Trash2 aria-hidden /> 삭제
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => onModeChange('reorder')}>
+                <GripVertical aria-hidden /> 순서 변경
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <Button variant="secondary" disabled>
+            <Pencil aria-hidden className="size-4" />
+            편집
+          </Button>
+        )}
       </div>
     )
   }

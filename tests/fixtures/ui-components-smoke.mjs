@@ -10,11 +10,20 @@ import ky from 'ky'
 import { inspectComponents } from './ui-components-qa.mjs'
 import { inspectShell } from './ui-shell-qa.mjs'
 import { inspectCustomCharts } from './ui-custom-charts-qa.mjs'
+import { inspectStockList } from './ui-stock-list-qa.mjs'
 import { inspectStockEdit } from './ui-stock-edit-qa.mjs'
 import { startOidcProvider, listen, stop } from './oidc-provider.ts'
 import { startRedisFixture } from './redis-server.ts'
 
 const scenario = [
+  {
+    flag: '--stock-list',
+    stage: 'UI-5c',
+    path: '/design-preview/stock-list',
+    prefix: 'stock-insight-ui5c-',
+    inspect: inspectStockList,
+    wide: true,
+  },
   {
     flag: '--stock-edit',
     stage: 'UI-5b',
