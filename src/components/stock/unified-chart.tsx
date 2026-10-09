@@ -1,18 +1,10 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Download, Check, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
 import { calculateWeeklyYoY } from '@/lib/calculations'
-import { CHART_SERIES_COLORS } from '@/lib/constants/chart-series'
+import { SERIES_CONFIG, type SeriesKey } from './stock-chart-config'
+import { StockChartControls } from './stock-chart-controls'
 import { captureChartAsPng } from '@/lib/export'
 import { getCurrencySymbol, formatPrice } from '@/lib/utils/currency'
 import { useChartTheme } from '@/hooks/use-chart-theme'
@@ -27,67 +19,6 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import type { UnifiedChartProps } from '@/types'
-
-const SERIES_CONFIG = {
-  open: {
-    name: '시가',
-    color: CHART_SERIES_COLORS.open,
-    yAxisId: 'left',
-    type: 'line',
-    enabled: true,
-    minWeeks: 0,
-  },
-  close: {
-    name: '종가',
-    color: CHART_SERIES_COLORS.price,
-    yAxisId: 'left',
-    type: 'line',
-    enabled: true,
-    minWeeks: 0,
-  },
-  low: {
-    name: '저가',
-    color: CHART_SERIES_COLORS.low,
-    yAxisId: 'left',
-    type: 'line',
-    enabled: false,
-    minWeeks: 0,
-  },
-  high: {
-    name: '고가',
-    color: CHART_SERIES_COLORS.high,
-    yAxisId: 'left',
-    type: 'line',
-    enabled: false,
-    minWeeks: 0,
-  },
-  ma13: {
-    name: '13주 MA',
-    color: CHART_SERIES_COLORS.ma13,
-    yAxisId: 'left',
-    type: 'area',
-    enabled: true,
-    minWeeks: 13,
-  },
-  yoy: {
-    name: '13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)',
-    color: CHART_SERIES_COLORS.yoy,
-    yAxisId: 'right',
-    type: 'area',
-    enabled: true,
-    minWeeks: 65,
-  },
-}
-
-type SeriesKey = keyof typeof SERIES_CONFIG
-
-const TIME_RANGE_PRESETS = [
-  { weeks: 52, label: '1년' },
-  { weeks: 104, label: '2년' },
-  { weeks: 156, label: '3년' },
-  { weeks: 208, label: '4년' },
-  { weeks: 260, label: '5년' },
-]
 
 export function UnifiedChart({
   ticker,
@@ -153,10 +84,13 @@ export function UnifiedChart({
   }
 
   const handleCustomRange = (value: string) => {
-    const weeks = parseInt(value)
-    if (value === '' || (weeks > 0 && weeks <= 260)) {
+    const weeks = Number(value)
+    if (
+      value === '' ||
+      (Number.isInteger(weeks) && weeks > 0 && weeks <= 260)
+    ) {
       setCustomRange(value)
-      if (weeks > 0 && weeks <= 260) {
+      if (Number.isInteger(weeks) && weeks > 0 && weeks <= 260) {
         setDisplayRange(weeks)
         disableAllSeries()
 
@@ -225,116 +159,25 @@ export function UnifiedChart({
   }
 
   return (
-    <div className="space-y-4">
-      {/* 제목 및 시간 범위 */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">통합 분석 차트</h3>
-
-        {/* 우측 시간 범위 컨트롤 패널 */}
-        <div className="flex items-center gap-2">
-          {/* Preset 버튼들 */}
-          <div className="flex gap-1">
-            {TIME_RANGE_PRESETS.map(preset => (
-              <button
-                key={preset.weeks}
-                onClick={() => handleRangeChange(preset.weeks)}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                  displayRange === preset.weeks
-                    ? 'bg-brand-subtle text-brand-text'
-                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                }`}
-              >
-                {preset.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Custom 입력 */}
-          <div className="flex items-center gap-1">
-            <Input
-              type="number"
-              min="1"
-              max="260"
-              value={customRange}
-              onChange={e => handleCustomRange(e.target.value)}
-              placeholder="주"
-              className="h-8 w-16 text-xs"
-            />
-            <span className="text-muted-foreground text-xs">주</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 토글 버튼 + PNG 다운로드 (현대적 디자인) */}
-      <div className="flex items-center justify-between gap-2">
-        <TooltipProvider>
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(SERIES_CONFIG).map(([key, config]) => {
-              const isDisabled = displayRange < config.minWeeks
-              return (
-                <Tooltip key={key} delayDuration={0}>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => toggleSeries(key as SeriesKey)}
-                      disabled={isDisabled}
-                      className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-all ${
-                        isDisabled
-                          ? 'cursor-not-allowed opacity-50'
-                          : enabledSeries[key as SeriesKey]
-                            ? 'bg-surface-raised text-foreground'
-                            : 'border-muted-foreground/30 text-muted-foreground hover:border-muted-foreground/50 border bg-transparent'
-                      }`}
-                      style={
-                        !isDisabled && enabledSeries[key as SeriesKey]
-                          ? { backgroundColor: 'var(--surface-raised)' }
-                          : {}
-                      }
-                    >
-                      <span
-                        className="flex h-2 w-2 rounded-full"
-                        style={{ backgroundColor: config.color }}
-                      />
-                      {config.name}
-                      {!isDisabled && enabledSeries[key as SeriesKey] && (
-                        <Check className="h-3 w-3" />
-                      )}
-                    </button>
-                  </TooltipTrigger>
-                  {isDisabled && (
-                    <TooltipContent
-                      side="top"
-                      className="flex items-center gap-1 bg-yellow-600/90"
-                    >
-                      <AlertCircle className="h-4 w-4" />
-                      <span>
-                        {config.minWeeks}주 이상 입력하셔야 볼 수 있어요
-                      </span>
-                    </TooltipContent>
-                  )}
-                </Tooltip>
-              )
-            })}
-          </div>
-        </TooltipProvider>
-
-        {/* PNG 다운로드 버튼 */}
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={onDownload ?? handleDownloadChart}
-          disabled={isPngLoading}
-          aria-label="통합 분석 차트를 PNG로 다운로드"
-          className="flex-shrink-0"
-        >
-          <Download className="mr-2 h-4 w-4" />
-          {isPngLoading ? '다운로드 중...' : 'PNG 다운로드'}
-        </Button>
-      </div>
+    <div className="bg-card overflow-hidden rounded-lg border">
+      <StockChartControls
+        displayRange={displayRange}
+        customRange={customRange}
+        availableWeeks={chartData.length}
+        startDate={chartData[0]?.date}
+        endDate={chartData.at(-1)?.date}
+        enabledSeries={enabledSeries}
+        onRangeChange={handleRangeChange}
+        onCustomChange={handleCustomRange}
+        onToggle={toggleSeries}
+        onDownload={onDownload ?? handleDownloadChart}
+        downloading={isPngLoading}
+      />
 
       {/* 차트 */}
       <div
         ref={chartContainerRef}
-        className="bg-card rounded-lg border p-4"
+        className="p-4"
         style={{ overflow: 'hidden' }}
       >
         <ResponsiveContainer width="100%" height={500}>
@@ -371,7 +214,7 @@ export function UnifiedChart({
             )}
 
             {/* 우측 Y축: 13주 이동평균 기준 52주 YoY (%) */}
-            {enabledSeries.yoy && (
+            {enabledSeries.yoy && chartData.length >= 65 && (
               <YAxis
                 yAxisId="right"
                 orientation="right"
@@ -471,7 +314,7 @@ export function UnifiedChart({
             )}
 
             {/* 13주 MA 영역 */}
-            {enabledSeries.ma13 && (
+            {enabledSeries.ma13 && chartData.length >= 13 && (
               <Area
                 yAxisId="left"
                 type="monotone"
@@ -486,7 +329,7 @@ export function UnifiedChart({
             )}
 
             {/* 13주 이동평균 기준 52주 YoY 영역 */}
-            {enabledSeries.yoy && (
+            {enabledSeries.yoy && chartData.length >= 65 && (
               <Area
                 yAxisId="right"
                 type="monotone"
@@ -501,17 +344,6 @@ export function UnifiedChart({
             )}
           </ComposedChart>
         </ResponsiveContainer>
-      </div>
-
-      {/* 데이터 설명 */}
-      <div className="bg-muted/50 text-muted-foreground rounded-lg p-4 text-sm">
-        <p>
-          💡 위의 토글 버튼을 클릭하여 원하는 데이터를 표시/숨길 수 있습니다.
-          선(Line)은 일일 가격(시가/종가/저가/고가), 영역(Area)은 이동평균과
-          13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)을 표시합니다. 좌측
-          Y축은 주가({getCurrencySymbol(currency || ticker || '')}) 우측은 13주
-          이동평균 기준 전년동기 대비 증감률(52주 YoY, %)입니다.
-        </p>
       </div>
     </div>
   )

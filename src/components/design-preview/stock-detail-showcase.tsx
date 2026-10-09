@@ -1,6 +1,8 @@
 'use client'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { UnifiedChart } from '@/components/stock/unified-chart'
+import { calculateMA13, calculateMetrics } from '@/lib/calculations'
 import { StockDetailSummary } from '@/components/stock/stock-detail-summary'
 import type { SearchRecord } from '@/types'
 
@@ -35,6 +37,15 @@ export function StockDetailShowcase() {
             : record
         }
       />
+      <section className="mt-6">
+        <UnifiedChart
+          ticker={record.ticker}
+          currency={record.currency}
+          priceData={record.price_data}
+          ma13={calculateMA13(record.price_data)}
+          metrics={calculateMetrics(record.price_data)}
+        />
+      </section>
       <Button
         variant="secondary"
         className="mt-6"
