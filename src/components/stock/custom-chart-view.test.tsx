@@ -40,7 +40,6 @@ function chart(overrides: Partial<CustomChart> = {}): CustomChart {
 describe('CustomChartView', () => {
   beforeEach(() => {
     localStorage.clear()
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
   })
 
   afterEach(() => {
@@ -127,7 +126,9 @@ describe('CustomChartView', () => {
     )
 
     expect(await screen.findByText('내 차트')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: '' }))
+    await user.click(screen.getByRole('button', { name: '내 차트 삭제' }))
+    expect(screen.getByRole('alertdialog')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: '삭제' }))
 
     expect(screen.queryByText('내 차트')).not.toBeInTheDocument()
     expect(localStorage.getItem('stock-custom-charts-search-1')).toBe('[]')

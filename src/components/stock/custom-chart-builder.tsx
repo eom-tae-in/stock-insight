@@ -1,319 +1,194 @@
 'use client'
-
-import { useState } from 'react'
-import { Plus } from 'lucide-react'
+import { useState, useSyncExternalStore } from 'react'
+import { Plus, X } from 'lucide-react'
+import { format, parseISO } from 'date-fns'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from '@/components/ui/dialog'
-import { CHART_SERIES_COLORS } from '@/lib/constants/chart-series'
-import type { CustomChart, CustomChartBuilderProps } from '@/types'
+import { Sparkline } from '@/components/shared/sparkline'
+import { CustomChartFields } from './custom-chart-fields'
+import {
+  CUSTOM_CHART_SERIES,
+  chartSeriesLabel,
+  readCustomCharts,
+} from '@/lib/custom-charts'
+import type {
+  CustomChart,
+  CustomChartBuilderProps,
+  PriceDataPoint,
+} from '@/types'
 
-const AVAILABLE_SERIES = [
-  {
-    key: 'close',
-    label: '종가',
-    color: CHART_SERIES_COLORS.price,
-    minWeeks: 0,
-  },
-  {
-    key: 'ma13',
-    label: '13주 MA',
-    color: CHART_SERIES_COLORS.ma13,
-    minWeeks: 13,
-  },
-  {
-    key: 'yoy',
-    label: '13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)',
-    color: CHART_SERIES_COLORS.yoy,
-    minWeeks: 65,
-  },
-]
-
-const TIME_RANGES = [
-  { weeks: 52, label: '1년' },
-  { weeks: 104, label: '2년' },
-  { weeks: 156, label: '3년' },
-  { weeks: 208, label: '4년' },
-  { weeks: 260, label: '5년' },
-]
+const subscribe = () => () => {}
+const clientSnapshot = () => true
+const serverSnapshot = () => false
 
 export function CustomChartBuilder({
   searchId,
   onChartCreated,
-}: CustomChartBuilderProps) {
-  const [isOpen, setIsOpen] = useState(false)
-  const [chartName, setChartName] = useState('')
-  const [selectedSeries, setSelectedSeries] = useState<string[]>(['close'])
-  const [timeRange, setTimeRange] = useState(52)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
-  const minRequiredWeeks = Math.max(
-    0,
-    ...selectedSeries.map(key => {
-      const series = AVAILABLE_SERIES.find(s => s.key === key)
-      return series?.minWeeks || 0
-    })
+  ticker,
+  priceData = [],
+}: CustomChartBuilderProps & {
+  readonly ticker?: string
+  readonly priceData?: readonly PriceDataPoint[]
+}) {
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [series, setSeries] = useState<string[]>(['close'])
+  const [weeks, setWeeks] = useState(52)
+  const [removed, setRemoved] = useState<string[]>([])
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const hydrated = useSyncExternalStore(
+    subscribe,
+    clientSnapshot,
+    serverSnapshot
   )
+  const points = priceData.slice(-weeks)
+  const first = points.at(0),
+    last = points.at(-1)
+  const range =
+    first && last
+      ? `${format(parseISO(first.date), 'yyyy.MM')} – ${format(parseISO(last.date), 'yyyy.MM')} · `
+      : ''
 
-  const toggleSeries = (seriesKey: string) => {
-    setSelectedSeries(prev => {
-      const newSeries = prev.includes(seriesKey)
-        ? prev.filter(s => s !== seriesKey)
-        : [...prev, seriesKey]
-
-      const minWeeks = Math.max(
-        0,
-        ...newSeries.map(key => {
-          const series = AVAILABLE_SERIES.find(s => s.key === key)
-          return series?.minWeeks || 0
-        })
-      )
-
-      if (timeRange < minWeeks) {
-        setTimeRange(minWeeks)
-      }
-
-      return newSeries
-    })
+  function changeWeeks(value: number) {
+    const unavailable = series.filter(
+      key =>
+        (CUSTOM_CHART_SERIES.find(item => item.key === key)?.minWeeks ?? 0) >
+        value
+    )
+    const unavailableKeys = new Set(unavailable)
+    setRemoved(unavailable)
+    setSeries(series.filter(key => !unavailableKeys.has(key)))
+    setWeeks(value)
   }
-
-  const handleSave = async () => {
-    if (!chartName.trim()) {
-      alert('차트 이름을 입력해주세요')
-      return
-    }
-
-    if (selectedSeries.length === 0) {
-      alert('최소 1개 이상의 시리즈를 선택해주세요')
-      return
-    }
-
-    setIsSubmitting(true)
-
+  function toggle(key: string) {
+    setSeries(previous =>
+      previous.includes(key)
+        ? previous.filter(item => item !== key)
+        : [...previous, key]
+    )
+    setRemoved(previous => previous.filter(item => item !== key))
+  }
+  function save() {
+    if (!name.trim() || series.length === 0 || busy) return
+    setBusy(true)
+    setError('')
     try {
-      const storageKey = `stock-custom-charts-${searchId}`
-      const existingData = localStorage.getItem(storageKey)
-      const charts: CustomChart[] = existingData ? JSON.parse(existingData) : []
-
-      const newChart: CustomChart = {
+      const chart: CustomChart = {
         id: crypto.randomUUID(),
-        name: chartName.trim(),
-        series: selectedSeries,
-        timeRange,
+        name: name.trim(),
+        series,
+        timeRange: weeks,
         createdAt: new Date().toISOString(),
       }
-
-      charts.push(newChart)
-      localStorage.setItem(storageKey, JSON.stringify(charts))
-
-      onChartCreated?.(newChart)
-
+      const charts = readCustomCharts(searchId)
+      localStorage.setItem(
+        `stock-custom-charts-${searchId}`,
+        JSON.stringify([...charts, chart])
+      )
+      onChartCreated?.(chart)
       window.dispatchEvent(
         new CustomEvent('customChartUpdated', {
-          detail: { searchId, newChart },
+          detail: { searchId, newChart: chart },
         })
       )
-
-      setChartName('')
-      setSelectedSeries(['close'])
-      setIsOpen(false)
+      setName('')
+      setSeries(['close'])
+      setRemoved([])
+      setOpen(false)
+    } catch (cause) {
+      if (!(cause instanceof Error)) throw cause
+      setError(
+        '차트를 저장하지 못했어요. 브라우저 저장 공간과 기존 차트 데이터를 확인해 주세요.'
+      )
     } finally {
-      setIsSubmitting(false)
+      setBusy(false)
     }
   }
-
+  const trigger = (
+    <Button variant="secondary" disabled={!hydrated}>
+      <Plus className="size-4" aria-hidden />
+      커스텀 차트 만들기
+    </Button>
+  )
+  if (!hydrated) return trigger
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <Button onClick={() => setIsOpen(true)} className="gap-2">
-        <Plus className="h-4 w-4" />
-        커스텀 차트 만들기
-      </Button>
-
-      <DialogContent className="m-2 flex max-h-[70vh] w-[950px] flex-col rounded-2xl border-0 bg-white p-0 shadow-2xl sm:m-4 dark:bg-slate-950">
-        {/* 헤더 (고정) */}
-        <div className="flex-shrink-0 border-b border-slate-200 px-8 py-6 dark:border-slate-700">
-          <DialogHeader className="text-left">
-            <DialogTitle className="text-2xl font-bold">
-              커스텀 차트 생성
-            </DialogTitle>
-            <DialogDescription className="mt-2 text-sm">
-              원하는 데이터를 선택하여 나만의 분석 차트를 만들어보세요
-            </DialogDescription>
-          </DialogHeader>
-        </div>
-
-        {/* 콘텐츠 (스크롤 가능) */}
-        <div className="flex-1 overflow-y-auto px-8 py-6">
-          <div className="space-y-6">
-            {/* 차트 이름 */}
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold tracking-wider text-slate-600 uppercase dark:text-slate-400">
-                차트 이름
-              </Label>
-              <Input
-                placeholder="예: 최근 1년 가격 추이"
-                value={chartName}
-                onChange={e => setChartName(e.target.value)}
-                disabled={isSubmitting}
-                className="h-9 border-slate-200 bg-slate-50/50 text-sm placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-900/30 dark:placeholder:text-slate-500"
-              />
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      <DialogContent
+        showCloseButton={false}
+        className="bg-card flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[560px]"
+      >
+        <DialogHeader className="relative shrink-0 gap-1 px-6 pt-5 pb-4 text-left">
+          <DialogTitle className="pr-10 text-xl leading-7">
+            커스텀 차트 만들기
+          </DialogTitle>
+          <DialogDescription className="pr-8 text-[13px] leading-5">
+            {ticker ? `${ticker} · ` : ''}원하는 기간과 시리즈를 골라 이 종목에
+            저장해요
+          </DialogDescription>
+          <DialogClose asChild>
+            <Button
+              variant="ghost"
+              aria-label="닫기"
+              className="absolute top-4 right-4 size-11 p-0"
+            >
+              <X className="size-[18px]" />
+            </Button>
+          </DialogClose>
+        </DialogHeader>
+        <div className="min-h-0 space-y-5 overflow-y-auto px-6 pt-1 pb-5">
+          <CustomChartFields
+            name={name}
+            onNameChange={setName}
+            weeks={weeks}
+            onWeeksChange={changeWeeks}
+            series={series}
+            onSeriesChange={toggle}
+            removed={removed}
+            error={error}
+            busy={busy}
+          />
+          <div className="bg-surface-sunken space-y-2 rounded-md px-3.5 py-3">
+            <div className="flex flex-wrap justify-between gap-2 text-xs">
+              <span className="text-text-secondary">미리보기</span>
+              <span className="text-tertiary tabular-nums">
+                {range}
+                {weeks}주 ·{' '}
+                {chartSeriesLabel(series) || '시리즈를 선택해 주세요'}
+              </span>
             </div>
-
-            {/* 기간 선택 (Segmented Control) */}
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold tracking-wider text-slate-600 uppercase dark:text-slate-400">
-                기간 선택
-              </Label>
-              <div className="flex gap-1 rounded-lg bg-slate-100/50 p-1 dark:bg-slate-800/50">
-                {TIME_RANGES.map(preset => (
-                  <button
-                    key={preset.weeks}
-                    onClick={() => setTimeRange(preset.weeks)}
-                    disabled={isSubmitting}
-                    className={`flex-1 rounded-md px-3 py-2 text-xs font-semibold transition-all duration-200 ${
-                      timeRange === preset.weeks
-                        ? 'bg-blue-500 text-white shadow-md'
-                        : 'text-slate-600 hover:bg-slate-200/50 dark:text-slate-300 dark:hover:bg-slate-700/50'
-                    }`}
-                  >
-                    {preset.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* 커스텀 입력 */}
-              {timeRange !== 52 &&
-                timeRange !== 104 &&
-                timeRange !== 156 &&
-                timeRange !== 208 &&
-                timeRange !== 260 && (
-                  <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/50 p-2 dark:border-slate-700 dark:bg-slate-900/30">
-                    <Input
-                      type="number"
-                      min="1"
-                      max="260"
-                      value={timeRange}
-                      onChange={e => {
-                        const weeks = parseInt(e.target.value) || 1
-                        setTimeRange(Math.min(Math.max(1, weeks), 260))
-                      }}
-                      disabled={isSubmitting}
-                      className="border-0 bg-transparent text-xs font-semibold placeholder:text-slate-400"
-                    />
-                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-                      주
-                    </span>
-                  </div>
-                )}
-
-              {timeRange < minRequiredWeeks && minRequiredWeeks > 0 && (
-                <div className="rounded-lg bg-amber-50/80 p-2 dark:bg-amber-950/30">
-                  <p className="text-xs text-amber-700 dark:text-amber-400">
-                    ⚠️ {minRequiredWeeks}주 이상 필요
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* 시리즈 선택 */}
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold tracking-wider text-slate-600 uppercase dark:text-slate-400">
-                포함할 시리즈
-              </Label>
-              <div className="grid grid-cols-3 gap-2">
-                {AVAILABLE_SERIES.map(series => (
-                  <button
-                    key={series.key}
-                    onClick={() => toggleSeries(series.key)}
-                    disabled={isSubmitting}
-                    className={`flex flex-col items-center gap-1.5 rounded-lg border-2 px-3 py-3 transition-all duration-200 ${
-                      selectedSeries.includes(series.key)
-                        ? 'border-blue-400 bg-blue-50/60 dark:border-blue-500 dark:bg-blue-950/40'
-                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/30 dark:border-slate-700 dark:bg-slate-900/20 dark:hover:border-slate-600 dark:hover:bg-slate-900/30'
-                    }`}
-                  >
-                    <div
-                      className={`h-4 w-4 rounded-sm transition-all ${
-                        selectedSeries.includes(series.key)
-                          ? 'ring-2 ring-blue-400 ring-offset-1 dark:ring-offset-slate-950'
-                          : ''
-                      }`}
-                      style={{
-                        backgroundColor: selectedSeries.includes(series.key)
-                          ? series.color
-                          : 'transparent',
-                        border: `2px solid ${series.color}`,
-                      }}
-                    />
-                    <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">
-                      {series.label}
-                    </p>
-                    {series.minWeeks > 0 && (
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        최소 {series.minWeeks}주
-                      </p>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* 선택된 데이터 미리보기 */}
-            {selectedSeries.length > 0 && (
-              <div className="space-y-2 border-t border-slate-200 pt-4 dark:border-slate-700">
-                <p className="text-xs font-semibold tracking-wider text-slate-600 uppercase dark:text-slate-400">
-                  선택된 데이터
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {selectedSeries.map(key => {
-                    const series = AVAILABLE_SERIES.find(s => s.key === key)
-                    return (
-                      <div
-                        key={key}
-                        className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold text-white shadow-sm"
-                        style={{
-                          backgroundColor: series?.color,
-                        }}
-                      >
-                        <div className="h-1 w-1 rounded-full bg-white/70" />
-                        {series?.label}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
+            <Sparkline
+              values={points.map(point => point.close)}
+              size="card"
+              label="선택 기간의 종가 추이"
+            />
           </div>
         </div>
-
-        {/* 푸터 (고정, 그림자) */}
-        <div className="flex flex-shrink-0 gap-3 border-t border-slate-200 bg-white px-8 py-4 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] dark:border-slate-700 dark:bg-slate-950">
+        <div className="border-border-subtle flex shrink-0 flex-wrap items-center justify-end gap-2 border-t px-6 py-4">
+          <p className="text-tertiary basis-full text-xs leading-4 sm:min-w-0 sm:flex-1 sm:basis-auto">
+            이 기기(브라우저)에 저장되고 아래 “커스텀 차트”에 추가돼요
+          </p>
           <Button
-            variant="outline"
-            onClick={() => setIsOpen(false)}
-            disabled={isSubmitting}
-            className="h-10 flex-1 text-sm font-semibold"
+            variant="secondary"
+            onClick={() => setOpen(false)}
+            disabled={busy}
           >
             취소
           </Button>
           <Button
-            onClick={handleSave}
-            disabled={
-              isSubmitting ||
-              !chartName.trim() ||
-              selectedSeries.length === 0 ||
-              timeRange < minRequiredWeeks
-            }
-            className="h-10 flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-sm font-bold text-white hover:from-blue-600 hover:to-blue-700"
+            onClick={save}
+            disabled={busy || !name.trim() || series.length === 0}
           >
-            {isSubmitting ? '생성 중...' : '차트 생성'}
+            {busy ? '저장 중…' : '차트 만들기'}
           </Button>
         </div>
       </DialogContent>
