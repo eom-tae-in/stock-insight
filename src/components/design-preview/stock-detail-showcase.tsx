@@ -23,27 +23,39 @@ const record: SearchRecord = {
 }
 export function StockDetailShowcase() {
   const [short, setShort] = useState(false)
+  const [declining, setDeclining] = useState(false)
+  const displayRecord = declining
+    ? {
+        ...record,
+        price_data: record.price_data.map((point, index) => ({
+          ...point,
+          close: 200 - index,
+          high: 210 - index,
+          low: 195 - index,
+        })),
+      }
+    : record
   return (
     <main className="mx-auto max-w-7xl px-4 py-8">
       <StockDetailSummary
         record={
           short
             ? {
-                ...record,
-                price_data: record.price_data
+                ...displayRecord,
+                price_data: displayRecord.price_data
                   .slice(-1)
                   .map(({ date, close }) => ({ date, close })),
               }
-            : record
+            : displayRecord
         }
       />
       <section className="mt-6">
         <UnifiedChart
           ticker={record.ticker}
           currency={record.currency}
-          priceData={record.price_data}
-          ma13={calculateMA13(record.price_data)}
-          metrics={calculateMetrics(record.price_data)}
+          priceData={displayRecord.price_data}
+          ma13={calculateMA13(displayRecord.price_data)}
+          metrics={calculateMetrics(displayRecord.price_data)}
         />
       </section>
       <Button
@@ -52,6 +64,13 @@ export function StockDetailShowcase() {
         onClick={() => setShort(value => !value)}
       >
         {short ? '전체 데이터 보기' : '부족한 데이터 보기'}
+      </Button>
+      <Button
+        variant="secondary"
+        className="mt-6 ml-2"
+        onClick={() => setDeclining(value => !value)}
+      >
+        {declining ? '상승 데이터 보기' : '하락 데이터 보기'}
       </Button>
       <p className="text-tertiary mt-4 text-xs">
         개발 전용 고정 데이터 · 실제 저장 데이터가 아니에요.
