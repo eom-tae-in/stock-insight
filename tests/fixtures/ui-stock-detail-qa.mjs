@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect } from '@playwright/test'
+import * as XLSX from 'xlsx'
 
 export async function inspectStockDetail(
   page,
@@ -34,15 +35,31 @@ export async function inspectStockDetail(
   ).toBeEnabled()
   await expect(page.locator('.recharts-surface').first()).toBeVisible()
   const captures = []
+  const weekly = page.getByRole('region', { name: '주간 데이터', exact: true })
   for (const state of ['complete', 'missing']) {
     if (state === 'missing') {
       await page.getByRole('button', { name: '부족한 데이터 보기' }).click()
       await expect(region.getByText('—', { exact: true }).first()).toBeVisible()
       await expect(region.getByText('주간 변동폭 —')).toBeVisible()
     }
+    const table = weekly.getByRole('table')
+    await expect(table.getByRole('row')).toHaveCount(
+      state === 'complete' ? 7 : 2
+    )
+    await expect(table.getByRole('columnheader')).toHaveCount(9)
+    if (state === 'missing') {
+      const cells = table.getByRole('row').nth(1).getByRole('cell')
+      for (const index of [1, 2, 3, 5, 6, 7, 8]) {
+        await expect(cells.nth(index)).toHaveText('—')
+      }
+    }
     const path = join(artifacts, `${width}-${theme}-${state}.png`)
     await page.screenshot({ path, animations: 'disabled', fullPage: true })
     captures.push(path)
+    await weekly.scrollIntoViewIfNeeded()
+    const weeklyPath = join(artifacts, `${width}-${theme}-weekly-${state}.png`)
+    await page.screenshot({ path: weeklyPath, animations: 'disabled' })
+    captures.push(weeklyPath)
   }
   await region.getByRole('button', { name: '13주 이동평균 설명' }).focus()
   await expect(page.getByRole('tooltip', { name: /최근 13주/ })).toContainText(
@@ -178,6 +195,53 @@ export async function inspectStockDetail(
     await download.saveAs(output)
     const bytes = await readFile(output)
     assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a')
+  }
+  await page
+    .getByRole('button', { name: '전체 데이터 보기', exact: true })
+    .click()
+  await expect(weekly.getByRole('row')).toHaveCount(7)
+  await expect(weekly.locator('[data-change="down"]').first()).toBeVisible()
+  await expect(weekly.getByRole('link', { name: '전체 보기' })).toHaveAttribute(
+    'href',
+    '/stock-analysis/preview-detail/table'
+  )
+  const scrollRegion = weekly.getByRole('region', { name: /가로로 스크롤/ })
+  await scrollRegion.focus()
+  if (width === 390) {
+    await page.keyboard.press('ArrowRight')
+    await expect
+      .poll(() => scrollRegion.evaluate(element => element.scrollLeft))
+      .toBeGreaterThan(0)
+    await scrollRegion.evaluate(element => {
+      element.scrollLeft = element.scrollWidth
+    })
+  }
+  const scrolledPath = join(artifacts, `${width}-${theme}-weekly-scrolled.png`)
+  await page.screenshot({ path: scrolledPath, animations: 'disabled' })
+  captures.push(scrolledPath)
+  assert.equal(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > innerWidth
+    ),
+    false
+  )
+  if (width === 390 && theme === 'light') {
+    const downloading = page.waitForEvent('download', { timeout: 30000 })
+    await weekly
+      .getByRole('button', { name: '전체 주간 데이터를 Excel로 다운로드' })
+      .click()
+    const download = await downloading
+    assert.match(download.suggestedFilename(), /^NVDA_Table_\d{8}\.xlsx$/)
+    const output = join(artifacts, 'weekly-export.xlsx')
+    await download.saveAs(output)
+    const workbook = XLSX.read(await readFile(output), { type: 'buffer' })
+    const sheet = workbook.Sheets[workbook.SheetNames[0]]
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 })
+    assert.equal(rows.length, 81, 'Excel에는 저장된 80주 전체가 있어야 합니다')
+    assert.equal(rows[0].length, 4, '기존 Excel의4열 계약을 유지해야 합니다')
+    assert.equal(rows[1][0], '2025-03-24')
+    assert.equal(rows[1][1], '$200.00')
+    assert.equal(rows.at(-1)[1], '$121.00')
   }
   assert.deepEqual(errors, [])
   return { width, theme, captures, errors }

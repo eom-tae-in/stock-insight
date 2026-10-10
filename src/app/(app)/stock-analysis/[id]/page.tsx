@@ -1,5 +1,4 @@
 import { notFound } from 'next/navigation'
-import Link from 'next/link'
 import { Container } from '@/components/layout/container'
 import { StockDetailSummary } from '@/components/stock/stock-detail-summary'
 import { UnifiedChart } from '@/components/stock/unified-chart'
@@ -8,7 +7,7 @@ import { CustomChartView } from '@/components/stock/custom-chart-view'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getSavedSearch } from '@/server/stock-search-service'
 import { calculateMetrics, calculateMA13 } from '@/lib/calculations'
-import { Table as TableIcon } from 'lucide-react'
+import { StockWeeklyCard } from '@/components/stock/stock-weekly-card'
 
 interface AnalysisPageProps {
   params: Promise<{ id: string }>
@@ -82,31 +81,7 @@ export default async function StockAnalysisDetailPage({
           />
         </section>
 
-        {/* 표로 보기 버튼 */}
-        <section className="mb-8">
-          <Link href={`/stock-analysis/${record.id}/table`}>
-            <div className="group cursor-pointer">
-              <div className="rounded-2xl border border-blue-500/20 bg-gradient-to-br from-blue-500/10 to-blue-500/5 p-8 transition-all hover:border-blue-500/40 hover:from-blue-500/15 hover:to-blue-500/10 hover:shadow-lg">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-xl bg-blue-500/20 transition-colors group-hover:bg-blue-500/30">
-                    <TableIcon className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold">표로 보기</h3>
-                    <p className="text-muted-foreground text-sm">
-                      일정, 주가, Google Trends, 13주 이동평균선, 전년도 대비
-                      성장률 데이터를 표로 조회합니다 (
-                      {record.price_data.length}개 항목)
-                    </p>
-                  </div>
-                  <div className="flex-shrink-0 text-blue-600 transition-transform group-hover:translate-x-1 dark:text-blue-400">
-                    →
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Link>
-        </section>
+        <StockWeeklyCard record={record} />
       </Container>
     </main>
   )
