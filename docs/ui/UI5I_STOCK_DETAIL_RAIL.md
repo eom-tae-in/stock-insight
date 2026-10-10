@@ -59,10 +59,18 @@ KeywordDetailClient integration과 hook 검사에서 검증했다.
 
 `WEB_AUTH_MODE=oidc npm run build` 최초 실행 통과.
 빌드의 Slow filesystem 경고와 기존 MODULE_TYPELESS_PACKAGE_JSON 경고를 확인했다.
-`npm run test:web-oidc` 최초 실행 통과(stock-insight-web-qa-bgza5f).
+`npm run test:web-oidc` 최초 실행(stock-insight-web-qa-bgza5f)은 기능 단언과
+result.json 작성 후 Next SIGTERM 종료에서 대기했다. 해당 실행의 Next를
+SIGKILL로 종료한 뒤 남은 fixture/Redis도 정리했다. 명령은143으로 중단했으며
+최초 실행 전체를 통과로 분류하지 않는다. 기존 상세 fixture처럼 exit/signal 상태를
+확인하고 exit listener 등록 후 SIGTERM,5초 뒤 SIGKILL을 적용했다.
+정리 실패도 cleanup.json에 기록하고 오류로 반환한다. 동일 인증 명령의 첫 재시도는
+종료 코드0으로 통과했다(stock-insight-web-qa-Et3CQf).
+result.json과 cleanup.json 모두 passed=true다.
 실제 Next 프로덕션·Chrome·Redis와 서명된 OIDC/HTTP Gateway fixture 검사이며
 실제 Keycloak·Spring·DB·브로커 검증 통과가 아니다.
-최종 browser/auth fixture의 finally에서 실행한 서버·브라우저·Redis를 정리했다.
+최종 상세 browser fixture는 finally에서 실행한 서버·브라우저·Redis를 정리했다.
+최종 인증 fixture도 종료까지 완료했고 이전 중단 실행의 소유 프로세스가 없음을 확인했다.
 주 세션이 diff·Figma·캡처·검증 결과를 검토했다. 독립 검토로 분류하지 않는다.
 실제 DB·RabbitMQ·Keycloak·Docker 검증은 사용자 지시에 따라 보류한다.
 legacy Supabase/Vercel 실패를 새 런타임 통과로 분류하지 않는다.
