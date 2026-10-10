@@ -11,6 +11,7 @@ import { StockWeeklyCard } from '@/components/stock/stock-weekly-card'
 import { StockDetailRail } from '@/components/stock/stock-detail-rail'
 import { getKeywords } from '@/server/keywords-service'
 import { getStockDataCacheInfo } from '@/server/cached-stock-service'
+import { StockDetailNavigation } from '@/components/stock/stock-detail-navigation'
 
 interface AnalysisPageProps {
   params: Promise<{ id: string }>
@@ -49,6 +50,7 @@ export default async function StockAnalysisDetailPage({
   return (
     <main className="flex-1">
       <Container className="py-8">
+        <StockDetailNavigation />
         <section className="mb-8">
           <StockDetailSummary record={record} />
         </section>
@@ -56,7 +58,12 @@ export default async function StockAnalysisDetailPage({
         <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
           <div className="min-w-0">
             {/* 통합 분석 차트 */}
-            <section className="mb-8">
+            <section
+              id="stock-price-chart"
+              tabIndex={-1}
+              aria-label="가격 차트"
+              className="mb-8 scroll-mt-24"
+            >
               <UnifiedChart
                 ticker={record.ticker}
                 currency={record.currency}
@@ -93,7 +100,7 @@ export default async function StockAnalysisDetailPage({
             cacheTtlSeconds={getStockDataCacheInfo()}
           />
         </div>
-        <div className="mt-6">
+        <div id="stock-weekly-data" tabIndex={-1} className="mt-6 scroll-mt-24">
           <StockWeeklyCard record={record} />
         </div>
       </Container>

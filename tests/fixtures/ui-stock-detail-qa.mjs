@@ -21,6 +21,29 @@ export async function inspectStockDetail(
     page.getByRole('button', { name: '부족한 데이터 보기' })
   ).toBeVisible()
   await page.evaluate(() => document.fonts.ready)
+  const navigation = page.getByRole('navigation', { name: '종목 상세 이동' })
+  await expect(
+    navigation.getByRole('link', { name: '관심 종목 목록' })
+  ).toHaveAttribute('href', '/stock-analysis')
+  const weeklyLink = navigation.getByRole('link', {
+    name: '주간 데이터',
+    exact: true,
+  })
+  await weeklyLink.focus()
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/#stock-weekly-data$/)
+  await expect(page.locator('#stock-weekly-data')).toBeFocused()
+  assert(
+    await page.locator('#stock-weekly-data').evaluate(element => {
+      const bounds = element.getBoundingClientRect()
+      return bounds.top >= 0 && bounds.top < innerHeight
+    }),
+    '주간 데이터 앵커가 화면 안에 있어야 합니다'
+  )
+  await navigation.getByRole('link', { name: '가격 차트', exact: true }).click()
+  await expect(page).toHaveURL(/#stock-price-chart$/)
+  await expect(page.locator('#stock-price-chart')).toBeFocused()
+  await page.evaluate(() => window.scrollTo(0, 0))
   const region = page.getByRole('region', { name: '종목 핵심 지표' })
   await expect(region.getByText('13주 이동평균', { exact: true })).toBeVisible()
   await expect(region.getByText('주간 거래량', { exact: true })).toBeVisible()
@@ -156,6 +179,7 @@ export async function inspectStockDetail(
   captures.push(seriesPath)
   const surface = page.locator('.recharts-surface').first()
   const grid = page.locator('.recharts-cartesian-grid').first()
+  await grid.scrollIntoViewIfNeeded()
   const surfaceBox = await surface.boundingBox()
   const gridBox = await grid.boundingBox()
   assert(surfaceBox && gridBox)
