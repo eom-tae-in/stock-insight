@@ -6,6 +6,7 @@ import { calculateMA13, calculateMetrics } from '@/lib/calculations'
 import { StockDetailSummary } from '@/components/stock/stock-detail-summary'
 import { StockWeeklyCard } from '@/components/stock/stock-weekly-card'
 import { StockDetailRail } from '@/components/stock/stock-detail-rail'
+import { StockDetailNavigation } from '@/components/stock/stock-detail-navigation'
 import type { KeywordRecord } from '@/types/database'
 import type { SearchRecord } from '@/types'
 
@@ -91,9 +92,15 @@ export function StockDetailShowcase() {
     : displayRecord
   return (
     <main className="mx-auto max-w-7xl px-4 py-8">
+      <StockDetailNavigation />
       <StockDetailSummary record={summaryRecord} />
       <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <section className="min-w-0">
+        <section
+          id="stock-price-chart"
+          tabIndex={-1}
+          aria-label="가격 차트"
+          className="min-w-0 scroll-mt-24"
+        >
           <UnifiedChart
             ticker={record.ticker}
             currency={record.currency}
@@ -108,7 +115,7 @@ export function StockDetailShowcase() {
           cacheTtlSeconds={short ? null : 86400}
         />
       </div>
-      <div className="mt-6">
+      <div id="stock-weekly-data" tabIndex={-1} className="mt-6 scroll-mt-24">
         <StockWeeklyCard record={summaryRecord} />
       </div>
       <Button
