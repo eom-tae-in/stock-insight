@@ -50,6 +50,25 @@ vi.mock('recharts', () => ({
   Line: ({ dataKey, name }: { dataKey: string; name: string }) => (
     <div data-testid={`line-${dataKey}`}>{name}</div>
   ),
+  Cell: ({ fill }: { fill: string }) => (
+    <span data-testid="yoy-cell" data-fill={fill} />
+  ),
+  Bar: ({
+    dataKey,
+    name,
+    children,
+  }: {
+    dataKey: string
+    name: string
+    children: React.ReactNode
+  }) => (
+    <div data-testid={`bar-${dataKey}`}>
+      {name}
+      {children}
+    </div>
+  ),
+  ReferenceLine: () => null,
+  ReferenceDot: () => null,
   Area: ({ dataKey, name }: { dataKey: string; name: string }) => (
     <div data-testid={`area-${dataKey}`}>{name}</div>
   ),
@@ -88,11 +107,33 @@ describe('UnifiedChart', () => {
     expect(screen.getByText('가격 차트')).toBeInTheDocument()
     expect(screen.queryByTestId('line-open')).not.toBeInTheDocument()
     expect(screen.getByTestId('line-close')).toHaveTextContent('종가')
-    expect(screen.getByTestId('area-ma13')).toHaveTextContent('13주 MA')
-    expect(screen.getByTestId('area-yoy')).toHaveTextContent('52주 YoY')
+    expect(screen.getByTestId('line-ma13')).toHaveTextContent('13주 MA')
+    expect(screen.getByTestId('bar-yoy')).toHaveTextContent('52주 YoY')
     expect(
       screen.getByRole('button', { name: '통합 분석 차트를 PNG로 다운로드' })
     ).toBeInTheDocument()
+  })
+
+  it('계산된 YoY가 음수면 막대를 하락 색으로 표시하고 결측 막대는 숨긴다', () => {
+    const falling = priceData.map((point, index) => ({
+      ...point,
+      close: 200 - index,
+    }))
+    render(
+      <UnifiedChart
+        ticker="AAPL"
+        currency="USD"
+        priceData={falling}
+        ma13={falling.map(point => point.close)}
+        metrics={metrics}
+      />
+    )
+    const colors = screen
+      .getAllByTestId('yoy-cell')
+      .map(cell => cell.getAttribute('data-fill'))
+    expect(colors).toContain('var(--down)')
+    expect(colors).toContain('transparent')
+    expect(colors).not.toContain('var(--up)')
   })
 
   it('uses initial enabled series and time range when provided', () => {
@@ -111,7 +152,7 @@ describe('UnifiedChart', () => {
     expect(screen.getByTestId('line-open')).toHaveTextContent('시가')
     expect(screen.getByTestId('line-high')).toHaveTextContent('고가')
     expect(screen.queryByTestId('line-close')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('area-ma13')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('line-ma13')).not.toBeInTheDocument()
   })
 
   it('disables long-history series when the selected range is too short', async () => {
@@ -135,7 +176,7 @@ describe('UnifiedChart', () => {
         name: '13주 이동평균 기준 전년동기 대비 증감률(52주 YoY)',
       })
     ).toBeDisabled()
-    expect(screen.queryByTestId('area-yoy')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('bar-yoy')).not.toBeInTheDocument()
   })
 
   it('기간 변경 시 종가만 남기고 필요한 기간에서 시리즈를 다시 켤 수 있다', async () => {
@@ -154,11 +195,11 @@ describe('UnifiedChart', () => {
       'data-points',
       '52'
     )
-    expect(screen.queryByTestId('area-ma13')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('area-yoy')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('line-ma13')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('bar-yoy')).not.toBeInTheDocument()
     await user.click(screen.getByRole('radio', { name: '2Y' }))
     await user.click(screen.getByRole('button', { name: '13주 MA' }))
-    expect(screen.getByTestId('area-ma13')).toBeInTheDocument()
+    expect(screen.getByTestId('line-ma13')).toBeInTheDocument()
   })
 
   it('선택 기간이 길어도 저장된 종가가 부족하면 MA13과 YoY를 켤 수 없다', () => {
@@ -172,8 +213,8 @@ describe('UnifiedChart', () => {
       />
     )
     expect(screen.getByRole('button', { name: '13주 MA' })).toBeDisabled()
-    expect(screen.queryByTestId('area-ma13')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('area-yoy')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('line-ma13')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('bar-yoy')).not.toBeInTheDocument()
   })
 
   it('delegates PNG download to the supplied callback when provided', async () => {

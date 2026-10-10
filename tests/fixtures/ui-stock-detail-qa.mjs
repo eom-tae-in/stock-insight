@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect } from '@playwright/test'
 
@@ -45,7 +45,9 @@ export async function inspectStockDetail(
     captures.push(path)
   }
   await region.getByRole('button', { name: '13주 이동평균 설명' }).focus()
-  await expect(page.getByRole('tooltip')).toContainText('최근 13주')
+  await expect(page.getByRole('tooltip', { name: /최근 13주/ })).toContainText(
+    '최근 13주'
+  )
   const group = page.getByRole('group', { name: '차트 시리즈' })
   const ma = group.getByRole('button', { name: '13주 MA', exact: true })
   const close = group.getByRole('button', { name: '종가', exact: true })
@@ -82,6 +84,90 @@ export async function inspectStockDetail(
     fullPage: true,
   })
   captures.push(seriesPath)
+  const surface = page.locator('.recharts-surface').first()
+  const grid = page.locator('.recharts-cartesian-grid').first()
+  const surfaceBox = await surface.boundingBox()
+  const gridBox = await grid.boundingBox()
+  assert(surfaceBox && gridBox)
+  assert(
+    gridBox.width / surfaceBox.width > 0.6,
+    '가격 플롯이 화면 폭을 충분히 사용해야 합니다'
+  )
+  const lastPriceBox = await page
+    .locator('[data-last-price-label]')
+    .boundingBox()
+  assert(lastPriceBox)
+  assert(
+    lastPriceBox.x >= gridBox.x &&
+      lastPriceBox.x + lastPriceBox.width <= gridBox.x + gridBox.width &&
+      lastPriceBox.y >= gridBox.y &&
+      lastPriceBox.y + lastPriceBox.height <= gridBox.y + gridBox.height,
+    '최근 가격 라벨은 축 숫자와 겹치거나 플롯 밖으로 잘리면 안 됩니다'
+  )
+  await page.mouse.move(
+    gridBox.x + gridBox.width * 0.7,
+    gridBox.y + gridBox.height * 0.5
+  )
+  await expect(
+    page.getByRole('tooltip', { name: '주간 가격 상세', exact: true })
+  ).toContainText(/W\d+/)
+  const tooltipPath = join(artifacts, `${width}-${theme}-weekly-tooltip.png`)
+  await page.screenshot({
+    path: tooltipPath,
+    animations: 'disabled',
+    fullPage: true,
+  })
+  captures.push(tooltipPath)
+  await page
+    .getByRole('button', { name: '하락 데이터 보기', exact: true })
+    .click()
+  const downBars = page.locator(
+    '.recharts-bar-rectangle path[fill="var(--down)"]'
+  )
+  await expect(downBars.first()).toBeVisible()
+  await expect(
+    page
+      .getByRole('region', { name: '52주 YoY 막대' })
+      .getByText('0%', { exact: true })
+  ).toBeVisible()
+  const downPath = join(artifacts, `${width}-${theme}-negative-yoy.png`)
+  await page.screenshot({
+    path: downPath,
+    animations: 'disabled',
+    fullPage: true,
+  })
+  captures.push(downPath)
+  const beforeScroll = await grid.boundingBox()
+  await grid.scrollIntoViewIfNeeded()
+  const negativeGridBox = await grid.boundingBox()
+  assert(negativeGridBox)
+  await writeFile(
+    join(artifacts, `${width}-${theme}-plot-geometry.json`),
+    JSON.stringify(
+      { initial: gridBox, beforeScroll, negative: negativeGridBox },
+      null,
+      2
+    )
+  )
+  await page.mouse.move(
+    negativeGridBox.x + negativeGridBox.width * 0.93,
+    negativeGridBox.y + negativeGridBox.height * 0.5
+  )
+  const downTooltip = page.getByRole('tooltip', {
+    name: '주간 가격 상세',
+    exact: true,
+  })
+  await expect(downTooltip.locator('[data-change="down"]')).toBeVisible()
+  const downTooltipPath = join(
+    artifacts,
+    `${width}-${theme}-negative-tooltip.png`
+  )
+  await page.screenshot({
+    path: downTooltipPath,
+    animations: 'disabled',
+    fullPage: true,
+  })
+  captures.push(downTooltipPath)
   if (width === 390 && theme === 'light') {
     const downloading = page.waitForEvent('download', { timeout: 30000 })
     await page
