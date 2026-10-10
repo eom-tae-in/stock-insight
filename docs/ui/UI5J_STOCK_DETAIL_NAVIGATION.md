@@ -1,6 +1,7 @@
 # UI-5j 종목 상세 목록 복귀와 섹션 이동
 
 이슈 #56 · 브랜치 `feat/56/stock-detail-navigation` · 담당자 eom-tae-in · enhancement.
+PR #57은 develop 대상으로 작성했고 `Closes #56`을 연결했다. 아직 미병합이며 이슈 #56은 열린 상태다.
 선행 이슈 #54는 PR #55로 squash 병합되고 자동으로 닫혔다
 (`59974f98af003ffc3422583011ae1db101613f4c`).
 
