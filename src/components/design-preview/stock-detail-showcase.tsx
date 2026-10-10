@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { UnifiedChart } from '@/components/stock/unified-chart'
 import { calculateMA13, calculateMetrics } from '@/lib/calculations'
 import { StockDetailSummary } from '@/components/stock/stock-detail-summary'
+import { StockWeeklyCard } from '@/components/stock/stock-weekly-card'
 import type { SearchRecord } from '@/types'
 
 const record: SearchRecord = {
@@ -35,20 +36,17 @@ export function StockDetailShowcase() {
         })),
       }
     : record
+  const summaryRecord = short
+    ? {
+        ...displayRecord,
+        price_data: displayRecord.price_data
+          .slice(-1)
+          .map(({ date, close }) => ({ date, close })),
+      }
+    : displayRecord
   return (
     <main className="mx-auto max-w-7xl px-4 py-8">
-      <StockDetailSummary
-        record={
-          short
-            ? {
-                ...displayRecord,
-                price_data: displayRecord.price_data
-                  .slice(-1)
-                  .map(({ date, close }) => ({ date, close })),
-              }
-            : displayRecord
-        }
-      />
+      <StockDetailSummary record={summaryRecord} />
       <section className="mt-6">
         <UnifiedChart
           ticker={record.ticker}
@@ -58,6 +56,9 @@ export function StockDetailShowcase() {
           metrics={calculateMetrics(displayRecord.price_data)}
         />
       </section>
+      <div className="mt-6">
+        <StockWeeklyCard record={summaryRecord} />
+      </div>
       <Button
         variant="secondary"
         className="mt-6"
