@@ -113,6 +113,15 @@ function mockFetchForDetail() {
     if (url === '/api/keywords/keyword-1/analyses') {
       return Response.json({ data: [analysis] })
     }
+    if (url === '/api/stocks/NVDA') {
+      return Response.json({
+        data: {
+          ticker: 'NVDA',
+          companyName: 'NVIDIA',
+          priceData: [{ date: '2026-01-01', price: 180 }],
+        },
+      })
+    }
     if (
       url === '/api/keywords/keyword-1/analyses?region=GLOBAL&searchType=WEB'
     ) {
@@ -142,6 +151,29 @@ describe('KeywordDetailClient integration', () => {
     toastMock.success.mockReset()
     toastMock.error.mockReset()
     toastMock.info.mockReset()
+  })
+
+  it('opens the URL preview in the existing comparison flow and removes its query on close', async () => {
+    window.history.replaceState(null, '', '/keywords/keyword-1?preview=NVDA')
+    mockFetchForDetail()
+    render(
+      <KeywordDetailClient
+        keywordId="keyword-1"
+        keyword={keyword}
+        initialPreviewTicker="NVDA"
+        initialSearchParams={{
+          region: 'GLOBAL',
+          period: '5Y',
+          searchType: 'WEB',
+        }}
+      />
+    )
+    expect(await screen.findByText('현재 비교 중: NVDA')).toBeVisible()
+    expect(window.location.search).toContain('preview=NVDA')
+    await userEvent.click(screen.getByRole('button', { name: '종목 제거' }))
+    expect(screen.queryByText('현재 비교 중: NVDA')).not.toBeInTheDocument()
+    expect(window.location.search).not.toContain('preview')
+    expect(window.location.search).toContain('region=GLOBAL')
   })
 
   it('loads analyses, current analysis, and overlay cards for the selected keyword', async () => {

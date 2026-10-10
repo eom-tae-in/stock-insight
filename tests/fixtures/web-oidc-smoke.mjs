@@ -328,11 +328,40 @@ try {
   )
   console.log(`PASS web OIDC/Trends browser smoke: ${artifacts}`)
 } finally {
-  await browser?.close()
-  application.kill('SIGTERM')
-  if (application.exitCode === null)
-    await new Promise(resolve => application.once('exit', resolve))
-  await stop(gateway)
-  await stop(provider.server)
-  await redis.close()
+  const cleanup = await Promise.allSettled([
+    browser?.close(),
+    (async () => {
+      if (application.exitCode !== null || application.signalCode !== null)
+        return
+      await new Promise(resolve => {
+        const timer = setTimeout(() => application.kill('SIGKILL'), 5000)
+        application.once('exit', () => {
+          clearTimeout(timer)
+          resolve()
+        })
+        application.kill('SIGTERM')
+      })
+    })(),
+    stop(gateway),
+    stop(provider.server),
+    redis.close(),
+  ])
+  const failures = cleanup
+    .filter(result => result.status === 'rejected')
+    .map(result => result.reason)
+  await writeFile(
+    join(artifacts, 'cleanup.json'),
+    JSON.stringify(
+      {
+        passed: failures.length === 0,
+        errors: failures.map(error =>
+          error instanceof Error ? error.message : String(error)
+        ),
+      },
+      null,
+      2
+    )
+  )
+  if (failures.length)
+    throw new AggregateError(failures, 'OIDC fixture cleanup failed')
 }

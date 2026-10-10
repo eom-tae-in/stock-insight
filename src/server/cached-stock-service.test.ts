@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   buildStockDataCacheKey,
   fetchCachedStockData,
+  getStockDataCacheInfo,
 } from './cached-stock-service'
 import { fetchStockData } from '@/lib/services/stock-service'
 
@@ -39,6 +40,14 @@ describe('cached-stock-service', () => {
     expect(buildStockDataCacheKey('aapl')).toMatch(
       /^stock-data:v1:AAPL:5y:1wk:\d{4}-\d{2}-\d{2}$/
     )
+  })
+
+  it('only exposes cache duration when both server settings exist', () => {
+    expect(getStockDataCacheInfo()).toBeNull()
+    process.env.UPSTASH_REDIS_REST_URL = 'https://redis.test/'
+    expect(getStockDataCacheInfo()).toBeNull()
+    process.env.UPSTASH_REDIS_REST_TOKEN = 'test-config-value'
+    expect(getStockDataCacheInfo()).toBe(86400)
   })
 
   it('fetches stock data directly when Redis is not configured', async () => {

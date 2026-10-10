@@ -83,6 +83,12 @@ export default async function KeywordDetailPage({
 
   return (
     <KeywordDetailClient
+      initialPreviewTicker={
+        typeof resolvedSearchParams.preview === 'string' &&
+        /^[A-Za-z0-9.^=-]{1,20}$/.test(resolvedSearchParams.preview)
+          ? resolvedSearchParams.preview.toUpperCase()
+          : undefined
+      }
       keywordId={keywordId}
       keyword={keyword}
       initialSearchParams={{
