@@ -1,6 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import { useStockPreview } from './use-stock-preview'
+import { REGION_LABEL, SEARCH_TYPE_LABEL } from '@/lib/insights/labels'
 import { useRouter } from 'next/navigation'
 import {
   useState,
@@ -255,32 +257,6 @@ type AnalysisSummary = {
 }
 
 // 레이블 매핑
-const REGION_LABEL: Record<Region, string> = {
-  GLOBAL: '전체',
-  US: '미국',
-  KR: '한국',
-  JP: '일본',
-  GB: '영국',
-  DE: '독일',
-  FR: '프랑스',
-  CA: '캐나다',
-  AU: '호주',
-  IN: '인도',
-  BR: '브라질',
-  CN: '중국',
-  TW: '대만',
-  HK: '홍콩',
-  SG: '싱가포르',
-}
-
-const SEARCH_TYPE_LABEL: Record<SearchType, string> = {
-  WEB: '웹 검색',
-  IMAGES: '이미지',
-  NEWS: '뉴스',
-  YOUTUBE: '유튜브',
-  SHOPPING: '쇼핑',
-}
-
 const PERIOD_MAX_YEARS: Record<Period, number> = {
   '1M': 1,
   '3M': 1,
@@ -312,6 +288,7 @@ function getFiveYearCutoffDate(latestDate: string) {
 }
 
 interface KeywordDetailClientProps {
+  initialPreviewTicker?: string
   keywordId: string
   keyword: KeywordRecord
   initialSearchParams: {
@@ -925,6 +902,7 @@ export function KeywordDetailClient({
   keywordId,
   keyword,
   initialSearchParams,
+  initialPreviewTicker,
 }: KeywordDetailClientProps) {
   const router = useRouter()
 
@@ -1139,8 +1117,14 @@ export function KeywordDetailClient({
   useEffect(() => {
     if (!isSelectionResolved || isLoadingList) return
 
-    const newUrl = `/keywords/${keywordId}?region=${region}&searchType=${searchType}`
-    window.history.replaceState(null, '', newUrl)
+    const query = new URLSearchParams(window.location.search)
+    query.set('region', region)
+    query.set('searchType', searchType)
+    window.history.replaceState(
+      window.history.state,
+      '',
+      `/keywords/${keywordId}?${query}`
+    )
 
     // 분석 조건 변경 시 selectedStock 초기화 (분석별 독립성 보장)
     setSelectedStock(null)
@@ -1175,6 +1159,13 @@ export function KeywordDetailClient({
   const [showAutocomplete, setShowAutocomplete] = useState(false)
   const [isSearchingStock, setIsSearchingStock] = useState(false)
   const [isAddingStock, setIsAddingStock] = useState(false)
+  const clearPreview = useStockPreview({
+    ticker: initialPreviewTicker,
+    ready: isSelectionResolved && !isLoadingList,
+    condition: `${keywordId}:${region}:${searchType}`,
+    setStock: setSelectedStock,
+    setLoading: setIsAddingStock,
+  })
   const [visibleLines, setVisibleLines] = useState({
     trendsValue: true,
     ma13Value: true,
@@ -1812,6 +1803,7 @@ export function KeywordDetailClient({
   }
 
   const handleRemoveSelectedStock = () => {
+    clearPreview()
     setSelectedStock(null)
     setStockSearchInput('')
     setShowAutocomplete(false)
@@ -1851,6 +1843,7 @@ export function KeywordDetailClient({
         toast.success('커스텀 차트가 저장되었습니다')
 
         // 상태 초기화
+        clearPreview()
         setSelectedStock(null)
         setStockSearchInput('')
 

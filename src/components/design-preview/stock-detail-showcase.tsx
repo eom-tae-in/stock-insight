@@ -5,6 +5,8 @@ import { UnifiedChart } from '@/components/stock/unified-chart'
 import { calculateMA13, calculateMetrics } from '@/lib/calculations'
 import { StockDetailSummary } from '@/components/stock/stock-detail-summary'
 import { StockWeeklyCard } from '@/components/stock/stock-weekly-card'
+import { StockDetailRail } from '@/components/stock/stock-detail-rail'
+import type { KeywordRecord } from '@/types/database'
 import type { SearchRecord } from '@/types'
 
 const record: SearchRecord = {
@@ -22,6 +24,49 @@ const record: SearchRecord = {
     volume: 1000000000 + week * 1000000,
   })),
 }
+const keywords: KeywordRecord[] = ['AI', '반도체', '클라우드'].map(
+  (keyword, index) => ({
+    id: `preview-keyword-${index}`,
+    user_id: 'design-preview',
+    keyword,
+    region: 'GLOBAL',
+    search_type: 'WEB',
+    trends_data: [],
+    searched_at: record.searched_at,
+    created_at: record.searched_at,
+    updated_at: record.searched_at,
+    analyses: [
+      {
+        id: `preview-analysis-${index}`,
+        keyword_id: `preview-keyword-${index}`,
+        region: 'GLOBAL',
+        search_type: 'WEB',
+        period: '5Y',
+        trends_data: Array.from({ length: 65 }, (_, week) => ({
+          date: new Date(Date.UTC(2025, 6, 7 + week * 7))
+            .toISOString()
+            .slice(0, 10),
+          value: 40 + week * 0.6 - index * 5,
+          ma13Value: null,
+          yoyValue: null,
+        })),
+        overlays:
+          index < 2
+            ? [
+                {
+                  id: `preview-overlay-${index}`,
+                  analysis_id: `preview-analysis-${index}`,
+                  created_at: record.searched_at,
+                  ticker: 'NVDA',
+                  company_name: 'NVIDIA',
+                  display_order: 0,
+                },
+              ]
+            : [],
+      },
+    ],
+  })
+)
 export function StockDetailShowcase() {
   const [short, setShort] = useState(false)
   const [declining, setDeclining] = useState(false)
@@ -47,15 +92,22 @@ export function StockDetailShowcase() {
   return (
     <main className="mx-auto max-w-7xl px-4 py-8">
       <StockDetailSummary record={summaryRecord} />
-      <section className="mt-6">
-        <UnifiedChart
-          ticker={record.ticker}
-          currency={record.currency}
-          priceData={displayRecord.price_data}
-          ma13={calculateMA13(displayRecord.price_data)}
-          metrics={calculateMetrics(displayRecord.price_data)}
+      <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <section className="min-w-0">
+          <UnifiedChart
+            ticker={record.ticker}
+            currency={record.currency}
+            priceData={displayRecord.price_data}
+            ma13={calculateMA13(displayRecord.price_data)}
+            metrics={calculateMetrics(displayRecord.price_data)}
+          />
+        </section>
+        <StockDetailRail
+          record={summaryRecord}
+          keywords={short ? [] : keywords}
+          cacheTtlSeconds={short ? null : 86400}
         />
-      </section>
+      </div>
       <div className="mt-6">
         <StockWeeklyCard record={summaryRecord} />
       </div>

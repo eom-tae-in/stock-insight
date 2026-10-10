@@ -8,6 +8,9 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getSavedSearch } from '@/server/stock-search-service'
 import { calculateMetrics, calculateMA13 } from '@/lib/calculations'
 import { StockWeeklyCard } from '@/components/stock/stock-weekly-card'
+import { StockDetailRail } from '@/components/stock/stock-detail-rail'
+import { getKeywords } from '@/server/keywords-service'
+import { getStockDataCacheInfo } from '@/server/cached-stock-service'
 
 interface AnalysisPageProps {
   params: Promise<{ id: string }>
@@ -41,6 +44,7 @@ export default async function StockAnalysisDetailPage({
 
   const metrics = calculateMetrics(record.price_data)
   const ma13Values = calculateMA13(record.price_data)
+  const keywords = await getKeywords(supabase, user.id)
 
   return (
     <main className="flex-1">
@@ -49,39 +53,49 @@ export default async function StockAnalysisDetailPage({
           <StockDetailSummary record={record} />
         </section>
 
-        {/* 통합 분석 차트 */}
-        <section className="mb-8">
-          <UnifiedChart
-            ticker={record.ticker}
-            currency={record.currency}
-            priceData={record.price_data}
-            ma13={ma13Values}
-            metrics={metrics}
-          />
-        </section>
+        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="min-w-0">
+            {/* 통합 분석 차트 */}
+            <section className="mb-8">
+              <UnifiedChart
+                ticker={record.ticker}
+                currency={record.currency}
+                priceData={record.price_data}
+                ma13={ma13Values}
+                metrics={metrics}
+              />
+            </section>
 
-        {/* 커스텀 차트 빌더 */}
-        <section className="mb-8">
-          <CustomChartBuilder
-            searchId={record.id}
-            ticker={record.ticker}
-            priceData={record.price_data}
-          />
-        </section>
+            {/* 커스텀 차트 빌더 */}
+            <section className="mb-8">
+              <CustomChartBuilder
+                searchId={record.id}
+                ticker={record.ticker}
+                priceData={record.price_data}
+              />
+            </section>
 
-        {/* 저장된 커스텀 차트 */}
-        <section className="mb-8">
-          <CustomChartView
-            searchId={record.id}
-            ticker={record.ticker}
-            currency={record.currency}
-            priceData={record.price_data}
-            ma13={ma13Values}
-            metrics={metrics}
+            {/* 저장된 커스텀 차트 */}
+            <section className="mb-8">
+              <CustomChartView
+                searchId={record.id}
+                ticker={record.ticker}
+                currency={record.currency}
+                priceData={record.price_data}
+                ma13={ma13Values}
+                metrics={metrics}
+              />
+            </section>
+          </div>
+          <StockDetailRail
+            record={record}
+            keywords={keywords}
+            cacheTtlSeconds={getStockDataCacheInfo()}
           />
-        </section>
-
-        <StockWeeklyCard record={record} />
+        </div>
+        <div className="mt-6">
+          <StockWeeklyCard record={record} />
+        </div>
       </Container>
     </main>
   )

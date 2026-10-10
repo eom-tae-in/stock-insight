@@ -27,6 +27,14 @@ function getRedisConfig() {
 export const STOCK_DATA_PERIOD = '5Y'
 export const STOCK_DATA_INTERVAL = '1wk'
 
+export function getStockDataCacheInfo(): number | null {
+  return getRedisConfig() &&
+    Number.isFinite(STOCK_DATA_CACHE_TTL_SECONDS) &&
+    STOCK_DATA_CACHE_TTL_SECONDS > 0
+    ? STOCK_DATA_CACHE_TTL_SECONDS
+    : null
+}
+
 export type StockDataPeriod = typeof STOCK_DATA_PERIOD
 export type StockDataInterval = typeof STOCK_DATA_INTERVAL
 

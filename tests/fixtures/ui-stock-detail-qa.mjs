@@ -35,12 +35,65 @@ export async function inspectStockDetail(
   ).toBeEnabled()
   await expect(page.locator('.recharts-surface').first()).toBeVisible()
   const captures = []
+  const rail = page.getByRole('complementary', {
+    name: '종목 연결과 데이터 정보',
+  })
+  await expect(rail.getByText('연결 키워드')).toBeVisible()
+  await expect(rail.getByText('캐시 사용 · 24시간')).toBeVisible()
+  await expect(rail.getByText('전체 · 웹 검색').first()).toBeVisible()
+  const contrast = await rail.getByText('Yahoo Finance').evaluate(element => {
+    const card = element.closest('section')
+    const channels = color =>
+      color
+        .match(/[\d.]+/g)
+        .slice(0, 3)
+        .map(Number)
+    const luminance = color =>
+      channels(color)
+        .map(value => {
+          const channel = value / 255
+          return channel <= 0.04045
+            ? channel / 12.92
+            : ((channel + 0.055) / 1.055) ** 2.4
+        })
+        .reduce(
+          (sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index],
+          0
+        )
+    const text = luminance(getComputedStyle(element).color)
+    const background = luminance(getComputedStyle(card).backgroundColor)
+    return (
+      (Math.max(text, background) + 0.05) / (Math.min(text, background) + 0.05)
+    )
+  })
+  assert(contrast >= 4.5, `Data information contrast ${contrast} is below 4.5`)
+  await rail.getByRole('button', { name: '키워드와 비교하기' }).click()
+  const chooser = page.getByRole('navigation', { name: '비교할 키워드' })
+  await expect(chooser.getByRole('link')).toHaveCount(3)
+  await expect(chooser.getByRole('link', { name: '클라우드' })).toHaveAttribute(
+    'href',
+    '/keywords/preview-keyword-2?preview=NVDA'
+  )
+  if (width === 390) await expect(page.getByRole('dialog')).toBeVisible()
+  const chooserPath = join(artifacts, `${width}-${theme}-keyword-chooser.png`)
+  await page.screenshot({ path: chooserPath, animations: 'disabled' })
+  captures.push(chooserPath)
+  await page.keyboard.press('Escape')
+  await expect(chooser).not.toBeVisible()
+  await expect(
+    rail.getByRole('button', { name: '키워드와 비교하기' })
+  ).toBeFocused()
   const weekly = page.getByRole('region', { name: '주간 데이터', exact: true })
   for (const state of ['complete', 'missing']) {
     if (state === 'missing') {
       await page.getByRole('button', { name: '부족한 데이터 보기' }).click()
       await expect(region.getByText('—', { exact: true }).first()).toBeVisible()
       await expect(region.getByText('주간 변동폭 —')).toBeVisible()
+      await expect(rail.getByText(/아직 이 종목에 연결된/)).toBeVisible()
+      await expect(rail.getByText(/캐시 사용/)).toHaveCount(0)
+      await rail.getByRole('button', { name: '키워드와 비교하기' }).click()
+      await expect(page.getByText(/먼저 키워드를 저장/)).toBeVisible()
+      await page.keyboard.press('Escape')
     }
     const table = weekly.getByRole('table')
     await expect(table.getByRole('row')).toHaveCount(
