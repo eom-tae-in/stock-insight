@@ -19,7 +19,6 @@ export function GuideReader({
   const [current, setCurrent] = useState(() =>
     guideStep(step, journeys[journey].cards.length)
   )
-  const [contents, setContents] = useState(false)
   const panel = useRef<HTMLDivElement>(null)
   const animation = useRef<Animation | null>(null)
   const direction = useRef(1)
@@ -52,13 +51,11 @@ export function GuideReader({
     if (next < 1 || next > collection.cards.length || next === current) return
     direction.current = next > current ? 1 : -1
     setCurrent(next)
-    setContents(false)
     heading.current?.focus({ preventScroll: true })
   }
   function switchJourney(next: Journey) {
     setActive(next)
     setCurrent(1)
-    setContents(false)
   }
   function keys(event: KeyboardEvent<HTMLElement>) {
     if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
@@ -104,109 +101,72 @@ export function GuideReader({
       <p className="sr-only" role="status">
         {current} / {collection.cards.length} · {card.title}
       </p>
-      {contents ? (
-        <section
-          aria-label="안내 목차"
-          className="min-h-0 space-y-5 overflow-y-auto overscroll-contain rounded-xl border p-5 sm:p-8"
-        >
-          <h1 className="text-2xl font-bold">궁금한 내용을 골라봐요</h1>
-          <ol className="grid gap-2 sm:grid-cols-2">
-            {collection.cards.map((item, index) => (
-              <li key={item.label}>
-                <Button
-                  variant="ghost"
-                  size="mobile"
-                  className="h-auto min-h-11 w-full justify-start text-left whitespace-normal"
-                  onClick={() => {
-                    setContents(false)
-                    change(index + 1)
-                  }}
-                >
-                  <span className="text-text-tertiary mr-2 tabular-nums">
-                    {String(index + 1).padStart(2, '0')}
-                  </span>
-                  {item.label}
-                </Button>
-              </li>
-            ))}
-          </ol>
-          <Button
-            variant="secondary"
-            size="mobile"
-            onClick={() => setContents(false)}
-          >
-            이어서 살펴봐요
-          </Button>
-        </section>
-      ) : (
-        <article
-          aria-label={card.label}
-          onTouchStart={event => {
-            const start = event.touches[0]
-            if (start) touch.current = [start.clientX, start.clientY]
-          }}
-          onTouchEnd={touchEnd}
-          className="min-h-0 overflow-y-auto overscroll-contain rounded-xl border"
-        >
-          <div ref={panel} className="space-y-6 p-5 sm:p-8">
-            <div className="space-y-2">
-              <p className="text-brand-text text-xs">
-                {active === 'current'
-                  ? '지금 이렇게 사용해요'
-                  : '이렇게 바꿔가요'}{' '}
-                · {card.label}
-              </p>
-              <h1
-                ref={heading}
-                tabIndex={-1}
-                className="text-2xl leading-8 font-bold tracking-tight outline-none sm:text-[32px] sm:leading-[42px]"
-              >
-                {card.title}
-              </h1>
-              <p className="text-text-secondary text-sm leading-[22px]">
-                {card.desc}
-              </p>
-            </div>
-            <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
-              <section className="space-y-4" aria-labelledby="steps-title">
-                <h2 id="steps-title" className="text-base font-semibold">
-                  {active === 'current'
-                    ? '하나씩 따라 해봐요'
-                    : '이런 경험을 준비해요'}
-                </h2>
-                <ol className="space-y-4">
-                  {card.steps.map((instruction, index) => (
-                    <li
-                      key={instruction}
-                      className="flex gap-2 text-sm leading-[22px]"
-                    >
-                      <span
-                        aria-hidden
-                        className="text-brand-text w-6 shrink-0 tabular-nums"
-                      >
-                        {String(index + 1).padStart(2, '0')}
-                      </span>
-                      <span>{instruction}</span>
-                    </li>
-                  ))}
-                </ol>
-                <aside className="bg-surface-sunken space-y-2 rounded-md p-4">
-                  <h3 className="text-sm font-medium">함께 알아두면 좋아요</h3>
-                  <p className="text-text-secondary text-[13px] leading-5">
-                    {card.tip}
-                  </p>
-                </aside>
-              </section>
-              <GuideIllustration visual={card.visual} />
-            </div>
+      <article
+        aria-label={card.label}
+        onTouchStart={event => {
+          const start = event.touches[0]
+          if (start) touch.current = [start.clientX, start.clientY]
+        }}
+        onTouchEnd={touchEnd}
+        className="min-h-0 overflow-y-auto overscroll-contain rounded-xl border"
+      >
+        <div ref={panel} className="space-y-6 p-5 sm:p-8">
+          <div className="space-y-2">
+            <p className="text-brand-text text-xs">
+              {active === 'current'
+                ? '지금 이렇게 사용해요'
+                : '이렇게 바꿔가요'}{' '}
+              · {card.label}
+            </p>
+            <h1
+              ref={heading}
+              tabIndex={-1}
+              className="text-2xl leading-8 font-bold tracking-tight outline-none sm:text-[32px] sm:leading-[42px]"
+            >
+              {card.title}
+            </h1>
+            <p className="text-text-secondary text-sm leading-[22px]">
+              {card.desc}
+            </p>
           </div>
-        </article>
-      )}
+          <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
+            <section className="space-y-4" aria-labelledby="steps-title">
+              <h2 id="steps-title" className="text-base font-semibold">
+                {active === 'current'
+                  ? '하나씩 따라 해봐요'
+                  : '이런 경험을 준비해요'}
+              </h2>
+              <ol className="space-y-4">
+                {card.steps.map((instruction, index) => (
+                  <li
+                    key={instruction}
+                    className="flex gap-2 text-sm leading-[22px]"
+                  >
+                    <span
+                      aria-hidden
+                      className="text-brand-text w-6 shrink-0 tabular-nums"
+                    >
+                      {String(index + 1).padStart(2, '0')}
+                    </span>
+                    <span>{instruction}</span>
+                  </li>
+                ))}
+              </ol>
+              <aside className="bg-surface-sunken space-y-2 rounded-md p-4">
+                <h3 className="text-sm font-medium">함께 알아두면 좋아요</h3>
+                <p className="text-text-secondary text-[13px] leading-5">
+                  {card.tip}
+                </p>
+              </aside>
+            </section>
+            <GuideIllustration visual={card.visual} />
+          </div>
+        </div>
+      </article>
       <GuideControls
         current={current}
         count={collection.cards.length}
         onChange={change}
-        onContents={() => setContents(true)}
       />
       <p className="text-text-tertiary h-10 overflow-y-auto text-xs leading-5">
         {active === 'current'
