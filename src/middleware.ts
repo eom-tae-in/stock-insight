@@ -12,6 +12,7 @@ import { createSupabaseMiddlewareClient } from '@/lib/supabase/middleware-client
 import { isOidcMode, authCookieName, oidcConfig } from '@/server/oidc/config'
 import { readSession } from '@/server/oidc/session'
 import { isDesignPreviewPath } from '@/lib/design-preview'
+import { isPublicGuidePath } from '@/lib/guides/public-paths'
 
 // 인증 없이 접근 가능한 경로
 // 참고: /set-password 는 이메일 OTP 인증 완료 후 세션이 있는 사용자만 접근하므로
@@ -27,6 +28,7 @@ function getSafeNextPath(input: string | null): string {
 }
 
 export async function middleware(request: NextRequest) {
+  if (isPublicGuidePath(request.nextUrl.pathname)) return NextResponse.next()
   if (isDesignPreviewPath(request.nextUrl.pathname)) {
     return process.env.NODE_ENV === 'development'
       ? NextResponse.next()
