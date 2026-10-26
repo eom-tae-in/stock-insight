@@ -12,12 +12,15 @@ export function OidcLogin({
   return (
     <LoginLayout>
       <section aria-labelledby="login-title" className="space-y-6">
-        <div className="space-y-2">
-          <h1 id="login-title" className="text-2xl leading-8 font-bold">
-            분석을 이어가세요
+        <div className="space-y-3 text-center">
+          <h1
+            id="login-title"
+            className="text-[32px] leading-[42px] font-bold tracking-tight"
+          >
+            로그인
           </h1>
           <p className="text-text-secondary text-sm leading-[22px]">
-            계정으로 로그인하고 검색 관심도의 주간 흐름을 확인하세요.
+            로그인하고 저장한 종목과 키워드를 이어서 살펴봐요.
           </p>
         </div>
         {failed && (
@@ -25,7 +28,11 @@ export function OidcLogin({
             로그인을 완료하지 못했어요. 다시 시도해주세요.
           </p>
         )}
-        <Button asChild size="lg" className="h-11 w-full">
+        <Button
+          asChild
+          size="lg"
+          className="h-12 w-full text-base font-semibold"
+        >
           <Link
             href={`/api/auth/oidc/login?next=${encodeURIComponent(nextPath)}`}
           >

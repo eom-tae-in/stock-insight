@@ -10,9 +10,11 @@ export function LoginLayout({ children }: { readonly children: ReactNode }) {
         <Brand href="/login" />
         <ThemeToggle />
       </header>
-      <main className="flex flex-1 justify-center px-6 pt-8 pb-12 sm:pt-12">
-        <div className="w-full max-w-[420px] space-y-8">
-          {children}
+      <main className="flex flex-1 justify-center px-5 pt-6 pb-12 sm:pt-12">
+        <div className="w-full max-w-[440px] space-y-5">
+          <div className="shadow-card rounded-xl border p-6 sm:p-8">
+            {children}
+          </div>
           <LoginGuideLinks />
         </div>
       </main>

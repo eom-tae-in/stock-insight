@@ -166,7 +166,7 @@ export function GuideChart({ name }: { readonly name: GuideChartName }) {
       </div>
       <div className="space-y-2">
         <label htmlFor={id} className="text-text-secondary block text-xs">
-          주차를 골라 자세히 확인해요 · 마우스를 올리거나 터치해도 돼요
+          주차 선택
         </label>
         <input
           id={id}

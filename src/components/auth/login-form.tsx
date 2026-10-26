@@ -91,7 +91,7 @@ export function LoginForm({ nextPath = '/' }: LoginFormProps) {
       />
       <Button
         type="submit"
-        className="w-full"
+        className="h-12 w-full text-base font-semibold"
         variant="default"
         size="lg"
         disabled={isLoading}
