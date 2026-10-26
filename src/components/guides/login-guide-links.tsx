@@ -1,25 +1,41 @@
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
+import { ArrowUpRight, BookOpen, Sparkles } from 'lucide-react'
+
+const entries = [
+  {
+    href: '/guide',
+    title: '사용법을 알아봐요',
+    detail: '종목 저장부터 키워드 비교까지',
+    icon: BookOpen,
+  },
+  {
+    href: '/renewal',
+    title: '새로워질 모습을 살펴봐요',
+    detail: '더 편하게 분석할 수 있도록 바꿔가요',
+    icon: Sparkles,
+  },
+] as const
+
 export function LoginGuideLinks() {
   return (
-    <aside
-      aria-labelledby="login-guides-title"
-      className="bg-card space-y-4 rounded-lg border p-5"
-    >
-      <h2 id="login-guides-title" className="text-base font-semibold">
-        로그인 전에 먼저 알아보세요
-      </h2>
-      <p className="text-text-secondary text-sm leading-[22px]">
-        큰 화면 예시로 사용법과 앞으로의 변화를 살펴볼 수 있어요.
-      </p>
-      <div className="space-y-2">
-        <Button asChild variant="secondary" size="mobile" className="w-full">
-          <Link href="/guide">서비스 사용법</Link>
-        </Button>
-        <Button asChild variant="ghost" size="mobile" className="w-full">
-          <Link href="/renewal">리뉴얼 미리보기</Link>
-        </Button>
-      </div>
-    </aside>
+    <nav aria-label="서비스 안내" className="space-y-2 border-t pt-6">
+      {entries.map(({ href, title, detail, icon: Icon }) => (
+        <Link
+          key={href}
+          href={href}
+          className="group hover:bg-surface-sunken focus-visible:ring-ring flex min-h-11 items-center gap-3 rounded-lg px-3 py-4 transition-colors outline-none focus-visible:ring-2 motion-reduce:transition-none"
+        >
+          <Icon aria-hidden className="text-text-secondary size-5 shrink-0" />
+          <div className="flex-1 space-y-1">
+            <p className="text-sm font-medium">{title}</p>
+            <p className="text-text-secondary text-xs leading-5">{detail}</p>
+          </div>
+          <ArrowUpRight
+            aria-hidden
+            className="text-text-tertiary size-4 shrink-0"
+          />
+        </Link>
+      ))}
+    </nav>
   )
 }

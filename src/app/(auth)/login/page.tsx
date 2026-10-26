@@ -39,9 +39,12 @@ export default async function LoginPage({
   return (
     <LoginLayout>
       <section aria-labelledby="login-title" className="space-y-6">
-        <div className="space-y-2">
-          <h1 id="login-title" className="text-2xl leading-8 font-bold">
-            다시 만나 반가워요
+        <div className="space-y-3 text-center">
+          <h1
+            id="login-title"
+            className="text-[32px] leading-[42px] font-bold tracking-tight"
+          >
+            로그인
           </h1>
           <p className="text-text-secondary text-sm leading-[22px]">
             저장한 종목과 키워드를 이어서 확인해요.
@@ -54,13 +57,13 @@ export default async function LoginPage({
         />
         <div className="relative">
           <Separator />
-          <span className="bg-background text-text-secondary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-2 text-xs">
+          <span className="bg-card text-text-secondary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-2 text-xs">
             또는 이메일로 로그인
           </span>
         </div>
         <LoginForm nextPath={nextPath} />
         <p className="text-text-secondary text-center text-xs">
-          로그인하면 우리의 서비스 약관에 동의하는 것입니다.
+          로그인하고 저장한 분석을 이어서 살펴봐요.
         </p>
       </section>
     </LoginLayout>

@@ -23,27 +23,13 @@ function ExampleAction({ children }: { readonly children: ReactNode }) {
     </p>
   )
 }
-function MetricsExample() {
-  return (
-    <>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Panel title="검색 관심도">68 / 100</Panel>
-        <Panel title="종가 · 예시">$210.00</Panel>
-      </div>
-      <GuideChart name="intro" />
-      <p className="text-text-secondary text-xs leading-4">
-        주간 데이터 · 서로 다른 단위와 축을 확인하세요
-      </p>
-    </>
-  )
-}
 export function GuideIllustration({
   visual,
 }: {
   readonly visual: GuideCard['visual']
 }) {
   const examples: Record<GuideCard['visual'], ReactNode> = {
-    0: <MetricsExample />,
+    0: <GuideChart name="intro" key="intro" />,
     1: (
       <>
         <h3 className="text-xl font-semibold">종목 검색</h3>
@@ -59,11 +45,7 @@ export function GuideIllustration({
     ),
     2: (
       <>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Panel title="검색 관심도">68 / 100</Panel>
-          <Panel title="종가 · 예시">$210.00</Panel>
-        </div>
-        <GuideChart name="metrics" />
+        <GuideChart key="metrics" name="metrics" />
         <p className="text-text-secondary text-xs">
           주간 데이터 · 서로 다른 단위와 축을 확인하세요
         </p>
@@ -73,7 +55,7 @@ export function GuideIllustration({
       <>
         <h3 className="text-2xl font-bold">Apple</h3>
         <Panel title="분석 조건">전체 지역 / 웹 검색 / 5년</Panel>
-        <GuideChart name="keyword" />
+        <GuideChart key="keyword" name="keyword" />
         <ExampleAction>키워드 저장</ExampleAction>
         <p className="text-text-secondary text-sm">
           저장 후: 내 키워드 → Apple → 조건별 분석
@@ -83,7 +65,7 @@ export function GuideIllustration({
     4: (
       <>
         <Panel title="1. 임시 비교">Apple 관심도 + AAPL 주가</Panel>
-        <GuideChart name="comparison" />
+        <GuideChart key="comparison" name="comparison" />
         <ExampleAction>커스텀 차트 저장</ExampleAction>
         <Panel title="2. 저장한 연동 차트">
           현재 분석 조건 아래 AAPL 카드가 남아요
@@ -95,7 +77,7 @@ export function GuideIllustration({
         <Panel title="내 차트 · AAPL 1년">
           종가 + 13주 MA / 이 브라우저에 저장
         </Panel>
-        <GuideChart name="exports" />
+        <GuideChart key="exports" name="exports" />
         <div className="grid gap-4 sm:grid-cols-3">
           {['PNG 이미지', 'Excel 표', 'CSV 비교'].map(title => (
             <p
@@ -138,7 +120,7 @@ export function GuideIllustration({
         <Panel title="이번 주에 달라진 것">
           관심도와 주가가 엇갈린 대상을 먼저 확인해요
         </Panel>
-        <GuideChart name="briefing" />
+        <GuideChart key="briefing" name="briefing" />
         <Panel title="요약에서 비교 근거로">
           저장한 키워드 → 연결 종목 → 차트·표
         </Panel>
@@ -146,11 +128,7 @@ export function GuideIllustration({
     ),
     9: (
       <>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Panel title="검색 관심도">68 / 100</Panel>
-          <Panel title="종가 · 예시">$210.00</Panel>
-        </div>
-        <GuideChart name="evidence" />
+        <GuideChart key="evidence" name="evidence" />
         <p className="text-text-secondary text-xs">
           주간 데이터 · 서로 다른 단위와 축을 확인하세요
         </p>
@@ -159,7 +137,7 @@ export function GuideIllustration({
     10: (
       <>
         <Panel title="PC · 넓게 분석">기간 · 시리즈 · 차트 · 비교 종목</Panel>
-        <GuideChart name="mobile" />
+        <GuideChart key="mobile" name="mobile" />
         <Panel title="Mobile · 빠르게 확인">
           핵심 요약 → 관심 목록 → 상세 근거
         </Panel>

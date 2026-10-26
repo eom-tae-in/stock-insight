@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser'
 import { Button } from '@/components/ui/button'
@@ -23,6 +23,8 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ nextPath = '/' }: LoginFormProps) {
+  const emailId = useId()
+  const passwordId = useId()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -73,25 +75,41 @@ export function LoginForm({ nextPath = '/' }: LoginFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
-      <Input
-        type="email"
-        placeholder="이메일"
-        value={email}
-        onChange={e => setEmail(e.target.value)}
-        disabled={isLoading}
-        className="h-10"
-      />
-      <Input
-        type="password"
-        placeholder="비밀번호"
-        value={password}
-        onChange={e => setPassword(e.target.value)}
-        disabled={isLoading}
-        className="h-10"
-      />
+      <div className="space-y-2">
+        <label htmlFor={emailId} className="text-sm font-medium">
+          이메일
+        </label>
+        <Input
+          id={emailId}
+          name="email"
+          autoComplete="email"
+          type="email"
+          placeholder="이메일"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          disabled={isLoading}
+          className="h-11"
+        />
+      </div>
+      <div className="space-y-2">
+        <label htmlFor={passwordId} className="text-sm font-medium">
+          비밀번호
+        </label>
+        <Input
+          id={passwordId}
+          name="password"
+          autoComplete="current-password"
+          type="password"
+          placeholder="비밀번호"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+          disabled={isLoading}
+          className="h-11"
+        />
+      </div>
       <Button
         type="submit"
-        className="w-full"
+        className="h-12 w-full text-base font-semibold"
         variant="default"
         size="lg"
         disabled={isLoading}

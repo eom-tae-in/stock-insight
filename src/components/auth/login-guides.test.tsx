@@ -11,12 +11,10 @@ it('retains the OIDC login target and error while exposing public guide links', 
     'href',
     '/api/auth/oidc/login?next=%2Ftrends-jobs'
   )
-  expect(screen.getByRole('link', { name: '서비스 사용법' })).toHaveAttribute(
-    'href',
-    '/guide'
-  )
-  expect(screen.getByRole('link', { name: '리뉴얼 미리보기' })).toHaveAttribute(
-    'href',
-    '/renewal'
-  )
+  expect(
+    screen.getByRole('link', { name: /사용법을 알아봐요/ })
+  ).toHaveAttribute('href', '/guide')
+  expect(
+    screen.getByRole('link', { name: /새로워질 모습을 살펴봐요/ })
+  ).toHaveAttribute('href', '/renewal')
 })
