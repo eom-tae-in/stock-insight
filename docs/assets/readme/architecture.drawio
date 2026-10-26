@@ -1,0 +1,185 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile host="app.diagrams.net" type="device">
+  <diagram name="기존 서비스 · 조회하고 저장하기" id="architecture-legacy">
+    <mxGraphModel dx="1120" dy="570" grid="1" gridSize="10" page="1" pageWidth="1120" pageHeight="570">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="기존 서비스 · 조회하고 저장하기&#10;prod 기준 / Next.js와 Supabase, Vercel Python Function을 사용하는 기존 경로" style="text;whiteSpace=wrap;html=0;fontSize=22;align=left;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="36" y="24" width="1040" height="100" />
+        </mxCell>
+        <mxCell id="user" value="사용자&#10;로그인 · 검색&#10;분석 · 저장" style="rounded=1;whiteSpace=wrap;html=0;fontSize=15;fillColor=#FFFFFF;strokeColor=#C4C9D2;fontColor=#12151C;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="36" y="172" width="175" height="105" />
+        </mxCell>
+        <mxCell id="web" value="Next.js · Vercel&#10;화면 / API Routes&#10;인증 검사 · 사용자별 조회&#10;계산 · 차트 · 다운로드" style="rounded=1;whiteSpace=wrap;html=0;fontSize=15;fillColor=#F1EDFF;strokeColor=#C4C9D2;fontColor=#12151C;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="274" y="172" width="260" height="130" />
+        </mxCell>
+        <mxCell id="sb" value="Supabase&#10;Auth · PostgreSQL · RLS&#10;사용자별 종목 / 키워드 / 분석 / 비교" style="rounded=1;whiteSpace=wrap;html=0;fontSize=15;fillColor=#FFFFFF;strokeColor=#C4C9D2;fontColor=#12151C;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="665" y="155" width="420" height="100" />
+        </mxCell>
+        <mxCell id="redis" value="Upstash Redis&#10;조회 결과 캐시&#10;선택 의존성" style="rounded=1;whiteSpace=wrap;html=0;fontSize=15;fillColor=#FFFFFF;strokeColor=#C4C9D2;fontColor=#12151C;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="665" y="305" width="185" height="100" />
+        </mxCell>
+        <mxCell id="yahoo" value="Yahoo Finance&#10;주가 · OHLCV&#10;외부 데이터" style="rounded=1;whiteSpace=wrap;html=0;fontSize=15;fillColor=#FFFFFF;strokeColor=#C4C9D2;fontColor=#12151C;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="900" y="305" width="185" height="100" />
+        </mxCell>
+        <mxCell id="py" value="Python Function · pytrends&#10;/api/pytrends → Google Trends&#10;내부 secret 검증 후 관심도 수집" style="rounded=1;whiteSpace=wrap;html=0;fontSize=15;fillColor=#FFFFFF;strokeColor=#C4C9D2;fontColor=#12151C;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="274" y="390" width="310" height="100" />
+        </mxCell>
+        <mxCell id="e1" value="" style="endArrow=block;html=0;rounded=0;" edge="1" parent="1">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="211" y="222" />
+            <mxPoint as="targetPoint" x="274" y="222" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e2" value="인증 / 저장" style="endArrow=block;html=0;rounded=0;" edge="1" parent="1">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="534" y="198" />
+            <mxPoint as="targetPoint" x="665" y="198" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e3" value="" style="endArrow=block;html=0;rounded=0;" edge="1" parent="1">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="534" y="295" />
+            <mxPoint as="targetPoint" x="665" y="355" />
+            <Array as="points">
+              <mxPoint x="550" y="295" />
+              <mxPoint x="550" y="355" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e4" value="" style="endArrow=block;html=0;rounded=0;" edge="1" parent="1">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="534" y="280" />
+            <mxPoint as="targetPoint" x="900" y="355" />
+            <Array as="points">
+              <mxPoint x="875" y="280" />
+              <mxPoint x="875" y="355" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e5" value="Trends 조회" style="endArrow=block;html=0;rounded=0;" edge="1" parent="1">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="405" y="302" />
+            <mxPoint as="targetPoint" x="405" y="390" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="notes" value="저장 전 조회 → 명시적 저장 → 같은 조건으로 복원 / 분석별 종목 비교를 유지한다.&#10;기존 구현 구조를 설명하는 그림이며 현재 배포의 전체 기능 검증 결과는 아니다." style="text;whiteSpace=wrap;html=0;fontSize=14;align=left;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="36" y="503" width="1040" height="60" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="목표 구조 · 수집과 분석의 책임 분리" id="architecture-target">
+    <mxGraphModel dx="1120" dy="970" grid="1" gridSize="10" page="1" pageWidth="1120" pageHeight="970">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="목표 구조 · 수집과 분석의 책임 분리&#10;설계 및 부분 구현 / 실제 Google 수집·계정 이전·전체 MSA 연동은 후속 검증 대상" style="text;whiteSpace=wrap;html=0;fontSize=22;align=left;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="36" y="24" width="1040" height="100" />
+        </mxCell>
+        <mxCell id="browser" value="브라우저&#10;분석 화면 · 작업 상태&#10;결과 확인 · 저장" style="rounded=1;whiteSpace=wrap;html=0;fontSize=15;fillColor=#FFFFFF;strokeColor=#C4C9D2;fontColor=#12151C;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="36" y="165" width="190" height="100" />
+        </mxCell>
+        <mxCell id="web" value="Next.js · BFF&#10;화면 / 서버 세션&#10;토큰은 브라우저에 노출 안 함" style="rounded=1;whiteSpace=wrap;html=0;fontSize=15;fillColor=#F1EDFF;strokeColor=#C4C9D2;fontColor=#12151C;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="302" y="165" width="265" height="100" />
+        </mxCell>
+        <mxCell id="idp" value="Keycloak · OIDC&#10;로그인 / 토큰 발급 / 별도 저장소&#10;PKCE · state · nonce 검증" style="rounded=1;whiteSpace=wrap;html=0;fontSize=15;fillColor=#FFFFFF;strokeColor=#C4C9D2;fontColor=#12151C;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="700" y="165" width="385" height="100" />
+        </mxCell>
+        <mxCell id="gateway" value="Spring Cloud Gateway&#10;인증된 API 요청 라우팅&#10;서비스별 JWT / 소유권 재검증" style="rounded=1;whiteSpace=wrap;html=0;fontSize=15;fillColor=#FFFFFF;strokeColor=#C4C9D2;fontColor=#12151C;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="302" y="325" width="265" height="100" />
+        </mxCell>
+        <mxCell id="eureka" value="Eureka&#10;서비스 등록 / 탐색&#10;라우팅 인프라 · 업무 도메인 아님" style="rounded=1;whiteSpace=wrap;html=0;fontSize=15;fillColor=#FFFFFF;strokeColor=#C4C9D2;fontColor=#12151C;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="700" y="325" width="385" height="100" />
+        </mxCell>
+        <mxCell id="analysis" value="analysis-service&#10;저장 종목 · 키워드 · 분석 · 오버레이&#10;소유권 / 작업 세대 / 결과 수용&#10;Analysis Management" style="rounded=1;whiteSpace=wrap;html=0;fontSize=15;fillColor=#F1EDFF;strokeColor=#C4C9D2;fontColor=#12151C;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="36" y="510" width="420" height="125" />
+        </mxCell>
+        <mxCell id="market" value="market-data-service&#10;종목 검색 / 공급자 어댑터 / 시계열 정규화&#10;Yahoo Finance 등 외부 주가 공급자&#10;Market Data" style="rounded=1;whiteSpace=wrap;html=0;fontSize=15;fillColor=#F1EDFF;strokeColor=#C4C9D2;fontColor=#12151C;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="665" y="510" width="420" height="125" />
+        </mxCell>
+        <mxCell id="db" value="PostgreSQL&#10;Analysis 저장소&#10;작업 / Outbox / Inbox" style="rounded=1;whiteSpace=wrap;html=0;fontSize=15;fillColor=#FFFFFF;strokeColor=#C4C9D2;fontColor=#12151C;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="36" y="730" width="195" height="115" />
+        </mxCell>
+        <mxCell id="mq" value="RabbitMQ&#10;요청 큐 → 결과 큐&#10;confirm / ACK / DLQ" style="rounded=1;whiteSpace=wrap;html=0;fontSize=15;fillColor=#FFFFFF;strokeColor=#C4C9D2;fontColor=#12151C;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="302" y="730" width="265" height="115" />
+        </mxCell>
+        <mxCell id="worker" value="Python Trends worker&#10;수집 실행 어댑터 · DB 직접 접근 없음&#10;현재 fixture 전용 / 실제 Google 연동 예정" style="rounded=1;whiteSpace=wrap;html=0;fontSize=15;fillColor=#FFFFFF;strokeColor=#C4C9D2;fontColor=#12151C;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="665" y="730" width="420" height="115" />
+        </mxCell>
+        <mxCell id="e1" value="HTTPS" style="endArrow=block;html=0;rounded=0;" edge="1" parent="1">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="226" y="210" />
+            <mxPoint as="targetPoint" x="302" y="210" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e2" value="OIDC" style="endArrow=block;html=0;rounded=0;" edge="1" parent="1">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="567" y="210" />
+            <mxPoint as="targetPoint" x="700" y="210" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e3" value="Bearer API" style="endArrow=block;html=0;rounded=0;" edge="1" parent="1">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="434" y="265" />
+            <mxPoint as="targetPoint" x="434" y="325" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e4" value="등록 / 탐색" style="endArrow=block;html=0;rounded=0;dashed=1;" edge="1" parent="1">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="567" y="376" />
+            <mxPoint as="targetPoint" x="700" y="376" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e5" value="" style="endArrow=block;html=0;rounded=0;" edge="1" parent="1">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="368" y="425" />
+            <mxPoint as="targetPoint" x="245" y="510" />
+            <Array as="points">
+              <mxPoint x="368" y="470" />
+              <mxPoint x="245" y="470" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e6" value="" style="endArrow=block;html=0;rounded=0;" edge="1" parent="1">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="510" y="425" />
+            <mxPoint as="targetPoint" x="870" y="510" />
+            <Array as="points">
+              <mxPoint x="510" y="470" />
+              <mxPoint x="870" y="470" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e7" value="시세 계약 / 어댑터" style="endArrow=block;html=0;rounded=0;" edge="1" parent="1">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="456" y="570" />
+            <mxPoint as="targetPoint" x="665" y="570" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e8" value="로컬 트랜잭션" style="endArrow=block;html=0;rounded=0;" edge="1" parent="1">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="133" y="635" />
+            <mxPoint as="targetPoint" x="133" y="730" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e9" value="요청 / 결과" style="endArrow=block;html=0;rounded=0;" edge="1" parent="1">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="368" y="635" />
+            <mxPoint as="targetPoint" x="368" y="730" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e10" value="수집 메시지" style="endArrow=block;html=0;rounded=0;" edge="1" parent="1">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="567" y="785" />
+            <mxPoint as="targetPoint" x="665" y="785" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="notes" value="실선: 요청·데이터 흐름(요약) / 점선: 서비스 탐색. 응답과 결과 회신은 같은 연결을 역방향으로 사용한다.&#10;Redis는 BFF 서버 세션·캐시 인프라다(그림에서 생략). 각 서비스 DB와 OIDC 저장소의 계정·권한을 분리한다." style="text;whiteSpace=wrap;html=0;fontSize=14;align=left;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="36" y="903" width="1040" height="60" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

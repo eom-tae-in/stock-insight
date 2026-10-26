@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="570" viewBox="0 0 1120 570" role="img" aria-labelledby="title desc">
+<title id="title">기존 서비스 · 조회하고 저장하기</title>
+<desc id="desc">prod 기준 / Next.js와 Supabase, Vercel Python Function을 사용하는 기존 경로. 사용자: 로그인 · 검색 / 분석 · 저장; Next.js · Vercel: 화면 / API Routes / 인증 검사 · 사용자별 조회 / 계산 · 차트 · 다운로드; Supabase: Auth · PostgreSQL · RLS / 사용자별 종목 / 키워드 / 분석 / 비교; Upstash Redis: 조회 결과 캐시 / 선택 의존성; Yahoo Finance: 주가 · OHLCV / 외부 데이터; Python Function · pytrends: /api/pytrends → Google Trends / 내부 secret 검증 후 관심도 수집</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#4A5261"/></marker></defs>
+<rect width="1120" height="570" rx="14" fill="#F3F4F6"/>
+<text x="36" y="40" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans CJK KR, sans-serif" font-size="13" fill="#6B3FE8" font-weight="600">STOCKINSIGHT / BASELINE</text>
+<text x="36" y="81" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans CJK KR, sans-serif" font-size="29" fill="#12151C" font-weight="700">기존 서비스 · 조회하고 저장하기</text>
+<text x="36" y="110" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans CJK KR, sans-serif" font-size="15" fill="#4A5261" font-weight="400">prod 기준 / Next.js와 Supabase, Vercel Python Function을 사용하는 기존 경로</text>
+<polyline points="211,222 274,222" fill="none" stroke="#4A5261" stroke-width="1.5" marker-end="url(#arrow)"/>
+<polyline points="534,198 665,198" fill="none" stroke="#4A5261" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="542" y="170" width="77" height="22" fill="#F3F4F6"/>
+<text x="548" y="185" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans CJK KR, sans-serif" font-size="13" fill="#4A5261" font-weight="400">인증 / 저장</text>
+<polyline points="534,295 550,295 550,355 665,355" fill="none" stroke="#4A5261" stroke-width="1.5" marker-end="url(#arrow)"/>
+<polyline points="534,280 875,280 875,355 900,355" fill="none" stroke="#4A5261" stroke-width="1.5" marker-end="url(#arrow)"/>
+<polyline points="405,302 405,390" fill="none" stroke="#4A5261" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="413" y="335" width="95" height="22" fill="#F3F4F6"/>
+<text x="419" y="350" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans CJK KR, sans-serif" font-size="13" fill="#4A5261" font-weight="400">Trends 조회</text>
+<rect x="36" y="172" width="175" height="105" rx="10" fill="#FFFFFF" stroke="#C4C9D2"/>
+<text x="54" y="201" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans CJK KR, sans-serif" font-size="18" fill="#12151C" font-weight="600">사용자</text>
+<text x="54" y="227" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans CJK KR, sans-serif" font-size="14" fill="#4A5261" font-weight="400">로그인 · 검색</text>
+<text x="54" y="250" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans CJK KR, sans-serif" font-size="14" fill="#4A5261" font-weight="400">분석 · 저장</text>
+<rect x="274" y="172" width="260" height="130" rx="10" fill="#F1EDFF" stroke="#C4C9D2"/>
+<text x="292" y="201" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans CJK KR, sans-serif" font-size="18" fill="#6B3FE8" font-weight="600">Next.js · Vercel</text>
+<text x="292" y="227" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans CJK KR, sans-serif" font-size="14" fill="#4A5261" font-weight="400">화면 / API Routes</text>
+<text x="292" y="250" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans CJK KR, sans-serif" font-size="14" fill="#4A5261" font-weight="400">인증 검사 · 사용자별 조회</text>
+<text x="292" y="273" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans CJK KR, sans-serif" font-size="14" fill="#4A5261" font-weight="400">계산 · 차트 · 다운로드</text>
+<rect x="665" y="155" width="420" height="100" rx="10" fill="#FFFFFF" stroke="#C4C9D2"/>
+<text x="683" y="184" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans CJK KR, sans-serif" font-size="18" fill="#12151C" font-weight="600">Supabase</text>
+<text x="683" y="210" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans CJK KR, sans-serif" font-size="14" fill="#4A5261" font-weight="400">Auth · PostgreSQL · RLS</text>
+<text x="683" y="233" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans CJK KR, sans-serif" font-size="14" fill="#4A5261" font-weight="400">사용자별 종목 / 키워드 / 분석 / 비교</text>
+<rect x="665" y="305" width="185" height="100" rx="10" fill="#FFFFFF" stroke="#C4C9D2"/>
+<text x="683" y="334" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans CJK KR, sans-serif" font-size="18" fill="#12151C" font-weight="600">Upstash Redis</text>
+<text x="683" y="360" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans CJK KR, sans-serif" font-size="14" fill="#4A5261" font-weight="400">조회 결과 캐시</text>
+<text x="683" y="383" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans CJK KR, sans-serif" font-size="14" fill="#4A5261" font-weight="400">선택 의존성</text>
+<rect x="900" y="305" width="185" height="100" rx="10" fill="#FFFFFF" stroke="#C4C9D2"/>
+<text x="918" y="334" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans CJK KR, sans-serif" font-size="18" fill="#12151C" font-weight="600">Yahoo Finance</text>
+<text x="918" y="360" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans CJK KR, sans-serif" font-size="14" fill="#4A5261" font-weight="400">주가 · OHLCV</text>
+<text x="918" y="383" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans CJK KR, sans-serif" font-size="14" fill="#4A5261" font-weight="400">외부 데이터</text>
+<rect x="274" y="390" width="310" height="100" rx="10" fill="#FFFFFF" stroke="#C4C9D2"/>
+<text x="292" y="419" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans CJK KR, sans-serif" font-size="18" fill="#12151C" font-weight="600">Python Function · pytrends</text>
+<text x="292" y="445" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans CJK KR, sans-serif" font-size="14" fill="#4A5261" font-weight="400">/api/pytrends → Google Trends</text>
+<text x="292" y="468" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans CJK KR, sans-serif" font-size="14" fill="#4A5261" font-weight="400">내부 secret 검증 후 관심도 수집</text>
+<text x="36" y="526" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans CJK KR, sans-serif" font-size="14" fill="#4A5261" font-weight="400">저장 전 조회 → 명시적 저장 → 같은 조건으로 복원 / 분석별 종목 비교를 유지한다.</text>
+<text x="36" y="548" font-family="Pretendard, Apple SD Gothic Neo, Noto Sans CJK KR, sans-serif" font-size="14" fill="#4A5261" font-weight="400">기존 구현 구조를 설명하는 그림이며 현재 배포의 전체 기능 검증 결과는 아니다.</text>
+</svg>
