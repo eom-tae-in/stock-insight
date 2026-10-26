@@ -34,6 +34,7 @@ describe.each(['legacy', 'oidc'])('public guides in %s mode', mode => {
     }
   )
   it.each([
+    '/',
     '/guide/private',
     '/renewal-data',
     '/explore/account',

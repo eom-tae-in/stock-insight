@@ -46,37 +46,56 @@ describe('guide navigation', () => {
   })
   it('supports arrow keys and prevents moving before the first card', () => {
     render(<GuideReader journey="current" step={undefined} />)
-    expect(screen.getByRole('button', { name: '이전' })).toBeDisabled()
+    expect(
+      screen.queryByRole('button', { name: '이전' })
+    ).not.toBeInTheDocument()
     fireEvent.keyDown(screen.getByRole('main'), { key: 'ArrowLeft' })
     fireEvent.keyDown(screen.getByRole('main'), { key: 'ArrowRight' })
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       '관심 종목부터 하나 저장해 보세요'
     )
   })
-  it('opens contents, jumps to a card and switches journeys without navigating', async () => {
+  it('switches journeys without navigating or showing contents', async () => {
     const user = userEvent.setup()
-    render(<GuideReader journey="current" step="1" />)
-    await user.click(screen.getByRole('button', { name: /목차 열기/ }))
-    await user.click(screen.getByRole('button', { name: /함께 비교/ }))
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      '비교해 보고, 남기고 싶을 때 저장'
-    )
+    render(<GuideReader journey="current" step="5" />)
+    const url = location.href
     await user.click(
       screen.getByRole('button', { name: '새로워질 모습을 살펴봐요' })
     )
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       '기능보다, 사용자의 질문에서 시작'
     )
-  })
-  it('opens contents at the last card instead of navigating away', async () => {
-    const user = userEvent.setup()
-    render(<GuideReader journey="renewal" step="6" />)
     expect(
-      screen.getByText(/자동 갱신·주간 메일·관계 탐색은 후속 구상/)
-    ).toBeVisible()
-    await user.click(screen.getByRole('button', { name: '목차' }))
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      '궁금한 내용을 골라봐요'
-    )
+      screen.queryByRole('button', { name: '이전' })
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText('궁금한 내용을 골라봐요')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /목차/ })
+    ).not.toBeInTheDocument()
+    expect(location.href).toBe(url)
   })
+  it.each([
+    ['current', '7'],
+    ['renewal', '6'],
+  ] as const)(
+    'hides next on the last %s card and retains previous',
+    async (journey, step) => {
+      const user = userEvent.setup()
+      render(<GuideReader journey={journey} step={step} />)
+      expect(
+        screen.queryByRole('button', { name: '다음' })
+      ).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: /목차/ })
+      ).not.toBeInTheDocument()
+      const title = screen.getByRole('heading', { level: 1 }).textContent
+      fireEvent.keyDown(screen.getByRole('main'), { key: 'ArrowRight' })
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+        title ?? ''
+      )
+      await user.click(screen.getByRole('button', { name: '이전' }))
+      expect(screen.getByRole('button', { name: '다음' })).toBeEnabled()
+      expect(screen.getByRole('button', { name: '이전' })).toBeEnabled()
+    }
+  )
 })
