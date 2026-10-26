@@ -5,7 +5,9 @@
 
 'use client'
 
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser'
 
 interface OAuthLoginButtonProps {
@@ -40,17 +42,15 @@ export function OAuthLoginButton({
     }
   }
 
-  const providerLabel = 'Google'
-  const providerEmoji = '🔍'
-
   return (
     <Button
       onClick={handleLogin}
-      className={className}
+      className={cn('h-12 gap-3 text-sm', className)}
       variant="outline"
       size="lg"
     >
-      {providerEmoji} {providerLabel}로 로그인
+      <Image src="/auth/google.svg" width={18} height={18} alt="" aria-hidden />
+      Google로 로그인
     </Button>
   )
 }

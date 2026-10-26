@@ -181,3 +181,29 @@ CUA로 로컬 로그인 제목·중앙 카드·주 로그인 링크를 직접 �
 해당 촬영은 안내 링크를 작은 텍스트로 줄였던 중간 상태이므로,
 최종 링크 영역의 새로운 시각 검증 통과로 확대하지 않는다.
 최종 로컬 서버를 갱신해 사용자 검토를 유지한다. PR #70에 후속 커밋하고 병합하지 않는다.
+
+## 후속 사용자 검토 · 기존 이메일/Google 로그인으로 로컬 실행
+
+사용자가 OIDC 테스트 진입이 아니라 기존 아이디(이메일)·비밀번호·Google OAuth
+형식의 실제 로그인 화면을 요청했다. 기존 legacy LoginForm/OAuthLoginButton을 유지해 보완했다.
+
+- 이메일·비밀번호에 연결된 label·고유 id·name·autocomplete를 추가하고44px 입력으로 통일.
+- 기존 Supabase signInWithPassword·Google OAuth callback/next와 로그인 후 이동 유지.
+- Google 버튼의 검색 이모지를 공식 Google 로고 SVG로 교체하고48px 높이 적용.
+  자산 출처: https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg
+- OIDC 모드와 접근 제어는 변경하지 않았다. 로컬 실행만 WEB_AUTH_MODE=legacy로 전환.
+- Vercel에 sensitive로 저장된 publishable key는 API에서 조회되지 않았다.
+  배포된 웹 클라이언트가 공개하는 Supabase URL·publishable key만 확인해
+  Git에 무시되는 .env.local(0600)에 저장했다. 관리자 키·개인 아이디·비밀번호는 저장하지 않았다.
+- Supabase 공개 인증 설정 조회에서 email/Google 제공자 enabled=true 확인.
+  실제 계정 로그인 성공이나 Google callback 완료 검증으로 분류하지 않는다.
+- 로컬 개발 서버에서 /login HTTP200과 email/password input, Google 버튼이 존재하고
+  OIDC 전용 «계정으로 로그인»은 표시되지 않음을 확인했다.
+- CUA로 기존 로그인 탭을 선택하려던 호출은30초 시간 초과로 실패했다.
+  최신 폼 전체의 시각 검증 완료로 분류하지 않는다.
+
+관련3개 파일10개 테스트 통과. 전체 타입·린트·포맷·114개 파일715개 테스트 통과.
+로그 /tmp/guides69-real-login-check.log.
+WEB_AUTH_MODE=oidc npm run build 통과: /tmp/guides69-real-login-build.log.
+새로 추가한 로컬 설정은 커밋·PR에 포함하지 않는다. 저장소/운영 환경변수는 변경하지 않았다.
+localhost3066은 기존 로그인 방식의 dev 서버로 유지해 사용자가 직접 검토할 수 있다.
