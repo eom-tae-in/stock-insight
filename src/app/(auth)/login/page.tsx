@@ -41,7 +41,7 @@ export default async function LoginPage({
       <section aria-labelledby="login-title" className="space-y-6">
         <div className="space-y-2">
           <h1 id="login-title" className="text-2xl leading-8 font-bold">
-            다시 만나 반가워요
+            로그인해요
           </h1>
           <p className="text-text-secondary text-sm leading-[22px]">
             저장한 종목과 키워드를 이어서 확인해요.
@@ -60,7 +60,7 @@ export default async function LoginPage({
         </div>
         <LoginForm nextPath={nextPath} />
         <p className="text-text-secondary text-center text-xs">
-          로그인하면 우리의 서비스 약관에 동의하는 것입니다.
+          로그인하고 저장한 분석을 이어서 살펴봐요.
         </p>
       </section>
     </LoginLayout>

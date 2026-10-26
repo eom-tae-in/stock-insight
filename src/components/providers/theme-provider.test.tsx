@@ -6,12 +6,7 @@ import { ThemeSelector } from '@/components/shared/theme-selector'
 
 function renderTheme() {
   return render(
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="system"
-      enableSystem
-      themes={['light', 'dark']}
-    >
+    <ThemeProvider attribute="class" enableSystem themes={['light', 'dark']}>
       <ThemeSelector />
     </ThemeProvider>
   )
@@ -31,9 +26,9 @@ describe('browser theme preference', () => {
     )
   })
 
-  it('defaults to the system preference without saving a fixed mode', async () => {
+  it('defaults to light without saving a fixed mode', async () => {
     renderTheme()
-    expect(screen.getByRole('radio', { name: '시스템' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: '라이트' })).toBeChecked()
     await waitFor(() => expect(document.documentElement).toHaveClass('light'))
     expect(localStorage.getItem('theme')).toBeNull()
   })
@@ -58,6 +53,7 @@ describe('browser theme preference', () => {
   it('saves selections, supports arrow keys and restores system mode', async () => {
     const user = userEvent.setup()
     renderTheme()
+    await user.click(screen.getByRole('radio', { name: '시스템' }))
     await user.click(screen.getByRole('radio', { name: '라이트' }))
     expect(localStorage.getItem('theme')).toBe('light')
     await user.keyboard('{ArrowRight}')

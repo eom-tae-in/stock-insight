@@ -5,9 +5,13 @@ import { ThemeProvider as NextThemesProvider, useTheme } from 'next-themes'
 
 type ThemeProviderProps = React.ComponentProps<typeof NextThemesProvider>
 
-export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
+export function ThemeProvider({
+  children,
+  defaultTheme = 'light',
+  ...props
+}: ThemeProviderProps) {
   return (
-    <NextThemesProvider {...props}>
+    <NextThemesProvider defaultTheme={defaultTheme} {...props}>
       <ThemeMigration />
       {children}
     </NextThemesProvider>

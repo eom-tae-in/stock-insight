@@ -7,7 +7,7 @@ export default function PublicLayout({
   readonly children: ReactNode
 }) {
   return (
-    <div className="min-h-dvh break-keep">
+    <div className="bg-card min-h-dvh break-keep">
       <PublicHeader />
       {children}
     </div>
